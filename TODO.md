@@ -9,7 +9,7 @@
 - [x] Wave 05 - Reddit Adapter and Moderation Operations
 - [x] Wave 06 - Lock and Unlock Menu Flows
 - [x] Wave 07 - Report Trigger Suppression
-- [ ] Wave 08 - Edit-Aware Reopen Triggers
+- [x] Wave 08 - Edit-Aware Reopen Triggers
 - [ ] Wave 09 - Dashboard API and Aggregation
 - [ ] Wave 10 - Dashboard Client
 - [ ] Wave 11 - Demo Mode

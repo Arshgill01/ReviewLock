@@ -201,3 +201,17 @@ Typing source already verified in Wave 01:
 Implementation note:
 
 - Report trigger handling is locally tested with dedupe and fail-open behavior. Live payload shape and delivery behavior remain unverified until Wave 13.
+
+## 2026-05-24 - Wave 08 update trigger check
+
+Typing source already verified in Wave 01:
+
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:112` includes `onPostUpdate`.
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:102` includes `onCommentUpdate`.
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:108` includes `onPostNsfwUpdate`.
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:110` includes `onPostSpoilerUpdate`.
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:107` includes `onPostFlairUpdate`.
+
+Implementation note:
+
+- Update trigger behavior is locally tested through refetch-and-fingerprint services. Live payload shape and delivery behavior remain unverified until Wave 13.

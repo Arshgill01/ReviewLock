@@ -105,3 +105,15 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Live trigger payload shape is not playtest-verified; Wave 13 must verify before runtime claims.
+
+## 2026-05-24 - Wave 08
+
+- Implemented the edit-aware reopen flow, update trigger reason mapping, update trigger handlers, and standalone update trigger routes.
+- Added tests for unchanged updates, content edits, flair/NSFW/spoiler changes, comment edits, runtime-uncertain refetch failure, unignoreReports failure visibility, duplicate idempotency, and route JSON shape.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/reopenFlow.test.ts src/server/services/updateTriggers.test.ts src/routes/triggers.update.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live Devvit update trigger delivery is not playtest-verified; Wave 13 must verify or keep claims marked unverified.
