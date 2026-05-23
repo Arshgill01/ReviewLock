@@ -3,7 +3,7 @@
 ## Planner-created implementation queue
 
 - [x] Wave 01 - Scaffold and Build Baseline
-- [ ] Wave 02 - Source Truth and Fixtures
+- [x] Wave 02 - Source Truth and Fixtures
 - [ ] Wave 03 - Fingerprint Engine
 - [ ] Wave 04 - Redis Store and Indexes
 - [ ] Wave 05 - Reddit Adapter and Moderation Operations

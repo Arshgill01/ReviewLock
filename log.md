@@ -30,3 +30,15 @@
 - Open risks:
   - Runtime Devvit behavior is unverified until Wave 13.
   - `npm install` reported transitive vulnerabilities in installed packages; no production runtime claim is made from this wave.
+
+## 2026-05-24 - Wave 02
+
+- Defined shared ReviewLock constants, unions, interfaces, validators, and deterministic demo scenario data.
+- Added server fixture exports and tests for validators, fixture counts, post/comment coverage, suppression counts, and the four-beat demo story.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/shared/schema.test.ts src/server/fixtures/demoScenario.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Demo data is static seed data only; live dashboard aggregation and demo seeding are owned by later waves.
