@@ -117,3 +117,15 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Live Devvit update trigger delivery is not playtest-verified; Wave 13 must verify or keep claims marked unverified.
+
+## 2026-05-24 - Wave 09
+
+- Implemented dashboard aggregation and standalone dashboard API routes for overview, locks, reopen queue, audit, and runtime status.
+- Added tests for empty state, demo flag propagation, active lock counts, suppressed report totals, reopened edit counts, top churn ordering, and API JSON/error shapes.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/dashboard.test.ts src/routes/api.dashboard.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Dashboard routes are standalone until Wave 12 mounts central API wiring.

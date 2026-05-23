@@ -10,7 +10,7 @@
 - [x] Wave 06 - Lock and Unlock Menu Flows
 - [x] Wave 07 - Report Trigger Suppression
 - [x] Wave 08 - Edit-Aware Reopen Triggers
-- [ ] Wave 09 - Dashboard API and Aggregation
+- [x] Wave 09 - Dashboard API and Aggregation
 - [ ] Wave 10 - Dashboard Client
 - [ ] Wave 11 - Demo Mode
 - [ ] Wave 12 - Integration Wiring
