@@ -4,7 +4,7 @@
 
 - [x] Wave 01 - Scaffold and Build Baseline
 - [x] Wave 02 - Source Truth and Fixtures
-- [ ] Wave 03 - Fingerprint Engine
+- [x] Wave 03 - Fingerprint Engine
 - [ ] Wave 04 - Redis Store and Indexes
 - [ ] Wave 05 - Reddit Adapter and Moderation Operations
 - [ ] Wave 06 - Lock and Unlock Menu Flows

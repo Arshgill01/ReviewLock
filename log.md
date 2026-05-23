@@ -42,3 +42,15 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Demo data is static seed data only; live dashboard aggregation and demo seeding are owned by later waves.
+
+## 2026-05-24 - Wave 03
+
+- Implemented deterministic text normalization, SHA-256 content fingerprinting, fingerprint comparison, and content-change classification.
+- Added tests for whitespace normalization, stable hashes, post/comment edits, flair/NSFW/spoiler reopen reasons, and fail-open missing content behavior.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/fingerprint.test.ts src/server/services/contentChange.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Fingerprints are local pure-service proof only; trigger/runtime refetch behavior is owned by later waves.
