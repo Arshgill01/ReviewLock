@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest';
+import { renderAuditTimeline } from './components/AuditTimeline';
+import { renderDemoBanner } from './components/DemoBanner';
+import { renderLockTable } from './components/LockTable';
+import { renderMetricStrip } from './components/MetricStrip';
+import { renderLatestReopenEvent, renderReopenQueue } from './components/ReopenQueue';
+import { renderRuntimeBanner } from './components/RuntimeBanner';
+import { renderDashboardPage } from './pages/DashboardPage';
+import { ReviewLockApiClient } from './state/api';
+import { ReviewLockStore } from './state/store';
+import type { AuditEvent, ReopenEvent, ReviewLockRecord, RuntimeProofStatus } from '../shared/schema';
+
+const forbiddenCopy = ['not reportable', 'disable reports', 'blocked reports'];
+
+const expectSafeCopy = (html: string): void => {
+  const normalized = html.toLowerCase();
+
+  for (const phrase of forbiddenCopy) {
+    expect(normalized).not.toContain(phrase);
+  }
+};
+
+const lock = (): ReviewLockRecord => ({
+  id: 'lock-1',
+  subreddit: 'reviewlock',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  targetAuthor: 'reviewed_author',
+  permalink: '/r/reviewlock/comments/reviewed',
+  title: 'Reviewed post',
+  contentPreview: 'Reviewed content preview',
+  contentHash: 'hash',
+  fingerprintVersion: 'content-v1',
+  lockedBy: 'mod',
+  lockedAt: '2026-05-24T00:00:00.000Z',
+  lockReason: 'reviewed_policy_compliant',
+  status: 'active',
+  lastKnownEdited: false,
+  lastReportCount: 3,
+  suppressedReportCount: 7,
+  runtimeWarnings: [],
+  demo: false,
+});
+
+const reopen = (): ReopenEvent => ({
+  id: 'reopen-1',
+  lockId: 'lock-1',
+  subreddit: 'reviewlock',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  oldContentHash: 'old',
+  newContentHash: 'new',
+  reason: 'content_changed',
+  createdAt: '2026-05-24T01:00:00.000Z',
+  summary: 'Post body changed after review.',
+  runtimeWarnings: [],
+  demo: false,
+});
+
+const runtime = (): RuntimeProofStatus => ({
+  overall: 'unverified',
+  generatedAt: '2026-05-24T00:00:00.000Z',
+  capabilities: [{ name: 'ignoreReports', status: 'unverified', notes: [] }],
+  warnings: ['Runtime behavior needs playtest proof.'],
+});
+
+const audit = (): AuditEvent => ({
+  id: 'audit-1',
+  kind: 'report_suppressed',
+  subreddit: 'reviewlock',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  lockId: 'lock-1',
+  actor: 'reviewlock',
+  createdAt: '2026-05-24T01:10:00.000Z',
+  message: 'Repeat report suppressed because reviewed content was unchanged.',
+  data: {},
+  demo: false,
+});
+
+describe('client render helpers', () => {
+  it('renders required metrics and copy', () => {
+    const html = renderMetricStrip({
+      activeLockCount: 2,
+      reportsSuppressed: 11,
+      reopenedAfterEditCount: 1,
+      topChurnTargets: [],
+      runtimeStatus: runtime(),
+    });
+
+    expect(html).toContain('Active locks');
+    expect(html).toContain('Reports suppressed');
+    expect(html).toContain('Reopened after edit');
+    expectSafeCopy(html);
+  });
+
+  it('renders active locks and empty lock state', () => {
+    const html = renderLockTable([lock()]);
+    expect(html).toContain('Reviewed post');
+    expect(html).toContain('Reports suppressed');
+    expect(html).toContain('Unlock');
+    expect(renderLockTable([])).toContain('No active locks.');
+    expectSafeCopy(html);
+  });
+
+  it('renders reopened queue and latest reopen states', () => {
+    expect(renderReopenQueue([reopen()])).toContain('Reopened after edit');
+    expect(renderReopenQueue([])).toContain('No reopened items are waiting.');
+    expect(renderLatestReopenEvent(reopen())).toContain('Latest edit-break event');
+    expect(renderLatestReopenEvent(undefined)).toContain('No reopened item is waiting.');
+  });
+
+  it('renders demo and runtime status plainly', () => {
+    expect(renderDemoBanner(false)).toBe('');
+    expect(renderDemoBanner(true)).toContain('Demo mode');
+    expect(renderRuntimeBanner(runtime())).toContain('Runtime proof/status');
+    expect(renderRuntimeBanner(runtime())).toContain('ignoreReports');
+  });
+
+  it('renders audit timeline', () => {
+    const html = renderAuditTimeline([audit()]);
+    expect(html).toContain('Audit timeline');
+    expect(html).toContain('Repeat report suppressed');
+    expectSafeCopy(html);
+  });
+
+  it('renders dashboard for demo and reopen states', () => {
+    const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock_demo', true);
+    store.overview = {
+      activeLockCount: 1,
+      reportsSuppressed: 7,
+      reopenedAfterEditCount: 1,
+      latestReopenEvent: reopen(),
+      topChurnTargets: [],
+      runtimeStatus: runtime(),
+    };
+    store.locks = [lock()];
+    store.reopenQueue = [reopen()];
+    store.auditEvents = [audit()];
+    store.runtimeStatus = runtime();
+
+    const html = renderDashboardPage(store);
+
+    expect(html).toContain('Lock reviewed content until it changes.');
+    expect(html).toContain('Reports suppressed');
+    expect(html).toContain('Reopened after edit');
+    expect(html).toContain('Demo mode');
+    expectSafeCopy(html);
+  });
+});

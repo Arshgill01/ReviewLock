@@ -129,3 +129,20 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Dashboard routes are standalone until Wave 12 mounts central API wiring.
+
+## 2026-05-24 - Wave 10
+
+- Launched Antigravity from tmux with a frontend-only prompt. It edited only Wave 10-owned client files, but its first implementation used forbidden dark/glass styling and external font imports, so Codex reviewed and replaced the violating UI locally before acceptance.
+- Implemented the dashboard client API wrapper, store, render helpers, operational dashboard layout, visible demo banner, metrics first viewport, active locks table, reopened-after-edit queue, report churn, audit timeline, and runtime proof/status sections.
+- Commands run:
+  - `command -v agy && command -v tmux`
+  - `tmux new-session -d -s reviewlock_wave10 'cd /Users/arshdeepsingh/Developer/ReviewLock && agy --dangerously-skip-permissions' && tmux load-buffer /tmp/reviewlock-wave10-antigravity-prompt.txt && tmux paste-buffer -t reviewlock_wave10 && tmux send-keys -t reviewlock_wave10 Enter && tmux capture-pane -pt reviewlock_wave10 -S -40`
+  - `npm run type-check`
+  - `npm run test -- --run src/client/state/store.test.ts src/client/render.test.ts`
+  - `npm run lint`
+  - `npm run build`
+  - `rg -n "glass|gradient|orb|bokeh|not reportable|disable reports|blocked reports|Inter|Outfit|premium|dark slate|hero|AI decides|automatic removal|🛡️" src/client || true`
+- Pass/fail status: PASS.
+- Open risks:
+  - Dashboard API is still mounted only by standalone modules until Wave 12 central wiring.
+  - The final `rg` output only hits the forbidden-copy test fixture, not production UI copy.

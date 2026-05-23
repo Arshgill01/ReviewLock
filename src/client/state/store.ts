@@ -1,0 +1,134 @@
+import type { ReviewLockApiClient } from './api';
+import type {
+  DashboardOverview,
+  ReviewLockRecord,
+  ReopenEvent,
+  AuditEvent,
+  DailyMetrics,
+  TargetMetrics,
+  RuntimeProofStatus,
+} from '../../shared/schema';
+
+export class ReviewLockStore {
+  private api: ReviewLockApiClient;
+  private listeners: Set<() => void> = new Set();
+
+  public subreddit: string = 'reviewlock';
+  public demo: boolean = false;
+  public isLoading: boolean = false;
+  public error: string | null = null;
+
+  public overview: DashboardOverview | null = null;
+  public locks: ReviewLockRecord[] = [];
+  public reopenQueue: ReopenEvent[] = [];
+  public auditEvents: AuditEvent[] = [];
+  public dailyMetrics: DailyMetrics[] = [];
+  public topChurnTargets: TargetMetrics[] = [];
+  public runtimeStatus: RuntimeProofStatus | null = null;
+
+  constructor(api: ReviewLockApiClient, initialSubreddit: string = 'reviewlock', initialDemo: boolean = false) {
+    this.api = api;
+    this.subreddit = initialSubreddit;
+    this.demo = initialDemo;
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notify() {
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+
+  async fetchState() {
+    this.isLoading = true;
+    this.error = null;
+    this.notify();
+
+    try {
+      const [overviewData, locks, reopenQueue, auditEvents, runtimeData] = await Promise.all([
+        this.api.fetchOverview(this.subreddit, this.demo),
+        this.api.fetchLocks(this.subreddit, this.demo),
+        this.api.fetchReopenQueue(this.subreddit, this.demo),
+        this.api.fetchAuditLog(this.subreddit, this.demo),
+        this.api.fetchRuntimeStatus(this.subreddit, this.demo),
+      ]);
+
+      this.overview = overviewData;
+      this.locks = locks;
+      this.reopenQueue = reopenQueue;
+      this.auditEvents = auditEvents;
+      this.runtimeStatus = runtimeData.runtime;
+      this.dailyMetrics = runtimeData.dailyMetrics;
+      this.topChurnTargets = runtimeData.topChurnTargets;
+      this.error = null;
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'An error occurred fetching dashboard state';
+    } finally {
+      this.isLoading = false;
+      this.notify();
+    }
+  }
+
+  async unlock(lockId: string, targetId: string) {
+    this.isLoading = true;
+    this.error = null;
+    this.notify();
+
+    try {
+      const res = await this.api.unlockTarget(targetId, 'moderator');
+      if (!res.ok) {
+        throw new Error(res.message || 'Failed to unlock content');
+      }
+
+      this.locks = this.locks.filter((l) => l.id !== lockId);
+      if (this.overview) {
+        this.overview.activeLockCount = Math.max(0, this.overview.activeLockCount - 1);
+      }
+      await this.fetchState();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'An error occurred while unlocking';
+      this.isLoading = false;
+      this.notify();
+    }
+  }
+
+  async dismissReopen(eventId: string) {
+    this.isLoading = true;
+    this.error = null;
+    this.notify();
+
+    try {
+      const res = await this.api.dismissReopen(eventId, 'moderator');
+      if (!res.ok) {
+        throw new Error(res.message || 'Failed to dismiss reopen event');
+      }
+
+      this.reopenQueue = this.reopenQueue.filter((e) => e.id !== eventId);
+      if (this.overview) {
+        this.overview.reopenedAfterEditCount = Math.max(0, this.overview.reopenedAfterEditCount - 1);
+        if (this.overview.latestReopenEvent?.id === eventId) {
+          this.overview.latestReopenEvent = this.reopenQueue[0];
+        }
+      }
+      await this.fetchState();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'An error occurred while dismissing';
+      this.isLoading = false;
+      this.notify();
+    }
+  }
+
+  async setSubreddit(subreddit: string) {
+    this.subreddit = subreddit;
+    await this.fetchState();
+  }
+
+  async setDemo(demo: boolean) {
+    this.demo = demo;
+    await this.fetchState();
+  }
+}

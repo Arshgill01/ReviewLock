@@ -11,7 +11,7 @@
 - [x] Wave 07 - Report Trigger Suppression
 - [x] Wave 08 - Edit-Aware Reopen Triggers
 - [x] Wave 09 - Dashboard API and Aggregation
-- [ ] Wave 10 - Dashboard Client
+- [x] Wave 10 - Dashboard Client
 - [ ] Wave 11 - Demo Mode
 - [ ] Wave 12 - Integration Wiring
 - [ ] Wave 13 - Runtime Proof and Hardening
