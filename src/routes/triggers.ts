@@ -1,37 +1,29 @@
 import { Hono } from 'hono';
+import type { Clock } from '../server/adapters/clock';
+import type { RedisStore } from '../server/adapters/redis';
+import type { RedditAdapter } from '../server/adapters/reddit';
+import { createReportTriggersRouter } from './triggers.report';
+import { createUpdateTriggersRouter } from './triggers.update';
 
-export const triggersRouter = new Hono();
+interface TriggerDeps {
+  reddit?: RedditAdapter;
+  redis?: RedisStore;
+  clock?: Clock;
+}
 
-const placeholderTriggerResponse = (trigger: string) => ({
-  ok: true,
-  trigger,
-  message: 'ReviewLock trigger scaffolded; implementation is owned by a later wave.',
-});
+export const createTriggersRouter = (deps: TriggerDeps = {}): Hono => {
+  const router = new Hono();
 
-triggersRouter.post('/on-app-install', (context) =>
-  context.json(placeholderTriggerResponse('onAppInstall')),
-);
-triggersRouter.post('/on-app-upgrade', (context) =>
-  context.json(placeholderTriggerResponse('onAppUpgrade')),
-);
-triggersRouter.post('/on-post-report', (context) =>
-  context.json(placeholderTriggerResponse('onPostReport')),
-);
-triggersRouter.post('/on-comment-report', (context) =>
-  context.json(placeholderTriggerResponse('onCommentReport')),
-);
-triggersRouter.post('/on-post-update', (context) =>
-  context.json(placeholderTriggerResponse('onPostUpdate')),
-);
-triggersRouter.post('/on-comment-update', (context) =>
-  context.json(placeholderTriggerResponse('onCommentUpdate')),
-);
-triggersRouter.post('/on-post-nsfw-update', (context) =>
-  context.json(placeholderTriggerResponse('onPostNsfwUpdate')),
-);
-triggersRouter.post('/on-post-spoiler-update', (context) =>
-  context.json(placeholderTriggerResponse('onPostSpoilerUpdate')),
-);
-triggersRouter.post('/on-post-flair-update', (context) =>
-  context.json(placeholderTriggerResponse('onPostFlairUpdate')),
-);
+  router.post('/on-app-install', (context) =>
+    context.json({ ok: true, trigger: 'onAppInstall', message: 'ReviewLock installed.' }),
+  );
+  router.post('/on-app-upgrade', (context) =>
+    context.json({ ok: true, trigger: 'onAppUpgrade', message: 'ReviewLock upgraded.' }),
+  );
+  router.route('/', createReportTriggersRouter(deps));
+  router.route('/', createUpdateTriggersRouter(deps));
+
+  return router;
+};
+
+export const triggersRouter = createTriggersRouter();

@@ -158,3 +158,18 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Demo API routes are standalone until Wave 12 central API wiring.
+
+## 2026-05-24 - Wave 12
+
+- Wired central API routes, demo routes, menu/form routes, report/update trigger routes, app install/upgrade trigger handlers, app factory dependencies, and shared integrated status.
+- Added integration tests for every `devvit.json` endpoint, duplicate endpoint detection, empty overview, demo enable-to-overview data, and representative trigger handling.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+  - `rg -n "scaffolded|placeholder|route scaffolded|form scaffolded|trigger scaffolded" src || true`
+- Pass/fail status: PASS.
+- Open risks:
+  - `npm run build` emits a Vite warning about mixed named/default exports in `src/index.ts`; build passes and the default export remains available for Devvit.
+  - Default app wiring uses in-memory fallback dependencies for local integration tests; runtime Devvit adapter wiring must be proven or documented in Wave 13.

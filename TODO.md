@@ -13,7 +13,7 @@
 - [x] Wave 09 - Dashboard API and Aggregation
 - [x] Wave 10 - Dashboard Client
 - [x] Wave 11 - Demo Mode
-- [ ] Wave 12 - Integration Wiring
+- [x] Wave 12 - Integration Wiring
 - [ ] Wave 13 - Runtime Proof and Hardening
 - [ ] Wave 14 - Submission Package and Final Audit
 

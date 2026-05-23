@@ -1,1 +1,1 @@
-export const REVIEWLOCK_STATUS = 'scaffolded';
+export const REVIEWLOCK_STATUS = 'integrated';
