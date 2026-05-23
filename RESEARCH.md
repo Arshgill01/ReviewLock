@@ -190,3 +190,14 @@ Installed typing evidence:
 Implementation note:
 
 - Wave 05 isolates these calls behind `RedditAdapter`; live method behavior still requires Wave 13 playtest.
+
+## 2026-05-24 - Wave 07 report trigger check
+
+Typing source already verified in Wave 01:
+
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:109` includes `onPostReport`.
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:100` includes `onCommentReport`.
+
+Implementation note:
+
+- Report trigger handling is locally tested with dedupe and fail-open behavior. Live payload shape and delivery behavior remain unverified until Wave 13.

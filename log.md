@@ -93,3 +93,15 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Route factories are implemented and testable, but final app-level dependency wiring is owned by Wave 12.
+
+## 2026-05-24 - Wave 07
+
+- Implemented report trigger decisions, report trigger orchestration, dedupe keys, unchanged-content suppression, changed-content reopen path, runtime-uncertain audit logging, and standalone report trigger routes.
+- Added tests for no-lock, suppress-unchanged, reopen-changed, missing target fail-open, duplicate event dedupe, ignoreReports failure, and route JSON shape.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/reportTriggers.test.ts src/server/services/triggerDecisions.test.ts src/routes/triggers.report.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live trigger payload shape is not playtest-verified; Wave 13 must verify before runtime claims.
