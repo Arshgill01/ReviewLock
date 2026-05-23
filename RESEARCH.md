@@ -170,3 +170,23 @@ Installed typing evidence:
 Implementation note:
 
 - Wave 04 uses a narrow structural Redis adapter plus in-memory fake for tests. Live Devvit Redis behavior remains unverified until Wave 13.
+
+## 2026-05-24 - Wave 05 Reddit typing check
+
+Commands:
+
+- `rg -n "getPostById|getCommentById|getCurrentUsername|ignoreReports\\(|unignoreReports\\(|approve\\(" node_modules/@devvit -g '*.d.ts' | head -100`
+- `rg -n "export .*Context|interface .*Context|reddit" node_modules/@devvit/web -g '*.d.ts' | head -80`
+
+Installed typing evidence:
+
+- `node_modules/@devvit/reddit/RedditClient.d.ts:244` includes `getPostById`.
+- `node_modules/@devvit/reddit/RedditClient.d.ts:389` includes `getCommentById`.
+- `node_modules/@devvit/reddit/RedditClient.d.ts:350` includes `getCurrentUsername`.
+- `node_modules/@devvit/reddit/models/Post.d.ts:564`, `:580`, and `:581` include post `approve`, `ignoreReports`, and `unignoreReports`.
+- `node_modules/@devvit/reddit/models/Comment.d.ts:74`, `:84`, and `:85` include comment `approve`, `ignoreReports`, and `unignoreReports`.
+- `node_modules/@devvit/web/server/index.d.ts:6` re-exports Reddit types for the web server runtime.
+
+Implementation note:
+
+- Wave 05 isolates these calls behind `RedditAdapter`; live method behavior still requires Wave 13 playtest.

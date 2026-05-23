@@ -6,7 +6,7 @@
 - [x] Wave 02 - Source Truth and Fixtures
 - [x] Wave 03 - Fingerprint Engine
 - [x] Wave 04 - Redis Store and Indexes
-- [ ] Wave 05 - Reddit Adapter and Moderation Operations
+- [x] Wave 05 - Reddit Adapter and Moderation Operations
 - [ ] Wave 06 - Lock and Unlock Menu Flows
 - [ ] Wave 07 - Report Trigger Suppression
 - [ ] Wave 08 - Edit-Aware Reopen Triggers
@@ -20,7 +20,7 @@
 ## Cross-wave reminders
 
 - [x] Verify Devvit package version after scaffold.
-- [ ] Confirm trigger payload shapes in generated app typings.
+- [x] Confirm trigger payload shapes in generated app typings.
 - [ ] Confirm `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support.
 - [ ] Capture screenshots only after demo loop is integrated.
 - [ ] Keep `decisions.md` updated for every scope or platform call.

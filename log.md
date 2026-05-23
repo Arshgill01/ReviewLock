@@ -67,3 +67,17 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Devvit Redis runtime behavior is adapter-compatible by typing only; live storage behavior is unverified until Wave 13.
+
+## 2026-05-24 - Wave 05
+
+- Implemented Reddit adapter interfaces, Devvit/fake adapter implementations, target mapping/resolution, structured moderation operations, clock adapters, and persisted runtime capability status.
+- Added tests for post/comment id inference, target resolution errors, adapter mapping, structured moderation failure results, and runtime proof transitions.
+- Commands run:
+  - `rg -n "getPostById|getCommentById|getCurrentUsername|ignoreReports\\(|unignoreReports\\(|approve\\(" node_modules/@devvit -g '*.d.ts' | head -100`
+  - `rg -n "export .*Context|interface .*Context|reddit" node_modules/@devvit/web -g '*.d.ts' | head -80`
+  - `npm run type-check`
+  - `npm run test -- --run src/server/adapters/reddit.test.ts src/server/adapters/clock.test.ts src/server/services/targetResolver.test.ts src/server/services/moderation.test.ts src/server/services/runtimeProof.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Reddit approve/ignore/unignore behavior is isolated and typing-verified, but not live verified until Wave 13.
