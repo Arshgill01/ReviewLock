@@ -81,3 +81,15 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Reddit approve/ignore/unignore behavior is isolated and typing-verified, but not live verified until Wave 13.
+
+## 2026-05-24 - Wave 06
+
+- Implemented lock/unlock menu form construction, form submission routes, lock orchestration, unlock orchestration, audit writes, and metrics writes.
+- Added tests for form field construction, lock success, target-not-found, ignoreReports failure, Redis rollback, no-active-lock unlock, and unlock success.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Route factories are implemented and testable, but final app-level dependency wiring is owned by Wave 12.

@@ -7,7 +7,7 @@
 - [x] Wave 03 - Fingerprint Engine
 - [x] Wave 04 - Redis Store and Indexes
 - [x] Wave 05 - Reddit Adapter and Moderation Operations
-- [ ] Wave 06 - Lock and Unlock Menu Flows
+- [x] Wave 06 - Lock and Unlock Menu Flows
 - [ ] Wave 07 - Report Trigger Suppression
 - [ ] Wave 08 - Edit-Aware Reopen Triggers
 - [ ] Wave 09 - Dashboard API and Aggregation
