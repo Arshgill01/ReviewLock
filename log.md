@@ -146,3 +146,15 @@
 - Open risks:
   - Dashboard API is still mounted only by standalone modules until Wave 12 central wiring.
   - The final `rg` output only hits the forbidden-copy test fixture, not production UI copy.
+
+## 2026-05-24 - Wave 11
+
+- Implemented deterministic demo data helpers, demo seeding/reset/enable/disable/status services, and standalone demo API routes.
+- Demo seeding writes locks, reopen events, audit events, metrics, runtime status, demo status, and config state with `demo: true` data separation.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/demoData.test.ts src/server/services/demoMode.test.ts src/routes/api.demo.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Demo API routes are standalone until Wave 12 central API wiring.
