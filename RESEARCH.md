@@ -153,3 +153,20 @@ Installed typing evidence:
 Runtime caveat:
 
 - These are installed typing checks only. Live moderation behavior remains unverified until Wave 13 playtest proof.
+
+## 2026-05-24 - Wave 04 Redis typing check
+
+Command:
+
+- `rg -n "interface RedisClient|class RedisClient|zAdd|zRange|hincrby|multi\\(" node_modules/@devvit -g '*Redis*.d.ts' -g '*.d.ts' | head -80`
+
+Installed typing evidence:
+
+- `node_modules/@devvit/redis/RedisClient.d.ts:58` declares `RedisClient`.
+- `node_modules/@devvit/redis/RedisClient.d.ts:75` and `:76` include sorted set `zAdd` and `zRange`.
+- `node_modules/@devvit/public-api/apis/redis/RedisClient.d.ts:134` includes `hincrby`.
+- `node_modules/@devvit/public-api/apis/redis/RedisClient.d.ts:8` includes transaction `multi`.
+
+Implementation note:
+
+- Wave 04 uses a narrow structural Redis adapter plus in-memory fake for tests. Live Devvit Redis behavior remains unverified until Wave 13.

@@ -54,3 +54,16 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Fingerprints are local pure-service proof only; trigger/runtime refetch behavior is owned by later waves.
+
+## 2026-05-24 - Wave 04
+
+- Implemented a narrow Redis adapter, in-memory fake, namespaced key helper, lock indexes, reopen queue, audit log, metrics, and config persistence.
+- Added tests for key names, namespace isolation, missing keys/defaults, list ordering, index removal, and metrics increments.
+- Commands run:
+  - `rg -n "interface RedisClient|class RedisClient|zAdd|zRange|hincrby|multi\\(" node_modules/@devvit -g '*Redis*.d.ts' -g '*.d.ts' | head -80`
+  - `npm run type-check`
+  - `npm run test -- --run src/server/adapters/redis.test.ts src/server/services/keys.test.ts src/server/services/locks.test.ts src/server/services/reopenQueue.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts src/server/services/config.test.ts`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Devvit Redis runtime behavior is adapter-compatible by typing only; live storage behavior is unverified until Wave 13.
