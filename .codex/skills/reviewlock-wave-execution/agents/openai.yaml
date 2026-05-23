@@ -1,0 +1,4 @@
+interface:
+  display_name: "ReviewLock Wave Execution"
+  short_description: "Execute ReviewLock waves exactly"
+  default_prompt: "Use $reviewlock-wave-execution to complete the assigned ReviewLock wave spec."

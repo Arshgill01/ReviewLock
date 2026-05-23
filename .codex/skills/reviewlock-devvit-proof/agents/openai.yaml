@@ -1,0 +1,4 @@
+interface:
+  display_name: "ReviewLock Devvit Proof"
+  short_description: "Verify Devvit runtime behavior safely"
+  default_prompt: "Use $reviewlock-devvit-proof to verify ReviewLock Devvit API behavior before claiming it works."

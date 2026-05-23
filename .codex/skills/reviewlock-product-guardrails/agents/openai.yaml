@@ -1,0 +1,4 @@
+interface:
+  display_name: "ReviewLock Guardrails"
+  short_description: "Protect the report-churn product thesis"
+  default_prompt: "Use $reviewlock-product-guardrails to keep ReviewLock focused on edit-aware reviewed-content locks."
