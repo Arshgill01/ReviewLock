@@ -126,3 +126,30 @@ python3 /Users/arshdeepsingh/.codex/skills/.system/skill-creator/scripts/quick_v
 
 This repository includes ReviewLock-specific skills under `.codex/skills/`.
 
+## 2026-05-24 - Wave 01 package verification
+
+Commands:
+
+- `npm view devvit version`
+- `npm view @devvit/web version`
+- `npm view @devvit/start version`
+- `node -p "require('./node_modules/devvit/package.json').version"`
+- `node -p "require('./node_modules/@devvit/web/package.json').version"`
+- `rg -n "onPostReport|onCommentReport|onPostUpdate|onCommentUpdate|onPostNsfwUpdate|onPostSpoilerUpdate|onPostFlairUpdate" node_modules/@devvit -g '*.d.ts'`
+- `rg -n "ignoreReports\\(|unignoreReports\\(|approve\\(" node_modules/@devvit -g '*.d.ts'`
+
+Observed package versions:
+
+- `devvit`: `0.12.24`
+- `@devvit/web`: `0.12.24`
+- `@devvit/start`: `0.12.24`
+
+Installed typing evidence:
+
+- `node_modules/@devvit/shared-types/schemas/config-file.v1.d.ts:100` through `:112` include the report and update trigger names used by `devvit.json`.
+- `node_modules/@devvit/reddit/models/Post.d.ts:564`, `:580`, and `:581` include `approve()`, `ignoreReports()`, and `unignoreReports()`.
+- `node_modules/@devvit/reddit/models/Comment.d.ts:74`, `:84`, and `:85` include `approve()`, `ignoreReports()`, and `unignoreReports()`.
+
+Runtime caveat:
+
+- These are installed typing checks only. Live moderation behavior remains unverified until Wave 13 playtest proof.

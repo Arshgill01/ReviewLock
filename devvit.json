@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "reviewlock",
+  "version": "0.1.0",
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "entry": "index.html",
+        "height": "tall",
+        "inline": true
+      }
+    }
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Lock review",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/lock-post"
+      },
+      {
+        "label": "Lock review",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/lock-comment"
+      },
+      {
+        "label": "Unlock review",
+        "location": "post",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/unlock-post"
+      },
+      {
+        "label": "Unlock review",
+        "location": "comment",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/unlock-comment"
+      },
+      {
+        "label": "Open ReviewLock dashboard",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/open-dashboard"
+      }
+    ]
+  },
+  "forms": {
+    "lockReview": "/internal/form/lock-review-submit",
+    "unlockReview": "/internal/form/unlock-review-submit",
+    "dashboardLaunch": "/internal/form/dashboard-launch-submit",
+    "reopenAction": "/internal/form/reopen-action-submit"
+  },
+  "triggers": {
+    "onAppInstall": "/internal/triggers/on-app-install",
+    "onAppUpgrade": "/internal/triggers/on-app-upgrade",
+    "onPostReport": "/internal/triggers/on-post-report",
+    "onCommentReport": "/internal/triggers/on-comment-report",
+    "onPostUpdate": "/internal/triggers/on-post-update",
+    "onCommentUpdate": "/internal/triggers/on-comment-update",
+    "onPostNsfwUpdate": "/internal/triggers/on-post-nsfw-update",
+    "onPostSpoilerUpdate": "/internal/triggers/on-post-spoiler-update",
+    "onPostFlairUpdate": "/internal/triggers/on-post-flair-update"
+  },
+  "permissions": {
+    "reddit": true,
+    "redis": true
+  },
+  "scripts": {
+    "build": "npm run build",
+    "dev": "npm run dev"
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Planner-created implementation queue
 
-- [ ] Wave 01 - Scaffold and Build Baseline
+- [x] Wave 01 - Scaffold and Build Baseline
 - [ ] Wave 02 - Source Truth and Fixtures
 - [ ] Wave 03 - Fingerprint Engine
 - [ ] Wave 04 - Redis Store and Indexes
@@ -19,9 +19,8 @@
 
 ## Cross-wave reminders
 
-- [ ] Verify Devvit package version after scaffold.
+- [x] Verify Devvit package version after scaffold.
 - [ ] Confirm trigger payload shapes in generated app typings.
 - [ ] Confirm `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support.
 - [ ] Capture screenshots only after demo loop is integrated.
 - [ ] Keep `decisions.md` updated for every scope or platform call.
-
