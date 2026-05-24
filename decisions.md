@@ -896,3 +896,24 @@ Reason:
 - Fingerprints and report churn metrics must not silently lose body text,
   report counts, flair, or author context if Devvit returns a nested trigger
   model shape instead of the higher-level Reddit client shape.
+
+### D059 - Accept raw and wrapped Devvit trigger payloads
+
+Installed Devvit typings expose both raw report/update event shapes and a
+`TriggerEvent` wrapper that can carry `postReport`, `commentReport`,
+`postUpdate`, `commentUpdate`, `postFlairUpdate`, `nsfwPostUpdate`, or
+`spoilerPostUpdate`.
+
+Decision:
+
+- Report trigger routes extract target id, subreddit, report count, event id,
+  and timestamp from either the top-level body or wrapped report payloads.
+- Update trigger routes extract target id and subreddit from either the
+  top-level body or wrapped update payloads.
+- Existing raw route shapes remain supported for tests and local harnesses.
+
+Reason:
+
+- Live trigger delivery is still unverified. Supporting both installed typed
+  shapes keeps the edit-break and report-suppression paths from depending on a
+  single assumed payload envelope.

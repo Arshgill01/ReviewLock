@@ -24,6 +24,11 @@ interface TriggerBody {
     id?: string;
     subredditName?: string;
   };
+  postUpdate?: TriggerBody;
+  commentUpdate?: TriggerBody;
+  postFlairUpdate?: TriggerBody;
+  nsfwPostUpdate?: TriggerBody;
+  spoilerPostUpdate?: TriggerBody;
 }
 
 const readBody = async (context: Context): Promise<TriggerBody> => {
@@ -34,13 +39,37 @@ const readBody = async (context: Context): Promise<TriggerBody> => {
   }
 };
 
+const payloads = (body: TriggerBody): TriggerBody[] => [
+  body,
+  ...(body.postUpdate ? [body.postUpdate] : []),
+  ...(body.commentUpdate ? [body.commentUpdate] : []),
+  ...(body.postFlairUpdate ? [body.postFlairUpdate] : []),
+  ...(body.nsfwPostUpdate ? [body.nsfwPostUpdate] : []),
+  ...(body.spoilerPostUpdate ? [body.spoilerPostUpdate] : []),
+];
+
+const first = <T>(values: (T | undefined)[]): T | undefined =>
+  values.find((value): value is T => value !== undefined);
+
 const targetId = (body: TriggerBody): string | undefined =>
-  body.targetId ?? body.postId ?? body.commentId ?? body.post?.id ?? body.comment?.id;
+  first(
+    payloads(body).flatMap((payload) => [
+      payload.targetId,
+      payload.postId,
+      payload.commentId,
+      payload.post?.id,
+      payload.comment?.id,
+    ]),
+  );
 
 const subreddit = (body: TriggerBody): string | undefined =>
-  (typeof body.subreddit === 'string' ? body.subreddit : body.subreddit?.name) ??
-  body.post?.subredditName ??
-  body.comment?.subredditName;
+  first(
+    payloads(body).flatMap((payload) => [
+      typeof payload.subreddit === 'string' ? payload.subreddit : payload.subreddit?.name,
+      payload.post?.subredditName,
+      payload.comment?.subredditName,
+    ]),
+  );
 
 const registerUpdate = (
   router: Hono,

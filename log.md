@@ -993,3 +993,32 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
+
+## 2026-05-25 - Wave 33 Devvit trigger wrapper hardening
+
+- Compared ReviewLock's trigger route parsers against installed raw event and
+  `TriggerEvent` wrapper typings.
+- Hardened report trigger routes to extract ids, subreddit scope, report counts,
+  event ids, and timestamps from raw or wrapped report payloads.
+- Hardened update trigger routes to extract ids and subreddit scope from raw or
+  wrapped update payloads, including flair/NSFW/spoiler wrapper names.
+- Added route regressions for wrapped post report, comment report, post update,
+  comment update, flair update, and fail-open runtime-uncertain paths when
+  refetch fails.
+- Commands run:
+  - `nl -ba node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts | sed -n '30,110p'`
+  - `nl -ba node_modules/@devvit/protos/json/devvit/triggers/v1alpha/triggers.d.ts | sed -n '1,60p'`
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+  - `npx prettier --write src/routes/triggers.report.ts src/routes/triggers.report.test.ts src/routes/triggers.update.ts src/routes/triggers.update.test.ts RESEARCH.md TODO.md decisions.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+  - `npm run test`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled" src docs README.md || true`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 238
+  tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.

@@ -90,6 +90,30 @@ describe('update trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
   });
 
+  it('accepts Devvit TriggerEvent-wrapped post update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([target('Edited body')]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-update',
+        subreddit: 'alpha',
+        postUpdate: {
+          post: { id: 't3_post' },
+          previousBody: 'Reviewed body',
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+  });
+
   it('uses Devvit top-level subreddit object for fail-open reopen when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
@@ -103,6 +127,36 @@ describe('update trigger routes', () => {
       body: JSON.stringify({
         post: { id: 't3_post' },
         subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'runtime_uncertain',
+      event: { reason: 'runtime_uncertain' },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'runtime_uncertain' }),
+    ]);
+  });
+
+  it('uses wrapped update subreddit for fail-open reopen when refetch fails', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-runtime-uncertain',
+        postUpdate: {
+          post: { id: 't3_post' },
+          previousBody: 'Reviewed body',
+          subreddit: { name: 'alpha' },
+        },
       }),
     });
 
@@ -155,6 +209,31 @@ describe('update trigger routes', () => {
     expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
   });
 
+  it('accepts Devvit TriggerEvent-wrapped comment update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-comment-update',
+        commentUpdate: {
+          comment: { id: 't1_comment' },
+          previousBody: 'Reviewed comment',
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+  });
+
   it('maps flair update route to flair_changed reopen reason', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock({ ...target(), flairText: 'Discussion' }));
@@ -167,6 +246,33 @@ describe('update trigger routes', () => {
     const response = await router.request('/on-post-flair-update', {
       method: 'POST',
       body: JSON.stringify({ postId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'flair_changed' },
+    });
+  });
+
+  it('accepts wrapped flair update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), flairText: 'Discussion' }));
+    const reddit = new FakeRedditAdapter([{ ...target(), flairText: 'News' }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-flair-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-flair',
+        postFlairUpdate: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
     });
 
     expect(await response.json()).toMatchObject({

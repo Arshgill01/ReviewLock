@@ -94,6 +94,86 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
   });
 
+  it('accepts Devvit TriggerEvent-wrapped post report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-post',
+        timestamp: '2026-05-24T01:00:00.000Z',
+        subreddit: 'alpha',
+        postReport: {
+          post: { id: 't3_post', numReports: 8 },
+          subreddit: { name: 'alpha' },
+          reason: 'spam',
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+  });
+
+  it('uses wrapped report subreddit for fail-open reopen when refetch fails', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-runtime-uncertain',
+        postReport: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+          reason: 'spam',
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      reopenEvent: { reason: 'runtime_uncertain' },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'runtime_uncertain' }),
+    ]);
+  });
+
+  it('accepts Devvit TriggerEvent-wrapped comment report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-comment',
+        commentReport: {
+          comment: { id: 't1_comment', numReports: 5 },
+          subreddit: { name: 'alpha' },
+          reason: 'spam',
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
   it('accepts comment report payloads and suppresses unchanged comments', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));

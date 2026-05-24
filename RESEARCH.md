@@ -271,3 +271,34 @@ Implementation conclusion:
 - ReviewLock's Reddit adapter should preserve both Reddit-client model fields and
   trigger/nested model field names so fingerprint inputs and report metrics do
   not silently degrade when Devvit returns a typed `PostV2`/`CommentV2` shape.
+
+## 2026-05-25 - Devvit trigger wrapper typing check
+
+Commands:
+
+- `nl -ba node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts | sed -n '30,110p'`
+- `nl -ba node_modules/@devvit/protos/json/devvit/triggers/v1alpha/triggers.d.ts | sed -n '1,60p'`
+
+Installed typing evidence:
+
+- `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts:37`
+  declares raw `PostUpdate` with nested `post`.
+- `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts:43`
+  declares raw `PostReport` with nested `post`.
+- `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts:89`
+  declares raw `CommentUpdate` with nested `comment`.
+- `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts:96`
+  declares raw `CommentReport` with nested `comment`.
+- `node_modules/@devvit/protos/json/devvit/triggers/v1alpha/triggers.d.ts:10`
+  declares `TriggerEvent`.
+- `node_modules/@devvit/protos/json/devvit/triggers/v1alpha/triggers.d.ts:18`
+  through `:25` expose wrapper fields including `postUpdate`, `postReport`,
+  `commentUpdate`, and `commentReport`.
+- `node_modules/@devvit/protos/json/devvit/triggers/v1alpha/triggers.d.ts:36`
+  and `:37` expose wrapper fields for NSFW/spoiler post updates.
+
+Implementation conclusion:
+
+- ReviewLock trigger routes should accept both raw event bodies and
+  `TriggerEvent`-wrapped bodies so live delivery shape differences do not skip
+  report suppression or edit-aware reopen handling.
