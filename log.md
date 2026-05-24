@@ -1022,3 +1022,37 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
+
+## 2026-05-25 - Wave 33 live WebView trigger-wrapper recheck
+
+- Started a fresh Devvit playtest for `r/reviewlock_dev`.
+- Observed playtest version `v0.0.2.64`.
+- Used the existing Zen browser tab for the ReviewLock dashboard custom post.
+- Confirmed the WebView updated to
+  `reviewlock-i1a3xr-0-0-2-64-webview.devvit.net/index.html`.
+- Confirmed the live dashboard rendered under `r/reviewlock_dev` with active
+  locks, reports suppressed, reopened after edit, latest edit-break state, and
+  active lock table in the first viewport.
+- Clicked `Verify runtime` from the embedded dashboard.
+- Confirmed the dashboard showed `Runtime proof refreshed.`, with
+  `redditContext verified`, `redis verified`, `approve verified`,
+  `ignoreReports verified`, `unignoreReports verified`, and
+  `triggers unverified`.
+- Opened demo mode from the same WebView and confirmed visible `Demo mode`
+  labeling, `r/reviewlock_demo` scope, seeded active locks, reports suppressed,
+  reopened after edit, report churn, read-only demo actions, runtime status, and
+  audit timeline.
+- Sampled Devvit logs; the CLI reported
+  `listen EADDRINUSE: address already in use :::5678` while playtest was
+  running, then connected to the log stream. No trigger payloads were emitted
+  during the sample window.
+- Commands run:
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser live WebView runtime and demo recheck on `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+  - `npx devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
+- Pass/fail status: PASS for live WebView render, runtime smoke, and demo mode;
+  PARTIAL for log sampling because of the Devvit CLI `EADDRINUSE` warning and
+  no trigger payload events.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission or controlled edit actions.
