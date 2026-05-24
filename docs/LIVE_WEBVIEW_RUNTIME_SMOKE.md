@@ -1,6 +1,6 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-24 18:58 IST.
+Last updated: 2026-05-24 23:58 IST.
 
 ## Scope
 
@@ -23,6 +23,7 @@ This pass does not prove live moderation methods or live report/edit trigger del
 - Dashboard custom post: `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
 - Playtest URL: `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.
 - Fixed WebView version observed in Zen: `reviewlock-i1a3xr-0-0-2-6-webview.devvit.net/index.html`.
+- Latest post-hardening playtest version observed in Zen: `v0.0.2.62`.
 
 ## Failure Found
 
@@ -61,6 +62,26 @@ After the fix hot reloaded:
   - `triggers unverified`
 - Runtime message showed `Runtime proof refreshed.`
 
+## Post-Hardening Recheck
+
+After runtime fallback and scoped-unlock hardening:
+
+- Playtest version: `v0.0.2.62`.
+- Existing Zen tab remained on `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- The dashboard header still showed `r/reviewlock_dev`.
+- The first viewport still showed active locks, reports suppressed, reopened after edit, latest edit-break state, active lock table, and runtime proof.
+- `Verify runtime` completed from the embedded WebView.
+- Runtime message showed `Runtime proof refreshed.`
+- Runtime panel still showed:
+  - `redditContext verified`
+  - `redis verified`
+  - `approve verified`
+  - `ignoreReports verified`
+  - `unignoreReports verified`
+  - `triggers unverified`
+
+No report submission, post edit, comment edit, unlock, or dismiss action was performed in this recheck.
+
 ## Commands Run
 
 - `npm run dev -- reviewlock_dev`
@@ -75,9 +96,14 @@ After the fix hot reloaded:
   - Result: PASS.
 - `npm run build`
   - Result: PASS.
+- `npm run dev -- reviewlock_dev`
+  - Result: PASS, playtest reached `v0.0.2.62`.
+- Zen browser live WebView runtime recheck
+  - Result: PASS, `Verify runtime` completed and showed `Runtime proof refreshed.` under `r/reviewlock_dev`.
+- `npx devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
+  - Result: PARTIAL, CLI reported `listen EADDRINUSE: address already in use :::5678` and then connected to the log stream; no trigger payload logs were emitted during the sample window.
 
 ## Open Risks
 
-- `approve()`, `ignoreReports()`, and `unignoreReports()` still need controlled live method proof on test subreddit content.
 - `PostReport`, `CommentReport`, and edit/update trigger delivery still need controlled live event proof.
 - Runtime smoke endpoint proof is dashboard/WebView-only; direct terminal calls remain intentionally unauthorized without Reddit WebView headers.

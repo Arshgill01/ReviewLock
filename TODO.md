@@ -78,6 +78,7 @@
 - [x] Reconcile proof-boundary docs after controlled post-target moderation proof.
 - [x] Remove controlled test subreddit fallbacks from runtime subreddit normalization and dashboard launch writes.
 - [x] Send explicit dashboard subreddit scope with inline unlock actions.
+- [x] Re-run live WebView runtime smoke after runtime fallback and scoped-unlock hardening.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

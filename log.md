@@ -939,3 +939,30 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 live WebView smoke recheck
+
+- Started a fresh Devvit playtest for `r/reviewlock_dev`.
+- Observed playtest version `v0.0.2.62`.
+- Used the existing Zen browser tab for the ReviewLock dashboard custom post.
+- Confirmed the dashboard still rendered under `r/reviewlock_dev` after runtime
+  fallback and scoped-unlock hardening.
+- Closed the previously open Reddit report modal without submitting a report.
+- Clicked `Verify runtime` from the embedded dashboard.
+- Confirmed the dashboard showed `Runtime proof refreshed.`, with
+  `redditContext verified`, `redis verified`, moderation method proof still
+  visible, and `triggers unverified`.
+- Sampled Devvit logs; the CLI reported
+  `listen EADDRINUSE: address already in use :::5678` while playtest was
+  running, then connected to the log stream. No trigger payloads were emitted
+  during the sample window.
+- Commands run:
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser live WebView runtime recheck on `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+  - `npx devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
+- Pass/fail status: PASS for live WebView render and runtime smoke; PARTIAL for
+  log sampling because of the Devvit CLI `EADDRINUSE` warning and no trigger
+  payload events.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
