@@ -478,3 +478,25 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Live report suppression and edit reopening remain implemented-not-live-verified until controlled Reddit events are generated.
+
+## 2026-05-24 - Wave 28
+
+- Ran a headless Chromium browser regression against the built dashboard served from `dist/client` with mocked ReviewLock API responses.
+- Exercised live dashboard load, runtime verification, unlock confirmation/action, demo toggle, reopen dismiss confirmation/action, demo mobile state, and return-to-live mobile state.
+- Captured screenshot evidence under `output/playwright/` and documented paths/results in `docs/BROWSER_REGRESSION.md`.
+- Automated browser assertions checked core product phrases, forbidden copy, body overflow, nested panels, `undefined`/`NaN` leaks, and clipped text in common controls/content rows.
+- No client code fixes were required.
+- Commands run:
+  - `command -v npx >/dev/null 2>&1 && echo npx-ok`
+  - `npm run build`
+  - `mkdir -p output/playwright`
+  - `python3 -m http.server 5173 --bind 127.0.0.1 --directory dist/client`
+  - `npx --yes --package=playwright node <<'NODE' ... NODE`
+  - `lsof -ti tcp:5173 | xargs -r kill`
+  - `npm run type-check`
+  - `npm run test -- --run src/client/state/store.test.ts src/client/render.test.ts`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Browser proof used mocked API responses; live Reddit WebView and live moderation methods remain unverified.
