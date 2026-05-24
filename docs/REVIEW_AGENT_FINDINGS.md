@@ -236,7 +236,67 @@
 - Suggested fix: Align the adapter with the installed Devvit Redis type instead of a narrowed local interface, and pass an explicit rank option, for example `{ by: 'rank', reverse: true }` for reverse range reads and `{ by: 'rank' }` where options are needed. Add an adapter-level test with a fake Devvit client that asserts reverse `zRange` receives `by: 'rank'`.
 - Files reviewed: `src/server/adapters/redis.ts`, `src/server/adapters/redis.test.ts`, `src/server/services/locks.ts`, `src/server/services/audit.ts`, `src/server/services/reopenQueue.ts`, `src/server/services/metrics.ts`, `node_modules/@devvit/redis/RedisClient.d.ts`, `node_modules/@devvit/redis/types/redis.d.ts`
 
+## 2026-05-24 23:23 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof banner renders Redis-backed text without escaping
+- Evidence: `renderRuntimeBanner()` injects `capability.name`, warning strings, and `verificationMessage` directly into HTML (`src/client/components/RuntimeBanner.ts:24-35`, `src/client/components/RuntimeBanner.ts:46-50`). Runtime proof records are loaded from Redis (`src/server/services/runtimeProof.ts:45-48`) and can include operation names, evidence, notes, and warning text derived from runtime errors (`src/server/services/runtimeProof.ts:82-103`). Other dashboard components already escape dynamic text through local `text()` helpers, but the runtime banner has no equivalent escaping. Current render tests check attribute escaping and reason label escaping, but the runtime banner test only checks ordinary copy (`src/client/render.test.ts:182-191`).
+- Why it matters: A malformed runtime proof record or runtime error string stored in Redis can render markup inside the moderator dashboard. This is especially risky because runtime proof is a trust/status surface that moderators are expected to inspect after failures.
+- Suggested fix: Add `text()`/`attr()` escaping to `RuntimeBanner.ts` for capability names, warning text, verification messages, and status-derived class names. Add a render regression with hostile runtime capability/warning values proving the dashboard shows escaped text and no raw `<script>`/event-handler markup.
+- Files reviewed: `src/client/components/RuntimeBanner.ts`, `src/client/pages/DashboardPage.ts`, `src/client/render.test.ts`, `src/server/services/runtimeProof.ts`
+
 ## 2026-05-24 23:13 IST - Codex Resolution Notes
 
 - Addressed dashboard unlock subreddit scoping by resolving the Devvit runtime subreddit before `/api/locks/unlock`, passing the expected subreddit into `unlockReviewedContent()`, and rejecting cross-subreddit targets before any `unignoreReports()` call.
 - Added service and dashboard API regressions proving cross-subreddit unlock attempts return `403`, leave the active lock intact, and make no Reddit moderation call.
+
+## 2026-05-24 23:19 IST - Finding
+
+- Severity: low
+- Area: Dashboard action errors discard message-only non-200 responses
+- Evidence: The client error extractor only reads `data.error` (`src/client/state/api.ts:41-42`), and `requestJson()` throws on non-2xx before action helpers can read `data.message` (`src/client/state/api.ts:58-72`). The dashboard unlock endpoint returns scope failures as HTTP 403 with `{ ok, message, warnings }`, not an `error` field (`src/routes/api.dashboard.ts:352-359`). `ReviewLockStore.unlock()` displays the thrown error text directly (`src/client/state/store.ts:113-126`), so a cross-subreddit/stale-context unlock rejection becomes the generic `API error: 403` instead of the moderator-actionable unlock message. Current API client tests cover non-200 bodies with `error`, but not non-200 action bodies with `message` (`src/client/state/api.test.ts:80-90`, `src/client/state/api.test.ts:139-164`).
+- Why it matters: This does not reintroduce the moderation-scope bug, but it makes the protective 403 path hard for moderators to understand and diagnose. The server already computed a specific explanation; the dashboard loses it at the transport layer.
+- Suggested fix: Have `errorText()` fall back to a string `message`, or make action routes consistently return `error` on non-2xx responses. Add an API client regression where `unlockTarget()` receives HTTP 403 with `{ ok: false, message: 'ReviewLock target is outside this subreddit context.' }` and surfaces that text.
+- Files reviewed: `src/client/state/api.ts`, `src/routes/api.dashboard.ts`, `src/client/state/store.ts`, `src/client/state/api.test.ts`
+
+## 2026-05-24 23:22 IST - Recheck
+
+- Area: Lock creation Redis-failure rollback visibility
+- Result: Resolved in the current worktree.
+- Evidence: The Redis persistence catch path now calls `unignoreReportsForReviewLock()`, records runtime proof for the rollback operation, keeps a failed visible lock when rollback fails, and writes a `runtime_failure` audit event (`src/server/services/lockFlow.ts:178-216`). `src/server/services/lockFlow.test.ts` now includes `keeps a visible failed lock when Redis persistence fails and unignore rollback also fails`. `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose` passes with 6 tests.
+
+## 2026-05-24 23:22 IST - Recheck
+
+- Area: Report trigger dedupe retryability and expiry
+- Result: Resolved in the current worktree.
+- Evidence: Report dedupe markers now receive a 7-day TTL on creation (`src/server/services/reportTriggers.ts:82-95`), and runtime-uncertain paths clear the marker before returning (`src/server/services/reportTriggers.ts:125-145`, `src/server/services/reportTriggers.ts:164-188`, `src/server/services/reportTriggers.ts:212-216`). `src/server/services/reportTriggers.test.ts` now covers TTL plus retry after target-resolution and `ignoreReports()` failures. `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose` passes with 18 tests.
+
+## 2026-05-24 23:22 IST - Recheck
+
+- Area: Devvit Redis `zRange` adapter options
+- Result: Resolved in the current worktree.
+- Evidence: The Devvit Redis client interface now requires `options?: { by: 'score' | 'lex' | 'rank'; reverse?: boolean }`, and the adapter passes `{ by: 'rank', reverse: true }` for reverse reads and `{ by: 'rank' }` otherwise (`src/server/adapters/redis.ts:134-181`). `src/server/adapters/redis.test.ts` now includes `passes explicit rank options for Devvit reverse sorted-set reads`. `npm run test -- src/server/adapters/redis.test.ts --reporter verbose` passes with 4 tests.
+
+## 2026-05-24 23:22 IST - Recheck
+
+- Area: Runtime proof banner escaping
+- Result: Resolved in the current worktree.
+- Evidence: `renderRuntimeBanner()` now escapes capability names, status labels, warning text, and verification messages, and sanitizes status class suffixes (`src/client/components/RuntimeBanner.ts:3-12`, `src/client/components/RuntimeBanner.ts:33-64`). `src/client/render.test.ts` now includes `escapes Redis-backed runtime proof text before rendering`. `npm run test -- src/client/render.test.ts --reporter verbose` passes with 12 tests.
+
+## 2026-05-24 23:23 IST - Codex Resolution Notes
+
+- Addressed message-only non-200 dashboard action errors by letting the API client fall back from `error` to a string `message`.
+- Added `src/client/state/api.test.ts` coverage proving a 403 unlock response with `ReviewLock target is outside this subreddit context.` surfaces that exact text instead of `API error: 403`.
+- Reran focused tests for the reviewer findings, then full `npm run type-check`, `npm run lint`, `npm run test`, and `npm run build`; all passed.
+
+## 2026-05-24 23:24 IST - Validation
+
+- Area: Current dirty implementation fixes
+- Result: Full local validation passed.
+- Evidence: `npm run type-check` passed. `npm run test` passed with 40 test files and 219 tests. The low-severity client error-message finding remains open because the suite does not currently cover non-2xx action responses that use `message` instead of `error`.
+
+## 2026-05-24 23:24 IST - Recheck
+
+- Area: Dashboard action message-only non-200 errors
+- Result: Resolved in the current worktree.
+- Evidence: `errorText()` now falls back from `data.error` to a string `data.message` (`src/client/state/api.ts:41-46`). `src/client/state/api.test.ts` now includes `uses action response message text for non-200 dashboard action responses`, covering the 403 unlock message path. `npm run test -- src/client/state/api.test.ts --reporter verbose` passes with 8 tests.

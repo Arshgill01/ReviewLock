@@ -191,6 +191,30 @@ describe('client render helpers', () => {
     );
   });
 
+  it('escapes Redis-backed runtime proof text before rendering', () => {
+    const html = renderRuntimeBanner(
+      {
+        overall: 'failed',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: [
+          {
+            name: 'ignoreReports<script>alert(1)</script>',
+            status: 'failed',
+            notes: [],
+          },
+        ],
+        warnings: ['<img src=x onerror=alert(1)>'],
+      },
+      'Runtime <script>alert(1)</script> refreshed.',
+    );
+
+    expect(html).toContain('ignoreReports&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('Runtime &lt;script&gt;alert(1)&lt;/script&gt; refreshed.');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+  });
+
   it('renders audit timeline', () => {
     const html = renderAuditTimeline([audit()]);
     expect(html).toContain('Audit timeline');

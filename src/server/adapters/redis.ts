@@ -52,7 +52,9 @@ export class InMemoryRedisStore implements RedisStore {
     this.sortedSets.delete(key);
   }
 
-  async expire(): Promise<void> {
+  async expire(key: string, seconds: number): Promise<void> {
+    void key;
+    void seconds;
     // In-memory tests do not simulate wall-clock expiry. Production Redis applies the lease TTL.
   }
 
@@ -135,7 +137,7 @@ interface DevvitRedisClient {
     key: string,
     start: number | string,
     stop: number | string,
-    options?: { reverse?: boolean },
+    options?: { by: 'score' | 'lex' | 'rank'; reverse?: boolean },
   ): Promise<SortedSetEntry[]>;
   zRem(key: string, members: string[]): Promise<unknown>;
   zIncrBy(key: string, member: string, increment: number): Promise<number>;
@@ -178,7 +180,7 @@ export const createDevvitRedisStore = (client: DevvitRedisClient): RedisStore =>
     await client.zAdd(key, entry);
   },
   async zRange(key, start, stop, reverse) {
-    return client.zRange(key, start, stop, reverse ? { reverse } : undefined);
+    return client.zRange(key, start, stop, reverse ? { by: 'rank', reverse } : { by: 'rank' });
   },
   async zRem(key, member) {
     await client.zRem(key, [member]);

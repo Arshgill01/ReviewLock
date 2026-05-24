@@ -39,7 +39,11 @@ const hasArray = (data: JsonObject, key: string): boolean => Array.isArray(data[
 const hasObject = (data: JsonObject, key: string): boolean => isObject(data[key]);
 
 const errorText = (data: unknown): string | undefined =>
-  isObject(data) && typeof data.error === 'string' ? data.error : undefined;
+  isObject(data) && typeof data.error === 'string'
+    ? data.error
+    : isObject(data) && typeof data.message === 'string'
+      ? data.message
+      : undefined;
 
 const contractError = (endpoint: string, message: string): Error =>
   new Error(`API contract error at ${endpoint}: ${message}`);

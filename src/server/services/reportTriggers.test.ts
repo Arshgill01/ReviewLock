@@ -121,6 +121,36 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('sets a bounded TTL on successful report dedupe markers', async () => {
+    class ExpiringRedisStore extends InMemoryRedisStore {
+      readonly expireCalls: Array<{ key: string; seconds: number }> = [];
+
+      override async expire(key: string, seconds: number): Promise<void> {
+        this.expireCalls.push({ key, seconds });
+        await super.expire(key, seconds);
+      }
+    }
+
+    const redis = new ExpiringRedisStore();
+    await saveLock(redis, lock());
+
+    await expect(
+      handleReportTrigger(
+        {
+          redis,
+          reddit: new FakeRedditAdapter([target()]),
+          clock: fixedClock('2026-05-24T01:00:00.000Z'),
+        },
+        { targetId: 't3_post', eventId: 'evt-expiring-dedupe' },
+      ),
+    ).resolves.toMatchObject({ action: 'suppress_unchanged' });
+
+    expect(redis.expireCalls).toContainEqual({
+      key: 'reviewlock:alpha:report:dedupe:evt-expiring-dedupe',
+      seconds: 604800,
+    });
+  });
+
   it('does not double-count concurrent duplicate report deliveries', async () => {
     const dependencies = await deps();
     const results = await Promise.all([
@@ -360,6 +390,36 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('does not keep a dedupe marker after target resolution fails so trigger retry can succeed', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter();
+    await saveLock(redis, lock());
+
+    const first = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-resolution-retry', subreddit: 'alpha' },
+    );
+    expect(first).toMatchObject({ ok: false, action: 'runtime_uncertain' });
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-resolution-retry')).toBe(false);
+
+    reddit.setTarget(target());
+    const retry = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-resolution-retry', subreddit: 'alpha' },
+    );
+
+    expect(retry).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
+  });
+
   it('records runtime failure when ignore reports fails', async () => {
     const dependencies = await deps();
     dependencies.reddit.failOperation('ignoreReports', 'permission denied');
@@ -376,6 +436,37 @@ describe('handleReportTrigger', () => {
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual([
       expect.objectContaining({ kind: 'runtime_failure' }),
     ]);
+  });
+
+  it('does not keep a dedupe marker after ignoreReports fails so trigger retry can succeed', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const failingReddit = new FakeRedditAdapter([target()]);
+    failingReddit.failOperation('ignoreReports', 'temporary permission failure');
+
+    const first = await handleReportTrigger(
+      {
+        redis,
+        reddit: failingReddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-ignore-retry' },
+    );
+    expect(first).toMatchObject({ ok: false, action: 'runtime_uncertain' });
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-ignore-retry')).toBe(false);
+
+    const retryReddit = new FakeRedditAdapter([target()]);
+    const retry = await handleReportTrigger(
+      {
+        redis,
+        reddit: retryReddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-ignore-retry' },
+    );
+
+    expect(retry).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(retryReddit.calls).toEqual(['ignoreReports:t3_post']);
   });
 
   it('rolls back ignoreReports when Redis fails after suppression', async () => {

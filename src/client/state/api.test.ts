@@ -90,6 +90,23 @@ describe('ReviewLockApiClient contract handling', () => {
     );
   });
 
+  it('uses action response message text for non-200 dashboard action responses', async () => {
+    stubFetch(
+      jsonResponse(
+        {
+          ok: false,
+          message: 'ReviewLock target is outside this subreddit context.',
+          warnings: ['subreddit_scope_mismatch'],
+        },
+        { status: 403, statusText: 'Forbidden' },
+      ),
+    );
+
+    await expect(
+      new ReviewLockApiClient().unlockTarget('t3_reviewed', 'lock-1', 'mod'),
+    ).rejects.toThrow('API error: ReviewLock target is outside this subreddit context.');
+  });
+
   it('turns malformed JSON into a contract error instead of leaking parser text', async () => {
     stubFetch(malformedJsonResponse());
 

@@ -57,6 +57,8 @@ const reportAuditId = (
   subjectId: string,
 ): string => `${prefix}-${Date.parse(now)}-${safeIdPart(subjectId)}-${auditIdPart(input, now)}`;
 
+const REPORT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
+
 export const buildReopenFromReportDecision = (
   lock: ReviewLockRecord,
   target: ReviewLockTarget,
@@ -83,8 +85,21 @@ const markDedupe = async (
   now: string,
 ): Promise<boolean> => {
   const dedupe = dedupeKey(input, now);
+  const created = await redis.setIfNotExists(dedupe, now);
 
-  return redis.setIfNotExists(dedupe, now);
+  if (created) {
+    await redis.expire(dedupe, REPORT_DEDUPE_TTL_SECONDS);
+  }
+
+  return created;
+};
+
+const clearDedupe = async (
+  redis: RedisStore,
+  input: ReportTriggerInput,
+  now: string,
+): Promise<void> => {
+  await redis.del(dedupeKey(input, now)).catch(() => undefined);
 };
 
 export const handleReportTrigger = async (
@@ -120,6 +135,7 @@ export const handleReportTrigger = async (
           data: { error: resolution.error },
           demo: false,
         });
+        await clearDedupe(deps.redis, dedupeInput, now);
 
         return {
           ok: false,
@@ -162,6 +178,7 @@ export const handleReportTrigger = async (
             data: { error: ignoreResult.errorMessage },
             demo: lock.demo,
           });
+          await clearDedupe(deps.redis, dedupeInput, now);
 
           return {
             ok: false,
@@ -194,6 +211,7 @@ export const handleReportTrigger = async (
           });
         } catch (error) {
           await deps.reddit.unignoreReports(resolution.target).catch(() => undefined);
+          await clearDedupe(deps.redis, dedupeInput, now);
 
           return {
             ok: false,
@@ -263,6 +281,7 @@ export const handleReportTrigger = async (
         data: { reason: decision.reason },
         demo: lock.demo,
       });
+      await clearDedupe(deps.redis, dedupeInput, now);
 
       return {
         ok: false,
@@ -281,6 +300,8 @@ export const handleReportTrigger = async (
         warnings: ['concurrent_trigger_in_progress'],
       };
     }
+
+    await clearDedupe(deps.redis, dedupeInput, now);
 
     return {
       ok: false,

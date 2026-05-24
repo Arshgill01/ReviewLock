@@ -56,3 +56,15 @@
 - [x] Live-verify `approve()` through a successful controlled ReviewLock lock submission.
 - [x] Live-verify `ignoreReports()` through a successful controlled ReviewLock lock submission.
 - [ ] Repeat moderation method proof on a controlled comment target if Devvit exposes the comment menu reliably.
+
+## Current Wave 33 prep state
+
+- [x] Review live reviewer findings before trigger proof work.
+- [x] Harden lock creation rollback when `ignoreReports()` succeeds, Redis persistence fails, and `unignoreReports()` rollback also fails.
+- [x] Harden report trigger dedupe so runtime-uncertain deliveries can retry and successful markers expire.
+- [x] Align Devvit Redis `zRange` adapter options with installed runtime typings.
+- [x] Escape Redis-backed runtime proof text before dashboard rendering.
+- [x] Surface message-only non-200 dashboard action errors in the client.
+- [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
+- [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
+- [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

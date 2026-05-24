@@ -672,3 +672,32 @@
   - Live report and edit trigger delivery still need controlled proof.
   - Comment-target moderation method proof is still unverified.
   - Devvit trigger live delivery remains unverified even though installed nested payload shapes are now covered locally.
+
+## 2026-05-24 - Wave 33 preparation hardening
+
+- Reviewed fresh findings from the active second Codex reviewer in `docs/REVIEW_AGENT_FINDINGS.md` before attempting live trigger proof.
+- Hardened lock creation rollback when `ignoreReports()` succeeds, Redis persistence fails, and `unignoreReports()` rollback also fails:
+  - rollback now uses `unignoreReportsForReviewLock()`;
+  - runtime proof records the rollback result;
+  - failed rollback keeps a visible `failed` lock record with runtime warnings when Redis remains writable.
+- Hardened report trigger dedupe:
+  - successful dedupe markers now get a seven-day TTL;
+  - runtime-uncertain paths clear the dedupe key so Devvit retries can reprocess the same event id;
+  - regressions cover retry after target-resolution failure and `ignoreReports()` failure.
+- Hardened the Devvit Redis adapter by passing explicit `{ by: 'rank' }` options to `zRange()` calls.
+- Escaped Redis-backed runtime proof text in the dashboard runtime banner.
+- Improved client action error extraction so non-200 dashboard action responses with a `message` field surface moderator-actionable text.
+- Commands run:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts src/server/adapters/redis.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test -- src/client/state/api.test.ts src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts src/server/adapters/redis.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 219 tests.
+- Open risks:
+  - Controlled live report and edit trigger delivery still need proof in `r/reviewlock_dev`.
+  - Comment-target moderation method proof remains unverified.
+  - The active reviewer may append more findings before the next commit; check `docs/REVIEW_AGENT_FINDINGS.md` again before staging.

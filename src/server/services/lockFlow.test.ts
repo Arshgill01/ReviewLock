@@ -151,4 +151,54 @@ describe('lockReviewedContent', () => {
     expect(await getLock(redis, 'alpha', result.lock?.id ?? '')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
+
+  it('keeps a visible failed lock when Redis persistence fails and unignore rollback also fails', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    reddit.failOperation('unignoreReports', 'rollback denied');
+    class MetricsFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':metrics:')) {
+          throw new Error('metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+    const redis = new MetricsFailingRedisStore();
+    const result = await lockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T00:00:00.000Z') },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'ReviewLock could not persist the lock, and unignoreReports rollback failed.',
+      warnings: expect.arrayContaining([
+        'redis_write_failed',
+        'unignoreReports failed for t3_post',
+      ]),
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getLock(redis, 'alpha', result.lock?.id ?? '')).toMatchObject({
+      status: 'failed',
+      runtimeWarnings: expect.arrayContaining([
+        'redis_write_failed',
+        'unignoreReports failed for t3_post',
+      ]),
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'unignoreReports', status: 'failed' }),
+      ]),
+    });
+  });
 });

@@ -126,6 +126,20 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - Demo data could previously be requested from the demo namespace without
   `demo=true`.
   - Hardened by rejecting unlabeled dashboard reads of `reviewlock_demo`.
+- Lock creation rollback could previously delete the local lock even when
+  `unignoreReports()` rollback failed after a Redis persistence error.
+  - Hardened by recording rollback runtime proof and keeping a visible `failed`
+    lock with runtime warnings when rollback fails.
+- Report trigger dedupe previously treated runtime-uncertain deliveries as
+  permanently processed and did not expire keys.
+  - Hardened by clearing dedupe markers on runtime-uncertain paths and expiring
+    successful markers after seven days.
+- Devvit Redis reverse sorted-set reads previously passed `{ reverse: true }`
+  without the required `by` option.
+  - Hardened by passing explicit rank options to `zRange()`.
+- Runtime proof text was previously rendered without escaping in the dashboard.
+  - Hardened by escaping Redis-backed runtime proof names, warnings, and
+    verification messages.
 
 ## Current Claim Boundary
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryRedisStore } from './redis';
+import { createDevvitRedisStore, InMemoryRedisStore, type SortedSetEntry } from './redis';
 
 describe('InMemoryRedisStore', () => {
   it('supports strings, hashes, and sorted sets', async () => {
@@ -31,5 +31,40 @@ describe('InMemoryRedisStore', () => {
     expect(await redis.setIfNotExists('dedupe', 'first')).toBe(true);
     expect(await redis.setIfNotExists('dedupe', 'second')).toBe(false);
     expect(await redis.get('dedupe')).toBe('first');
+  });
+
+  it('passes explicit rank options for Devvit reverse sorted-set reads', async () => {
+    const zRangeCalls: unknown[] = [];
+    const store = createDevvitRedisStore({
+      get: async () => undefined,
+      set: async () => undefined,
+      del: async () => undefined,
+      exists: async () => false,
+      expire: async () => undefined,
+      hGetAll: async () => ({}),
+      hSet: async () => undefined,
+      hDel: async () => undefined,
+      hIncrBy: async () => 0,
+      zAdd: async () => undefined,
+      zRange: async (
+        key: string,
+        start: number | string,
+        stop: number | string,
+        options?: { by: 'score' | 'lex' | 'rank'; reverse?: boolean },
+      ): Promise<SortedSetEntry[]> => {
+        zRangeCalls.push({ key, start, stop, options });
+        return [];
+      },
+      zRem: async () => undefined,
+      zIncrBy: async () => 0,
+    });
+
+    await store.zRange('set', 0, 10, true);
+    await store.zRange('set', 0, 10);
+
+    expect(zRangeCalls).toEqual([
+      { key: 'set', start: 0, stop: 10, options: { by: 'rank', reverse: true } },
+      { key: 'set', start: 0, stop: 10, options: { by: 'rank' } },
+    ]);
   });
 });

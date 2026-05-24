@@ -556,3 +556,78 @@ Reason:
 
 - Moderators need a direct target-context path into ReviewLock while reviewing a
   post or comment.
+
+### D040 - Keep failed lock state visible when Reddit rollback fails
+
+Reviewer analysis found that a Redis failure after `ignoreReports()` could hide
+reports without leaving a visible ReviewLock record if `unignoreReports()`
+rollback also failed.
+
+Decision:
+
+- Use the moderation result wrapper for rollback.
+- Record runtime proof for rollback success or failure.
+- If rollback fails, keep a `failed` lock record with runtime warnings and write
+  a runtime failure audit event when Redis is still available.
+
+Reason:
+
+- A potentially still-ignored Reddit target must remain visible to moderators
+  rather than disappearing from ReviewLock state.
+
+### D041 - Make report-trigger dedupe retryable and bounded
+
+Reviewer analysis found that report-trigger dedupe keys were written before the
+trigger reached a terminal state and never expired.
+
+Decision:
+
+- Keep early dedupe reservation for concurrent duplicate suppression.
+- Clear the dedupe key before returning `runtime_uncertain`.
+- Expire successful dedupe markers after seven days.
+
+Reason:
+
+- Devvit trigger delivery can be at least once, and transient failures must be
+  retryable without allowing permanent key growth.
+
+### D042 - Pass explicit rank options to Devvit Redis zRange
+
+Installed Devvit typings require `zRange` options to include `by`.
+
+Decision:
+
+- The Devvit Redis adapter passes `{ by: 'rank' }` for sorted-set reads and
+  `{ by: 'rank', reverse: true }` for newest-first reads.
+
+Reason:
+
+- Dashboard sorted-set reads should match the live Devvit Redis client contract,
+  not just the in-memory test double.
+
+### D043 - Treat runtime proof text as untrusted dashboard data
+
+Reviewer analysis found that Redis-backed runtime proof capability names,
+warnings, and verification messages were rendered without escaping.
+
+Decision:
+
+- Escape runtime proof text and sanitize status class suffixes in the client.
+
+Reason:
+
+- Runtime proof is a trust surface and must not render malformed Redis text as
+  HTML.
+
+### D044 - Surface dashboard action messages on non-200 responses
+
+Reviewer analysis found that 403 dashboard action responses with `{ message }`
+were displayed as generic HTTP errors.
+
+Decision:
+
+- API client error extraction now falls back from `error` to a string `message`.
+
+Reason:
+
+- Protective moderation-scope rejections should be understandable to moderators.

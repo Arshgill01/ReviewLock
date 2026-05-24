@@ -6,7 +6,11 @@ import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
 import { removeLock, saveLock, updateLock } from './locks';
 import { recordLockCreatedMetric } from './metrics';
-import { approveForReviewLock, ignoreReportsForReviewLock } from './moderation';
+import {
+  approveForReviewLock,
+  ignoreReportsForReviewLock,
+  unignoreReportsForReviewLock,
+} from './moderation';
 import { recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 
@@ -172,13 +176,44 @@ export const lockReviewedContent = async (
       warnings,
     };
   } catch (error) {
-    await deps.reddit.unignoreReports(resolution.target).catch(() => undefined);
-    await removeLock(deps.redis, lock).catch(() => undefined);
+    const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+    await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
+
+    if (rollbackResult.ok) {
+      await removeLock(deps.redis, lock).catch(() => undefined);
+    } else {
+      const failedLock: ReviewLockRecord = {
+        ...lock,
+        status: 'failed',
+        runtimeWarnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
+      };
+
+      await updateLock(deps.redis, failedLock).catch(() => undefined);
+      await appendAuditEvent(deps.redis, {
+        id: `audit-${lock.id}-rollback-failure`,
+        kind: 'runtime_failure',
+        subreddit: lock.subreddit,
+        targetId: lock.targetId,
+        targetKind: lock.targetKind,
+        lockId: lock.id,
+        actor: input.actor,
+        createdAt: now,
+        message:
+          'ReviewLock could not persist the lock and could not unignore reports during rollback.',
+        data: { operation: 'unignoreReports', error: rollbackResult.errorMessage },
+        demo: false,
+      }).catch(() => undefined);
+    }
+
     return {
       ok: false,
       lock,
-      message: error instanceof Error ? error.message : 'ReviewLock could not persist the lock.',
-      warnings: [...warnings, 'redis_write_failed'],
+      message: rollbackResult.ok
+        ? error instanceof Error
+          ? error.message
+          : 'ReviewLock could not persist the lock.'
+        : 'ReviewLock could not persist the lock, and unignoreReports rollback failed.',
+      warnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
     };
   }
 };
