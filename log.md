@@ -1121,3 +1121,37 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission or controlled edit actions.
+
+## 2026-05-25 - Wave 33 seeded demo data depth hardening
+
+- Expanded the deterministic demo scenario from 12 locks to 18 locks: 12 active,
+  5 reopened after edit, and 1 failed runtime-warning example.
+- Raised seeded suppressed report churn to 47 reports across post and comment
+  examples.
+- Added richer reopen coverage for content, flair, NSFW, and spoiler changes.
+- Kept demo mode clearly scoped to `r/reviewlock_demo`, with seeded data marked
+  demo-only and trigger proof still unverified.
+- Started a fresh Devvit playtest for `r/reviewlock_dev`.
+- Observed playtest version `v0.0.2.68`.
+- Used Zen on the existing ReviewLock dashboard post.
+- Opened demo mode and confirmed visible `Demo mode` labeling,
+  `r/reviewlock_demo` scope, 12 active locks, 47 reports suppressed, 5 reopened
+  after edit, latest edit-break event for `post:demo018`, read-only demo
+  actions, report churn, runtime status warning, and audit timeline.
+- Commands run:
+  - `npm run test -- src/server/fixtures/demoScenario.test.ts src/server/services/demoData.test.ts src/server/services/demoMode.test.ts src/integration.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run test -- src/routes/api.demo.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `git diff --check`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+  - `npm run build`
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser demo-mode recheck on `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+- Pass/fail status: PASS for local tests, type-check, lint, build, and live
+  WebView demo render.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission or controlled edit actions.

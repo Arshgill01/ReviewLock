@@ -961,3 +961,24 @@ Reason:
   thesis and proof boundary need stricter review than an autonomous UI agent can
   provide. The integrated result must remain a moderator operations tool, not a
   decorative SaaS landing page.
+
+### D062 - Deepen seeded demo data without upgrading runtime claims
+
+The first demo fixture met the minimum 12-record requirement but still felt too
+thin for a moderator-facing operational dashboard.
+
+Decision:
+
+- Seed 18 demo lock records: 12 active locks, 5 reopened locks, and 1 failed
+  runtime-warning example.
+- Raise seeded suppressed report churn to 47 reports across posts and comments.
+- Include multiple edit-break reopen reasons in demo data: content, flair, NSFW,
+  and spoiler changes.
+- Keep demo runtime status explicitly warning that seeded data is not runtime
+  proof, with trigger capability still labeled unverified.
+
+Reason:
+
+- The demo should show a believable mod-team ledger and the complete
+  edit-aware reopen loop without implying that seeded records prove live Reddit
+  trigger delivery.

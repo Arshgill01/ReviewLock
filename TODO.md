@@ -85,6 +85,8 @@
 - [x] Remove the remaining controlled test subreddit fallback from runtime smoke routes.
 - [x] Review and harden the Antigravity dashboard UI refresh before integration.
 - [x] Re-run live WebView runtime and demo smoke after dashboard UI polish.
+- [x] Expand seeded demo data to 18 records with richer churn and reopen reasons.
+- [x] Re-run live WebView demo smoke after seeded demo data expansion.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

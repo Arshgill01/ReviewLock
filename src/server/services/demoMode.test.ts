@@ -15,10 +15,10 @@ describe('demo mode service', () => {
     const redis = new InMemoryRedisStore();
     const status = await seedDemoData(redis, '2026-05-24T00:00:00.000Z');
 
-    expect(status).toMatchObject({ demo: true, enabled: true, lockCount: 12 });
-    expect(await listActiveLocks(redis, DEMO_SUBREDDIT)).toHaveLength(8);
-    expect(await listOpenReopenEvents(redis, DEMO_SUBREDDIT)).toHaveLength(3);
-    expect(await listDailyMetrics(redis, DEMO_SUBREDDIT)).toHaveLength(1);
+    expect(status).toMatchObject({ demo: true, enabled: true, lockCount: 18 });
+    expect(await listActiveLocks(redis, DEMO_SUBREDDIT)).toHaveLength(12);
+    expect(await listOpenReopenEvents(redis, DEMO_SUBREDDIT)).toHaveLength(5);
+    expect(await listDailyMetrics(redis, DEMO_SUBREDDIT)).toHaveLength(3);
     expect(await listTopTargetMetrics(redis, DEMO_SUBREDDIT)).toHaveLength(10);
     expect(
       (await listAuditEvents(redis, DEMO_SUBREDDIT)).some((event) => event.kind === 'demo_reset'),
@@ -31,8 +31,8 @@ describe('demo mode service', () => {
     await resetDemoMode(redis, '2026-05-24T00:00:00.000Z');
     await resetDemoMode(redis, '2026-05-24T00:00:00.000Z');
 
-    expect(await listActiveLocks(redis, DEMO_SUBREDDIT)).toHaveLength(8);
-    expect(await listOpenReopenEvents(redis, DEMO_SUBREDDIT)).toHaveLength(3);
+    expect(await listActiveLocks(redis, DEMO_SUBREDDIT)).toHaveLength(12);
+    expect(await listOpenReopenEvents(redis, DEMO_SUBREDDIT)).toHaveLength(5);
   });
 
   it('tracks demo status separately from live config', async () => {

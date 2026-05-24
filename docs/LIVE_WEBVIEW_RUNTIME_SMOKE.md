@@ -26,6 +26,7 @@ This pass does not prove live moderation methods or live report/edit trigger del
 - Latest post-hardening playtest version observed in Zen: `v0.0.2.62`.
 - Latest trigger-wrapper hardening playtest version observed in Zen: `v0.0.2.64`.
 - Latest dashboard UI hardening playtest version observed in Zen: `v0.0.2.66`.
+- Latest demo data depth hardening playtest version observed in Zen: `v0.0.2.68`.
 
 ## Failure Found
 
@@ -114,6 +115,31 @@ After Reddit adapter mapping and trigger wrapper payload hardening:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Demo Data Depth Recheck
+
+After the deterministic demo scenario was expanded:
+
+- Playtest version: `v0.0.2.68`.
+- Existing Zen tab was used on the ReviewLock dashboard post.
+- Demo mode was opened from the embedded dashboard.
+- Demo mode showed the visible `Demo mode` banner and `r/reviewlock_demo`
+  scope.
+- First viewport showed 12 active locks, 47 reports suppressed, and 5 reopened
+  after edit.
+- Latest edit-break event showed `post:demo018`, reason `spoiler changed`, and
+  summary text explaining the post returned to the queue.
+- Active locks showed 12 rows with read-only demo actions.
+- Reopened-after-edit queue showed 5 events.
+- Report churn showed seeded top targets across posts and comments.
+- Runtime proof/status showed the demo warning:
+  `Demo data only. Seeded records are not runtime proof.`
+- Runtime proof/status still listed triggers as unverified.
+- Audit timeline showed seeded lock, suppress, reopen, runtime failure, and
+  demo reset events.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -175,6 +201,10 @@ performed in this recheck.
   - Result: PASS, playtest reached `v0.0.2.66`.
 - Zen browser live WebView runtime and demo recheck
   - Result: PASS, live dashboard rendered with the polished metric loop, demo mode showed visibly labeled seeded data under `reviewlock_demo`, and `Verify runtime` completed with `Runtime proof refreshed.`
+- `npm run dev -- reviewlock_dev`
+  - Result: PASS, playtest reached `v0.0.2.68`.
+- Zen browser demo-mode recheck
+  - Result: PASS, demo mode rendered the expanded seeded scenario with 12 active locks, 47 reports suppressed, 5 reopened after edit, read-only demo actions, report churn, runtime warning, and audit timeline.
 
 ## Open Risks
 

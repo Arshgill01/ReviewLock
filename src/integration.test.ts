@@ -42,11 +42,19 @@ const makeApp = () =>
 
 const endpointPayload = (path: string): string => {
   if (path.includes('comment')) {
-    return JSON.stringify({ targetId: 't1_comment', actor: 'mod', lockReason: 'reviewed_policy_compliant' });
+    return JSON.stringify({
+      targetId: 't1_comment',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant',
+    });
   }
 
   if (path.includes('lock-review-submit')) {
-    return JSON.stringify({ targetId: 't3_post', actor: 'mod', lockReason: 'reviewed_policy_compliant' });
+    return JSON.stringify({
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant',
+    });
   }
 
   if (path.includes('unlock-review-submit')) {
@@ -127,8 +135,8 @@ describe('integrated ReviewLock app', () => {
       ok: true,
       demo: true,
       overview: {
-        activeLockCount: 8,
-        reopenedAfterEditCount: 3,
+        activeLockCount: 12,
+        reopenedAfterEditCount: 5,
       },
     });
   });

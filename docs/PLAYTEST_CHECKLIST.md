@@ -82,7 +82,7 @@ Dev account: `u/BrightyBrainiac`.
 
 ## Demo mode
 
-- [ ] Toggle demo mode from the dashboard.
-- [ ] Confirm demo banner is visible.
-- [ ] Confirm seeded active locks, suppressed reports, reopened-after-edit items, report churn, audit timeline, and runtime warning appear.
-- [ ] Confirm toggling back to live mode does not show demo data as live proof.
+- [x] Toggle demo mode from the dashboard.
+- [x] Confirm demo banner is visible.
+- [x] Confirm seeded active locks, suppressed reports, reopened-after-edit items, report churn, audit timeline, and runtime warning appear.
+- [x] Confirm toggling back to live mode does not show demo data as live proof.

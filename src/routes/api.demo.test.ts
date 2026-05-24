@@ -26,7 +26,7 @@ describe('demo API routes', () => {
     ).toMatchObject({
       ok: true,
       demo: true,
-      status: { enabled: true, lockCount: 12 },
+      status: { enabled: true, lockCount: 18, reopenEventCount: 5 },
     });
   });
 

@@ -6,9 +6,11 @@ describe('demo data helpers', () => {
     const scenario = loadDemoScenario();
     const summary = summarizeDemoScenario(scenario);
 
-    expect(summary.locks).toBe(12);
-    expect(summary.reopenedLocks).toBeGreaterThanOrEqual(3);
-    expect(summary.reportsSuppressed).toBeGreaterThanOrEqual(5);
+    expect(summary.locks).toBe(18);
+    expect(summary.activeLocks).toBe(12);
+    expect(summary.reopenedLocks).toBe(5);
+    expect(summary.reopenEvents).toBe(5);
+    expect(summary.reportsSuppressed).toBeGreaterThanOrEqual(40);
     expect(summary.runtimeWarnings).toBeGreaterThanOrEqual(1);
   });
 });
