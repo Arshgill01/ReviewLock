@@ -500,3 +500,37 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Browser proof used mocked API responses; live Reddit WebView and live moderation methods remain unverified.
+
+## 2026-05-24 - Wave 29
+
+- Added `docs/INSTALL_DEPLOY_REHEARSAL.md` with the Devvit account, private upload, controlled install, playtest, logs, local verification, blockers, and next actions from the rehearsal.
+- Verified CLI account access as `u/BrightyBrainiac` and app metadata for `reviewlock`.
+- Uploaded a private developer version; the CLI bumped the app to `0.0.2` and uploaded two WebView assets.
+- Installed `reviewlock` `0.0.2` on the controlled test subreddit `r/reviewlock_dev`.
+- Started playtest successfully and captured the playtest URL `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock` with version `v0.0.2.2`.
+- Connected to Devvit logs for `r/reviewlock_dev`; no runtime log lines were emitted during the sample window.
+- Did not run `devvit publish` and did not make any public release.
+- Commands run:
+  - `npx devvit whoami`
+  - `npx devvit view --json`
+  - `npx devvit upload --help`
+  - `npx devvit install --help`
+  - `npx devvit upload`
+  - `npx devvit install reviewlock_dev`
+  - `npm run dev -- reviewlock_dev`
+  - `ps -ax -o pid,ppid,command | rg 'devvit playtest|npm run dev|reviewlock_dev'`
+  - `kill 18687 18664`
+  - `npx devvit logs --help`
+  - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
+  - `ps -ax -o pid,ppid,command | rg 'devvit logs reviewlock_dev|node .*devvit logs'`
+  - `kill 30809 30573`
+  - `ps -ax -o pid,ppid,command | rg 'devvit playtest|devvit logs reviewlock_dev|npm run dev reviewlock_dev'`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live `approve()`, `ignoreReports()`, and `unignoreReports()` behavior remains unverified on controlled Reddit content.
+  - Live report and edit trigger delivery remains unverified because no controlled Reddit report/edit events were generated during this wave.
+  - `npx devvit view --json` still reports `isWebviewEnabled: false`; playtest booted and uploaded WebView assets, but live WebView rendering still needs isolated browser verification.
