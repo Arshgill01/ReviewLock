@@ -8,9 +8,16 @@ const app = document.querySelector<HTMLDivElement>('#app');
 const params = new URLSearchParams(window.location.search);
 const api = new ReviewLockApiClient();
 const requestedSubreddit = params.get('subreddit');
+const embeddedSubreddit = requestedSubreddit
+  ? undefined
+  : inferEmbeddedSubreddit(
+      window.location.href,
+      document.referrer,
+      (globalThis as { devvit?: unknown }).devvit,
+    );
 const store = new ReviewLockStore(
   api,
-  requestedSubreddit ?? 'reviewlock',
+  requestedSubreddit ?? embeddedSubreddit ?? 'reviewlock',
   params.get('demo') === 'true',
 );
 
@@ -69,14 +76,16 @@ app?.addEventListener('click', (event) => {
 render();
 void (async () => {
   if (!requestedSubreddit) {
-    const embeddedSubreddit = inferEmbeddedSubreddit(window.location.href, document.referrer);
     if (embeddedSubreddit) {
       store.updateSubredditContext(embeddedSubreddit);
     }
 
     try {
       const runtimeContext = await api.fetchRuntimeContext();
-      if (runtimeContext.subreddit) {
+      if (
+        runtimeContext.subreddit &&
+        (!embeddedSubreddit || runtimeContext.subreddit === embeddedSubreddit)
+      ) {
         store.updateSubredditContext(runtimeContext.subreddit);
       }
     } catch {

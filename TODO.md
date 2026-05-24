@@ -31,7 +31,7 @@
 - [x] Wave 28 - Browser Regression Hardening
 - [x] Wave 29 - Install/Deploy Rehearsal Hardening
 - [x] Wave 30 - Production Trust Audit
-- [ ] Wave 31 - Isolated Live WebView Runtime Smoke Proof
+- [x] Wave 31 - Isolated Live WebView Runtime Smoke Proof
 - [ ] Wave 32 - Controlled Moderation Method Proof
 - [ ] Wave 33 - Controlled Report and Edit Trigger Proof
 - [ ] Wave 34 - Claim Boundary Cleanup After Live Proof
@@ -42,7 +42,7 @@
 - [x] Verify Devvit package version after scaffold.
 - [x] Confirm trigger payload shapes in generated app typings.
 - [ ] Confirm `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support.
-- [ ] Rerun dashboard `Verify runtime` in an isolated ReviewLock browser window and confirm proof writes under `reviewlock_dev`.
+- [x] Rerun dashboard `Verify runtime` in an isolated ReviewLock browser window and confirm proof writes under `reviewlock_dev`.
 - [ ] Capture screenshots only after demo loop is integrated.
 - [ ] Keep `decisions.md` updated for every scope or platform call.
 - [ ] Do not treat Wave 14 as final until Waves 15-30 have run and committed.

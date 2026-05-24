@@ -557,3 +557,29 @@
 - Pass/fail status: PASS. `npm run launch` intentionally exits 1 after refusing public publish; the four required verification commands passed.
 - Open risks:
   - Live WebView smoke, moderation methods, report triggers, and edit triggers still require controlled runtime proof before ReviewLock can be trusted for production use.
+
+## 2026-05-24 - Wave 31
+
+- Ran the live ReviewLock WebView smoke inside the existing Zen browser window only.
+- Found a live context bug where the dashboard custom post in `r/reviewlock_dev` rendered the embedded dashboard under the fallback `r/reviewlock` namespace.
+- Hardened client subreddit resolution to prefer Devvit-injected WebView context, then URL/referrer inference, and to avoid overwriting a verified embedded subreddit with a mismatched weaker runtime context response.
+- Added runtime context tests for subreddit normalization, Devvit WebView context extraction, context precedence, and invalid-context fallback.
+- Confirmed in Zen that the fixed WebView version `reviewlock-i1a3xr-0-0-2-6-webview.devvit.net/index.html` renders `r/reviewlock_dev`.
+- Clicked `Verify runtime` in the embedded WebView and observed `Runtime proof refreshed.`, `redditContext verified`, and `redis verified`.
+- Added `docs/LIVE_WEBVIEW_RUNTIME_SMOKE.md`, updated runtime proof, known limitations, TODO, and decisions.
+- Commands run:
+  - `aerospace list-windows --all --format '%{window-id} | %{app-name} | %{workspace} | %{window-title}'`
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser live smoke at `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`
+  - `npx prettier --write src/client/main.ts src/client/state/runtimeContext.ts src/client/state/runtimeContext.test.ts`
+  - `npm run test -- --run src/client/state/runtimeContext.test.ts src/client/state/store.test.ts`
+  - `npm run type-check`
+  - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
+  - `npx devvit view --json`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS for the live WebView/runtime-smoke scope.
+- Open risks:
+  - Live `approve()`, `ignoreReports()`, and `unignoreReports()` behavior remains unverified on controlled Reddit content.
+  - Live report and edit trigger delivery remains unverified because controlled Reddit report/edit events still need to be generated.

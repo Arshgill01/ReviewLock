@@ -331,3 +331,18 @@ Reason:
 
 - ReviewLock still has live moderation and trigger proof gaps.
 - A one-command public publish path is too risky while the app is intentionally carrying unverified runtime claims.
+
+### D026 - Prefer Devvit WebView context for embedded subreddit identity
+
+Wave 31 found that the live WebView could render inside `r/reviewlock_dev` while the client still initialized the dashboard store with the generic fallback `reviewlock`.
+
+Decision:
+
+- When no explicit `?subreddit=` query parameter exists, the client resolves subreddit identity from `globalThis.devvit.context.subredditName` first.
+- URL and referrer path inference remain fallbacks.
+- A later `/api/context` response cannot overwrite an embedded subreddit when it disagrees with the stronger client-side WebView context.
+
+Reason:
+
+- Runtime proof and Redis smoke must write under the controlled test subreddit namespace.
+- A moderation dashboard showing the wrong subreddit is a trust failure even if the surrounding Reddit page is correct.

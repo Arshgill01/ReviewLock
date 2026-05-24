@@ -1,6 +1,6 @@
 # Known Limitations
 
-Last updated: 2026-05-24 16:21 IST.
+Last updated: 2026-05-24 18:58 IST.
 
 ## Runtime proof gaps
 
@@ -11,9 +11,8 @@ Last updated: 2026-05-24 16:21 IST.
 
 ## Browser proof gaps
 
-- The dashboard `Verify runtime` button was exercised in an embedded WebView before the subreddit context fix, but it wrote proof under the fallback `reviewlock` namespace.
-- A fresh browser rerun must confirm the live header and runtime smoke writes use `r/reviewlock_dev`.
-- Zen browser automation is paused until a dedicated ReviewLock window can be targeted without disturbing other browsing windows.
+- Zen browser live WebView smoke now confirms the dashboard header and runtime smoke use `r/reviewlock_dev`.
+- Browser automation must stay isolated to the existing ReviewLock Zen tab/window so live proof does not disturb unrelated Aerospace workspaces.
 
 ## Dashboard/API gaps
 
