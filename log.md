@@ -390,3 +390,27 @@
 - Open risks:
   - Live Devvit report payloads may omit both `eventId` and `reportCount`; in that case ReviewLock keeps the conservative target/minute fallback to avoid overcounting duplicate-looking deliveries.
   - Live moderation method behavior and real report/update delivery remain unverified until controlled Reddit content is exercised.
+
+## 2026-05-24 - Wave 24
+
+- Added `docs/DATA_NAMESPACE_AUDIT.md` with evidence for Redis key prefixing, dynamic key usage, demo/live separation, malformed-record fallback behavior, and the schema migration note.
+- Hardened persistence JSON readers for locks, config, audit events, reopen events, metrics, runtime proof, and demo markers so malformed records degrade to defaults, `undefined`, or filtered lists.
+- Restricted demo write operations to the `reviewlock_demo` namespace so seeded data and demo-disable writes cannot mutate a live subreddit namespace.
+- Added namespace, demo-live separation, malformed lock, malformed config, malformed audit, malformed reopen, malformed metrics, malformed runtime, and malformed demo marker tests.
+- Logged D020-D021 for demo namespace restrictions and malformed persisted JSON behavior.
+- Commands run:
+  - `npx prettier --write src/server/services/audit.ts src/server/services/config.ts src/server/services/demoMode.ts src/server/services/demoMode.test.ts src/server/services/keys.test.ts src/server/services/locks.ts src/server/services/locks.test.ts src/server/services/metrics.ts src/server/services/reopenQueue.ts src/server/services/runtimeProof.ts`
+  - `npm run test -- --run src/server/services/keys.test.ts src/server/adapters/redis.test.ts src/server/services/demoMode.test.ts src/server/services/locks.test.ts`
+  - `rg -n "JSON\\.parse|reviewlock:|keys\\." src/server/services src/server/adapters src/routes src/shared | head -n 240`
+  - `npx prettier --write src/server/services/config.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts src/server/services/reopenQueue.test.ts src/server/services/runtimeProof.test.ts`
+  - `rg -n "redis\\.(get|set|del|exists|expire|hget|hset|hgetall|hdel|hincrby|zAdd|zRange|zRem|zRemRangeByScore|zIncrBy|setIfNotExists)\\(" src --glob '!**/*.test.ts'`
+  - `rg -n "reviewlock:" src --glob '!**/*.test.ts'`
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/keys.test.ts src/server/adapters/redis.test.ts src/server/services/demoMode.test.ts src/server/services/locks.test.ts`
+  - `npm run test -- --run src/server/services/config.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts src/server/services/reopenQueue.test.ts src/server/services/runtimeProof.test.ts`
+  - `npm run lint`
+  - `npm run build`
+  - `npm run test`
+- Pass/fail status: PASS.
+- Open risks:
+  - Existing records remain unversioned except lock fingerprint versions; the migration note defines the next-step requirement before incompatible schema changes.

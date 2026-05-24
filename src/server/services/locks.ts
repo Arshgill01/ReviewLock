@@ -2,10 +2,20 @@ import type { RedisStore } from '../adapters/redis';
 import type { LockStatus, ReviewLockRecord } from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined =>
-  value === undefined ? undefined : (JSON.parse(value) as T);
+const parseJson = <T>(value: string | undefined): T | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
 
-const scoreFromIso = (value: string | undefined): number => (value ? Date.parse(value) : Date.now());
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+};
+
+const scoreFromIso = (value: string | undefined): number =>
+  value ? Date.parse(value) : Date.now();
 
 export const saveLock = async (redis: RedisStore, lock: ReviewLockRecord): Promise<void> => {
   await redis.set(keys.lock(lock.subreddit, lock.id), JSON.stringify(lock));
@@ -24,7 +34,8 @@ export const getLock = async (
   redis: RedisStore,
   subreddit: string,
   lockId: string,
-): Promise<ReviewLockRecord | undefined> => parseJson(await redis.get(keys.lock(subreddit, lockId)));
+): Promise<ReviewLockRecord | undefined> =>
+  parseJson(await redis.get(keys.lock(subreddit, lockId)));
 
 export const getActiveLockByTarget = async (
   redis: RedisStore,

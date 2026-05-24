@@ -2,10 +2,22 @@ import type { RedisStore } from '../adapters/redis';
 import type { AuditEvent } from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined =>
-  value === undefined ? undefined : (JSON.parse(value) as T);
+const parseJson = <T>(value: string | undefined): T | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
 
-export const appendAuditEvent = async (redis: RedisStore, event: AuditEvent): Promise<AuditEvent> => {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+};
+
+export const appendAuditEvent = async (
+  redis: RedisStore,
+  event: AuditEvent,
+): Promise<AuditEvent> => {
   await redis.set(keys.auditEvent(event.subreddit, event.id), JSON.stringify(event));
   await redis.zAdd(keys.audit(event.subreddit), {
     member: event.id,
@@ -18,7 +30,8 @@ export const getAuditEvent = async (
   redis: RedisStore,
   subreddit: string,
   eventId: string,
-): Promise<AuditEvent | undefined> => parseJson(await redis.get(keys.auditEvent(subreddit, eventId)));
+): Promise<AuditEvent | undefined> =>
+  parseJson(await redis.get(keys.auditEvent(subreddit, eventId)));
 
 export const listAuditEvents = async (
   redis: RedisStore,
@@ -26,7 +39,9 @@ export const listAuditEvents = async (
   limit = 100,
 ): Promise<AuditEvent[]> => {
   const entries = await redis.zRange(keys.audit(subreddit), 0, Math.max(0, limit - 1), true);
-  const events = await Promise.all(entries.map((entry) => getAuditEvent(redis, subreddit, entry.member)));
+  const events = await Promise.all(
+    entries.map((entry) => getAuditEvent(redis, subreddit, entry.member)),
+  );
 
   return events.filter((event): event is AuditEvent => event !== undefined);
 };

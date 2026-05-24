@@ -3,10 +3,22 @@ import type { ReviewLockConfig } from '../../shared/schema';
 import type { RedisStore } from '../adapters/redis';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined =>
-  value === undefined ? undefined : (JSON.parse(value) as T);
+const parseJson = <T>(value: string | undefined): T | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
 
-export const defaultConfig = (subreddit: string, now = new Date().toISOString()): ReviewLockConfig => ({
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+};
+
+export const defaultConfig = (
+  subreddit: string,
+  now = new Date().toISOString(),
+): ReviewLockConfig => ({
   subreddit,
   lockExpiryDays: DEFAULT_LOCK_EXPIRY_DAYS,
   demoModeEnabled: false,
@@ -14,10 +26,7 @@ export const defaultConfig = (subreddit: string, now = new Date().toISOString())
   updatedAt: now,
 });
 
-export const loadConfig = async (
-  redis: RedisStore,
-  subreddit: string,
-): Promise<ReviewLockConfig> =>
+export const loadConfig = async (redis: RedisStore, subreddit: string): Promise<ReviewLockConfig> =>
   parseJson<ReviewLockConfig>(await redis.get(keys.config(subreddit))) ?? defaultConfig(subreddit);
 
 export const saveConfig = async (

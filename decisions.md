@@ -242,3 +242,32 @@ Reason:
 
 - Duplicate no-id deliveries with the same report count should not double-count suppression.
 - Two real reports in the same minute commonly differ by report count and should not collapse into one audit/metric event.
+
+### D020 - Restrict demo data writes to the demo namespace
+
+Wave 24 found that demo write functions accepted a scenario or subreddit argument and relied on callers to pass `reviewlock_demo`.
+
+Decision:
+
+- `seedDemoData()` rejects any scenario that is not for `reviewlock_demo`.
+- `disableDemoMode()` rejects live subreddit namespaces instead of writing demo-disable markers into live config.
+- Demo status reads remain allowed for any namespace so the dashboard can show a safe disabled status.
+
+Reason:
+
+- Seeded demo records must never overwrite real moderator data.
+- A live subreddit config should not be mutated by demo-only controls.
+
+### D021 - Treat malformed persisted JSON as absent data
+
+Wave 24 found that malformed JSON in Redis-backed records could throw during dashboard, trigger, or runtime-proof reads.
+
+Decision:
+
+- Persistence readers catch JSON parse failures and return defaults, `undefined`, or filtered lists.
+- Writes still store the current typed JSON shapes; no schema migration is required for this wave.
+
+Reason:
+
+- A single corrupt Redis value should not blank ReviewLock or stop moderators from seeing remaining trustworthy state.
+- Failing closed keeps suppression and reopen claims honest while preserving recoverability.

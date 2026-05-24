@@ -1,4 +1,5 @@
 import { DEMO_SCENARIO } from '../fixtures/demoScenario';
+import { DEMO_SUBREDDIT } from '../../shared/constants';
 import type { RedisStore } from '../adapters/redis';
 import type { DemoScenario } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
@@ -27,11 +28,37 @@ const writeDemoMetrics = async (redis: RedisStore, scenario: DemoScenario): Prom
   }
 
   for (const target of scenario.targetMetrics) {
-    await redis.set(keys.metricsTarget(scenario.subreddit, target.targetId), JSON.stringify(target));
+    await redis.set(
+      keys.metricsTarget(scenario.subreddit, target.targetId),
+      JSON.stringify(target),
+    );
     await redis.zAdd(keys.metricsTargetIndex(scenario.subreddit), {
       member: target.targetId,
       score: target.reportsSuppressed,
     });
+  }
+};
+
+const assertDemoSubreddit = (subreddit: string): void => {
+  if (subreddit !== DEMO_SUBREDDIT) {
+    throw new Error(`Demo data writes are restricted to ${DEMO_SUBREDDIT}.`);
+  }
+};
+
+const parseDemoMarker = (raw: string): { enabled: boolean; seededAt?: string } | undefined => {
+  try {
+    const parsed = JSON.parse(raw) as { enabled?: unknown; seededAt?: unknown };
+
+    if (typeof parsed.enabled !== 'boolean') {
+      return undefined;
+    }
+
+    return {
+      enabled: parsed.enabled,
+      seededAt: typeof parsed.seededAt === 'string' ? parsed.seededAt : undefined,
+    };
+  } catch {
+    return undefined;
   }
 };
 
@@ -40,6 +67,8 @@ export const seedDemoData = async (
   now: string,
   scenario: DemoScenario = DEMO_SCENARIO,
 ): Promise<DemoModeStatus> => {
+  assertDemoSubreddit(scenario.subreddit);
+
   for (const lock of scenario.locks) {
     await saveLock(redis, lock);
   }
@@ -64,7 +93,10 @@ export const seedDemoData = async (
   });
   await writeDemoMetrics(redis, scenario);
   await saveRuntimeProofStatus(redis, scenario.subreddit, scenario.runtimeStatus);
-  await redis.set(keys.demo(scenario.subreddit), JSON.stringify({ enabled: true, seededAt: now, demo: true }));
+  await redis.set(
+    keys.demo(scenario.subreddit),
+    JSON.stringify({ enabled: true, seededAt: now, demo: true }),
+  );
   await updateConfig(redis, scenario.subreddit, { demoModeEnabled: true }, now);
 
   return {
@@ -94,7 +126,12 @@ export const disableDemoMode = async (
   subreddit: string,
   now: string,
 ): Promise<DemoModeStatus> => {
-  await redis.set(keys.demo(subreddit), JSON.stringify({ enabled: false, disabledAt: now, demo: true }));
+  assertDemoSubreddit(subreddit);
+
+  await redis.set(
+    keys.demo(subreddit),
+    JSON.stringify({ enabled: false, disabledAt: now, demo: true }),
+  );
   await updateConfig(redis, subreddit, { demoModeEnabled: false }, now);
 
   return {
@@ -122,7 +159,17 @@ export const getDemoModeStatus = async (
     };
   }
 
-  const stored = JSON.parse(raw) as { enabled: boolean; seededAt?: string };
+  const stored = parseDemoMarker(raw);
+
+  if (!stored) {
+    return {
+      subreddit,
+      enabled: false,
+      demo: true,
+      lockCount: 0,
+      reopenEventCount: 0,
+    };
+  }
 
   return {
     subreddit,

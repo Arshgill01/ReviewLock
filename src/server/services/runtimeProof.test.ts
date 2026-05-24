@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import { loadRuntimeProofStatus, recordCapabilityStatus } from './runtimeProof';
+import { keys } from './keys';
 
 describe('runtime proof status', () => {
   it('loads an unverified default matrix', async () => {
@@ -43,5 +44,15 @@ describe('runtime proof status', () => {
         expect.objectContaining({ name: 'unignoreReports', status: 'failed' }),
       ]),
     );
+  });
+
+  it('loads the unverified default matrix for malformed runtime proof records', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.runtime('alpha'), '{');
+
+    expect(await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T00:00:00.000Z')).toMatchObject({
+      overall: 'unverified',
+      capabilities: expect.arrayContaining([expect.objectContaining({ name: 'redis' })]),
+    });
   });
 });

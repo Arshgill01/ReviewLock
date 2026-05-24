@@ -10,6 +10,7 @@ import {
   listTopTargetMetrics,
   recordLockCreatedMetric,
 } from './metrics';
+import { keys } from './keys';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't3_alpha',
@@ -47,9 +48,21 @@ describe('metrics persistence', () => {
   it('orders daily and top target metrics', async () => {
     const redis = new InMemoryRedisStore();
 
-    await incrementSuppressedReportMetric(redis, target({ id: 't3_low' }), '2026-05-23T01:00:00.000Z');
-    await incrementSuppressedReportMetric(redis, target({ id: 't3_high' }), '2026-05-24T01:00:00.000Z');
-    await incrementSuppressedReportMetric(redis, target({ id: 't3_high' }), '2026-05-24T02:00:00.000Z');
+    await incrementSuppressedReportMetric(
+      redis,
+      target({ id: 't3_low' }),
+      '2026-05-23T01:00:00.000Z',
+    );
+    await incrementSuppressedReportMetric(
+      redis,
+      target({ id: 't3_high' }),
+      '2026-05-24T01:00:00.000Z',
+    );
+    await incrementSuppressedReportMetric(
+      redis,
+      target({ id: 't3_high' }),
+      '2026-05-24T02:00:00.000Z',
+    );
 
     expect((await listDailyMetrics(redis, 'alpha')).map((entry) => entry.date)).toEqual([
       '2026-05-24',
@@ -58,5 +71,24 @@ describe('metrics persistence', () => {
     expect((await listTopTargetMetrics(redis, 'alpha')).map((entry) => entry.targetId)[0]).toBe(
       't3_high',
     );
+  });
+
+  it('skips malformed daily and target metric records', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.metricsDaily('alpha', '2026-05-24'), '{');
+    await redis.zAdd(keys.metricsDailyIndex('alpha'), {
+      member: '2026-05-24',
+      score: Date.parse('2026-05-24T00:00:00.000Z'),
+    });
+    await redis.set(keys.metricsTarget('alpha', 't3_bad'), '{');
+    await redis.zAdd(keys.metricsTargetIndex('alpha'), {
+      member: 't3_bad',
+      score: 10,
+    });
+
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toBeUndefined();
+    expect(await listDailyMetrics(redis, 'alpha')).toEqual([]);
+    expect(await getTargetMetrics(redis, 'alpha', 't3_bad')).toBeUndefined();
+    expect(await listTopTargetMetrics(redis, 'alpha')).toEqual([]);
   });
 });

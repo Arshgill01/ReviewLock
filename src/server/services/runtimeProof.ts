@@ -8,8 +8,17 @@ import { keys } from './keys';
 
 const defaultCapabilityNames = ['approve', 'ignoreReports', 'unignoreReports', 'redis', 'triggers'];
 
-const parseJson = <T>(value: string | undefined): T | undefined =>
-  value === undefined ? undefined : (JSON.parse(value) as T);
+const parseJson = <T>(value: string | undefined): T | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+};
 
 const defaultRuntimeStatus = (now: string): RuntimeProofStatus => ({
   overall: 'unverified',
@@ -44,7 +53,8 @@ export const loadRuntimeProofStatus = async (
   subreddit: string,
   now = new Date().toISOString(),
 ): Promise<RuntimeProofStatus> =>
-  parseJson<RuntimeProofStatus>(await redis.get(keys.runtime(subreddit))) ?? defaultRuntimeStatus(now);
+  parseJson<RuntimeProofStatus>(await redis.get(keys.runtime(subreddit))) ??
+  defaultRuntimeStatus(now);
 
 export const saveRuntimeProofStatus = async (
   redis: RedisStore,

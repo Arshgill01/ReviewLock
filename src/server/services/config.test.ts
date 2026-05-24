@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import { defaultConfig, loadConfig, saveConfig, updateConfig } from './config';
+import { keys } from './keys';
 
 describe('config persistence', () => {
   it('loads defaults for missing config', async () => {
@@ -20,6 +21,16 @@ describe('config persistence', () => {
     expect(await loadConfig(redis, 'alpha')).toMatchObject({
       demoModeEnabled: true,
       updatedAt: '2026-05-24T01:00:00.000Z',
+    });
+  });
+
+  it('loads defaults for malformed config records', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.config('alpha'), '{');
+
+    expect(await loadConfig(redis, 'alpha')).toMatchObject({
+      subreddit: 'alpha',
+      demoModeEnabled: false,
     });
   });
 });

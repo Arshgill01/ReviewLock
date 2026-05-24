@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import type { ReopenEvent } from '../../shared/schema';
-import { dismissReopenEvent, enqueueReopenEvent, getReopenEvent, listOpenReopenEvents } from './reopenQueue';
+import {
+  dismissReopenEvent,
+  enqueueReopenEvent,
+  getReopenEvent,
+  listOpenReopenEvents,
+} from './reopenQueue';
+import { keys } from './keys';
 
 const event = (overrides: Partial<ReopenEvent> = {}): ReopenEvent => ({
   id: 'event-1',
@@ -38,5 +44,18 @@ describe('reopen queue', () => {
 
     expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
     expect(await getReopenEvent(redis, 'alpha', 'event-1')).toMatchObject({ dismissedBy: 'mod' });
+  });
+
+  it('skips malformed reopen event records', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, event({ id: 'good' }));
+    await redis.set(keys.reopenEvent('alpha', 'bad'), '{');
+    await redis.zAdd(keys.reopenQueue('alpha'), {
+      member: 'bad',
+      score: Date.parse('2026-05-24T01:00:00.000Z'),
+    });
+
+    expect(await getReopenEvent(redis, 'alpha', 'bad')).toBeUndefined();
+    expect((await listOpenReopenEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
   });
 });

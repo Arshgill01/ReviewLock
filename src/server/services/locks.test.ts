@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import type { ReviewLockRecord } from '../../shared/schema';
-import { getActiveLockByTarget, getLock, listActiveLocks, saveLock, updateLockStatus } from './locks';
+import {
+  getActiveLockByTarget,
+  getLock,
+  listActiveLocks,
+  saveLock,
+  updateLockStatus,
+} from './locks';
+import { keys } from './keys';
 
 const lock = (overrides: Partial<ReviewLockRecord> = {}): ReviewLockRecord => ({
   id: 'lock-1',
@@ -37,8 +44,14 @@ describe('lock persistence', () => {
 
   it('orders active locks newest first', async () => {
     const redis = new InMemoryRedisStore();
-    await saveLock(redis, lock({ id: 'lock-old', targetId: 't3_old', lockedAt: '2026-05-23T00:00:00.000Z' }));
-    await saveLock(redis, lock({ id: 'lock-new', targetId: 't3_new', lockedAt: '2026-05-24T00:00:00.000Z' }));
+    await saveLock(
+      redis,
+      lock({ id: 'lock-old', targetId: 't3_old', lockedAt: '2026-05-23T00:00:00.000Z' }),
+    );
+    await saveLock(
+      redis,
+      lock({ id: 'lock-new', targetId: 't3_new', lockedAt: '2026-05-24T00:00:00.000Z' }),
+    );
 
     expect((await listActiveLocks(redis, 'alpha')).map((entry) => entry.id)).toEqual([
       'lock-new',
@@ -60,5 +73,20 @@ describe('lock persistence', () => {
     await saveLock(redis, lock());
 
     expect(await getActiveLockByTarget(redis, 'beta', 't3_alpha')).toBeUndefined();
+  });
+
+  it('degrades safely when a lock record is malformed', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.lock('alpha', 'lock-bad'), '{');
+    await redis.set(keys.targetLock('alpha', 't3_bad'), 'lock-bad');
+    await redis.zAdd(keys.activeLocks('alpha'), {
+      member: 'lock-bad',
+      score: Date.parse('2026-05-24T00:00:00.000Z'),
+    });
+
+    expect(await getLock(redis, 'alpha', 'lock-bad')).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_bad')).toBeUndefined();
+    expect(await listActiveLocks(redis, 'alpha')).toEqual([]);
+    expect(await updateLockStatus(redis, 'alpha', 'lock-bad', 'reopened')).toBeUndefined();
   });
 });

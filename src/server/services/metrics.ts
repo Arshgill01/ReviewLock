@@ -2,8 +2,17 @@ import type { RedisStore } from '../adapters/redis';
 import type { DailyMetrics, ReviewLockTarget, TargetMetrics } from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined =>
-  value === undefined ? undefined : (JSON.parse(value) as T);
+const parseJson = <T>(value: string | undefined): T | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+};
 
 const emptyDailyMetrics = (subreddit: string, date: string, demo = false): DailyMetrics => ({
   subreddit,
@@ -14,7 +23,11 @@ const emptyDailyMetrics = (subreddit: string, date: string, demo = false): Daily
   demo,
 });
 
-const emptyTargetMetrics = (target: ReviewLockTarget, now: string, demo = false): TargetMetrics => ({
+const emptyTargetMetrics = (
+  target: ReviewLockTarget,
+  now: string,
+  demo = false,
+): TargetMetrics => ({
   subreddit: target.subreddit,
   targetId: target.id,
   targetKind: target.kind,
@@ -25,7 +38,10 @@ const emptyTargetMetrics = (target: ReviewLockTarget, now: string, demo = false)
   demo,
 });
 
-const saveDailyMetrics = async (redis: RedisStore, metrics: DailyMetrics): Promise<DailyMetrics> => {
+const saveDailyMetrics = async (
+  redis: RedisStore,
+  metrics: DailyMetrics,
+): Promise<DailyMetrics> => {
   await redis.set(keys.metricsDaily(metrics.subreddit, metrics.date), JSON.stringify(metrics));
   await redis.zAdd(keys.metricsDailyIndex(metrics.subreddit), {
     member: metrics.date,
@@ -34,7 +50,10 @@ const saveDailyMetrics = async (redis: RedisStore, metrics: DailyMetrics): Promi
   return metrics;
 };
 
-const saveTargetMetrics = async (redis: RedisStore, metrics: TargetMetrics): Promise<TargetMetrics> => {
+const saveTargetMetrics = async (
+  redis: RedisStore,
+  metrics: TargetMetrics,
+): Promise<TargetMetrics> => {
   await redis.set(keys.metricsTarget(metrics.subreddit, metrics.targetId), JSON.stringify(metrics));
   await redis.zAdd(keys.metricsTargetIndex(metrics.subreddit), {
     member: metrics.targetId,
@@ -47,14 +66,20 @@ export const getDailyMetrics = async (
   redis: RedisStore,
   subreddit: string,
   date: string,
-): Promise<DailyMetrics | undefined> => parseJson(await redis.get(keys.metricsDaily(subreddit, date)));
+): Promise<DailyMetrics | undefined> =>
+  parseJson(await redis.get(keys.metricsDaily(subreddit, date)));
 
 export const listDailyMetrics = async (
   redis: RedisStore,
   subreddit: string,
   limit = 30,
 ): Promise<DailyMetrics[]> => {
-  const entries = await redis.zRange(keys.metricsDailyIndex(subreddit), 0, Math.max(0, limit - 1), true);
+  const entries = await redis.zRange(
+    keys.metricsDailyIndex(subreddit),
+    0,
+    Math.max(0, limit - 1),
+    true,
+  );
   const metrics = await Promise.all(
     entries.map((entry) => getDailyMetrics(redis, subreddit, entry.member)),
   );
@@ -66,7 +91,8 @@ export const getTargetMetrics = async (
   redis: RedisStore,
   subreddit: string,
   targetId: string,
-): Promise<TargetMetrics | undefined> => parseJson(await redis.get(keys.metricsTarget(subreddit, targetId)));
+): Promise<TargetMetrics | undefined> =>
+  parseJson(await redis.get(keys.metricsTarget(subreddit, targetId)));
 
 export const listTopTargetMetrics = async (
   redis: RedisStore,
@@ -93,9 +119,12 @@ export const recordLockCreatedMetric = async (
   demo = false,
 ): Promise<void> => {
   const date = now.slice(0, 10);
-  const daily = (await getDailyMetrics(redis, target.subreddit, date)) ?? emptyDailyMetrics(target.subreddit, date, demo);
+  const daily =
+    (await getDailyMetrics(redis, target.subreddit, date)) ??
+    emptyDailyMetrics(target.subreddit, date, demo);
   const targetMetrics =
-    (await getTargetMetrics(redis, target.subreddit, target.id)) ?? emptyTargetMetrics(target, now, demo);
+    (await getTargetMetrics(redis, target.subreddit, target.id)) ??
+    emptyTargetMetrics(target, now, demo);
 
   await saveDailyMetrics(redis, { ...daily, locksCreated: daily.locksCreated + 1 });
   await saveTargetMetrics(redis, {
@@ -112,9 +141,12 @@ export const incrementSuppressedReportMetric = async (
   demo = false,
 ): Promise<void> => {
   const date = now.slice(0, 10);
-  const daily = (await getDailyMetrics(redis, target.subreddit, date)) ?? emptyDailyMetrics(target.subreddit, date, demo);
+  const daily =
+    (await getDailyMetrics(redis, target.subreddit, date)) ??
+    emptyDailyMetrics(target.subreddit, date, demo);
   const targetMetrics =
-    (await getTargetMetrics(redis, target.subreddit, target.id)) ?? emptyTargetMetrics(target, now, demo);
+    (await getTargetMetrics(redis, target.subreddit, target.id)) ??
+    emptyTargetMetrics(target, now, demo);
 
   await saveDailyMetrics(redis, { ...daily, reportsSuppressed: daily.reportsSuppressed + 1 });
   await saveTargetMetrics(redis, {
@@ -131,9 +163,12 @@ export const incrementReopenedMetric = async (
   demo = false,
 ): Promise<void> => {
   const date = now.slice(0, 10);
-  const daily = (await getDailyMetrics(redis, target.subreddit, date)) ?? emptyDailyMetrics(target.subreddit, date, demo);
+  const daily =
+    (await getDailyMetrics(redis, target.subreddit, date)) ??
+    emptyDailyMetrics(target.subreddit, date, demo);
   const targetMetrics =
-    (await getTargetMetrics(redis, target.subreddit, target.id)) ?? emptyTargetMetrics(target, now, demo);
+    (await getTargetMetrics(redis, target.subreddit, target.id)) ??
+    emptyTargetMetrics(target, now, demo);
 
   await saveDailyMetrics(redis, { ...daily, locksReopened: daily.locksReopened + 1 });
   await saveTargetMetrics(redis, {
