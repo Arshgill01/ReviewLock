@@ -115,7 +115,7 @@ export class ReviewLockStore {
     this.notify();
 
     try {
-      const res = await this.api.unlockTarget(targetId, lockId, 'moderator');
+      const res = await this.api.unlockTarget(targetId, lockId, 'moderator', this.subreddit);
       if (!res.ok) {
         throw new Error(res.message || 'Failed to unlock content');
       }

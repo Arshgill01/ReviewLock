@@ -77,6 +77,7 @@
 - [x] Unignore stale locks before attempting replacement relock writes.
 - [x] Reconcile proof-boundary docs after controlled post-target moderation proof.
 - [x] Remove controlled test subreddit fallbacks from runtime subreddit normalization and dashboard launch writes.
+- [x] Send explicit dashboard subreddit scope with inline unlock actions.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

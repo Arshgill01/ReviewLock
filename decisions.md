@@ -858,3 +858,22 @@ Reason:
 - `reviewlock_dev` is the controlled proof subreddit, not a production fallback.
   A missing runtime context should be visible and non-destructive instead of
   creating a dashboard post in the wrong community.
+
+### D057 - Dashboard write actions carry explicit subreddit scope
+
+Dashboard read routes and reopen-dismiss writes already carried the current
+dashboard subreddit. Inline unlock actions depended on runtime context alone.
+
+Decision:
+
+- The dashboard API client now sends the current subreddit on unlock requests as
+  a query parameter.
+- The store passes its active live subreddit into unlock actions, matching the
+  existing dismiss path's explicit scope.
+
+Reason:
+
+- Moderator actions should be scoped by both the Devvit runtime context and the
+  dashboard state the moderator is looking at. Explicit client scope gives the
+  server another mismatch check and prevents hidden fallback behavior in weaker
+  or local runtime contexts.

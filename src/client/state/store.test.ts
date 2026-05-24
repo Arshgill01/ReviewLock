@@ -152,7 +152,12 @@ describe('ReviewLockStore', () => {
 
     await store.unlock('lock-1', 't3_1');
 
-    expect(apiClient.unlockTarget).toHaveBeenCalledWith('t3_1', 'lock-1', 'moderator');
+    expect(apiClient.unlockTarget).toHaveBeenCalledWith(
+      't3_1',
+      'lock-1',
+      'moderator',
+      'test_subreddit',
+    );
     expect(apiClient.fetchOverview).toHaveBeenCalledTimes(2); // Initial + after unlock
     expect(store.confirmation).toBeNull();
   });

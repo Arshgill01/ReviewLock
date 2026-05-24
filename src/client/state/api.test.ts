@@ -103,7 +103,7 @@ describe('ReviewLockApiClient contract handling', () => {
     );
 
     await expect(
-      new ReviewLockApiClient().unlockTarget('t3_reviewed', 'lock-1', 'mod'),
+      new ReviewLockApiClient().unlockTarget('t3_reviewed', 'lock-1', 'mod', 'alpha'),
     ).rejects.toThrow('API error: ReviewLock target is outside this subreddit context.');
   });
 
@@ -164,7 +164,7 @@ describe('ReviewLockApiClient contract handling', () => {
     );
     const api = new ReviewLockApiClient();
 
-    await expect(api.unlockTarget('t3_reviewed', 'lock-1', 'mod')).resolves.toEqual({
+    await expect(api.unlockTarget('t3_reviewed', 'lock-1', 'mod', 'alpha')).resolves.toEqual({
       ok: true,
       message: 'ReviewLock unlocked this reviewed content.',
     });
@@ -172,7 +172,7 @@ describe('ReviewLockApiClient contract handling', () => {
       ok: true,
       message: 'ReviewLock dismissed this reopened item.',
     });
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/locks/unlock', {
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/locks/unlock?subreddit=alpha', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetId: 't3_reviewed', lockId: 'lock-1', actor: 'mod' }),

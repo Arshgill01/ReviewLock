@@ -259,8 +259,9 @@ export class ReviewLockApiClient {
     targetId: string,
     lockId: string,
     actor: string,
+    subreddit: string,
   ): Promise<{ ok: boolean; message?: string }> {
-    const endpoint = '/api/locks/unlock';
+    const endpoint = `/api/locks/unlock?subreddit=${encodeURIComponent(subreddit)}`;
     const data = await this.requestJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

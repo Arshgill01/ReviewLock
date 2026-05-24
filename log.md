@@ -917,3 +917,25 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 dashboard unlock scope hardening
+
+- Hardened dashboard inline unlock actions to send the current dashboard
+  subreddit as explicit request scope.
+- Updated the store and API client contract tests so unlock mirrors other
+  dashboard scoped requests.
+- Commands run:
+  - `npm run test -- src/client/state/api.test.ts src/client/state/store.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - `npx prettier --write src/client/state/api.ts src/client/state/api.test.ts src/client/state/store.ts src/client/state/store.test.ts TODO.md decisions.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+  - `npm run test`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled" src docs README.md || true`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 229
+  tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
