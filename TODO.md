@@ -15,6 +15,22 @@
 - [x] Wave 11 - Demo Mode
 - [x] Wave 12 - Integration Wiring
 - [ ] Wave 13 - Runtime Proof and Hardening
+- [ ] Wave 15 - End-to-End Trigger Proof
+- [ ] Wave 16 - Edit-Fingerprint Stress
+- [ ] Wave 17 - Redis Failure and Race Conditions
+- [ ] Wave 18 - UI and Dashboard Audit
+- [ ] Wave 19 - Full Scenario Walkthrough
+- [ ] Wave 20 - Hardening Pass 1
+- [ ] Wave 21 - Devvit Config and Registration Hardening
+- [ ] Wave 22 - API Contract and Client Integration Hardening
+- [ ] Wave 23 - Trigger Idempotency Hardening
+- [ ] Wave 24 - Data Namespace and Migration Hardening
+- [ ] Wave 25 - Safety and Privacy Hardening
+- [ ] Wave 26 - Performance and High-Volume Hardening
+- [ ] Wave 27 - Claim and Copy Hardening
+- [ ] Wave 28 - Browser Regression Hardening
+- [ ] Wave 29 - Install/Deploy Rehearsal Hardening
+- [ ] Wave 30 - Production Trust Audit
 - [ ] Wave 14 - Submission Package and Final Audit
 
 ## Cross-wave reminders
@@ -24,3 +40,4 @@
 - [ ] Confirm `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support.
 - [ ] Capture screenshots only after demo loop is integrated.
 - [ ] Keep `decisions.md` updated for every scope or platform call.
+- [ ] Do not treat Wave 14 as final until Waves 15-30 have run and committed.

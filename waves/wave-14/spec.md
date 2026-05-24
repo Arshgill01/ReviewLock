@@ -13,7 +13,7 @@ Prepare the hackathon-facing materials and audit the repository against the orig
 
 ## Dependencies
 
-Waves 01 through 13 should be complete.
+Waves 01 through 13 and Waves 15 through 30 should be complete. Wave 14 is intentionally held until after the added runtime, scenario, and hardening waves so final submission claims are backed by stronger evidence.
 
 ## Write ownership
 
@@ -103,4 +103,3 @@ Review any `rg` hits manually. The command returning hits is not automatically f
 ```txt
 docs: prepare reviewlock submission package
 ```
-
