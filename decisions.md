@@ -228,3 +228,17 @@ Reason:
 
 - Devvit WebView failures, stale bundles, or server-side regressions should never produce a blank moderation dashboard.
 - Moderators need an honest retryable failure state more than optimistic rendering with partial or malformed data.
+
+### D019 - Use report count in no-id report trigger dedupe
+
+Wave 23 found that no-id report trigger fallback dedupe used only target id and minute bucket.
+
+Decision:
+
+- For report triggers without an event id, include `reportCount` in the dedupe and audit identity when it is present.
+- Keep the target/minute fallback when both event id and report count are missing.
+
+Reason:
+
+- Duplicate no-id deliveries with the same report count should not double-count suppression.
+- Two real reports in the same minute commonly differ by report count and should not collapse into one audit/metric event.

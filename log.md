@@ -370,3 +370,23 @@
 - Open risks:
   - The contract proof is local route/client proof; live Reddit WebView request timing and platform outages still need later browser/runtime regression passes.
   - Runtime moderation operations remain live-unverified until controlled Reddit report/edit events are exercised.
+
+## 2026-05-24 - Wave 23
+
+- Hardened no-id report trigger fallback dedupe to include `reportCount` when present, preventing same-minute undercounting of distinct reports.
+- Updated no-id report audit ids to include the report-count component so metrics and audit entries stay aligned.
+- Added duplicate changed-report, missing-event-id, report-then-update, update-then-report, sequential update/update, and concurrent update/update idempotency tests.
+- Added `docs/TRIGGER_IDEMPOTENCY_PROOF.md` with the duplicate/out-of-order proof matrix and remaining live-payload boundary.
+- Logged D019 for no-id report trigger fallback identity.
+- Commands run:
+  - `npx prettier --write src/server/services/reportTriggers.ts src/server/services/reportTriggers.test.ts src/server/services/updateTriggers.test.ts`
+  - `npm run test -- --run src/server/services/reportTriggers.test.ts src/server/services/updateTriggers.test.ts`
+  - `npx prettier --write docs/TRIGGER_IDEMPOTENCY_PROOF.md decisions.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run build`
+  - `npm run test`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live Devvit report payloads may omit both `eventId` and `reportCount`; in that case ReviewLock keeps the conservative target/minute fallback to avoid overcounting duplicate-looking deliveries.
+  - Live moderation method behavior and real report/update delivery remain unverified until controlled Reddit content is exercised.

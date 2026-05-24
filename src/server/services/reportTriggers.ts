@@ -37,14 +37,18 @@ export interface ReportTriggerResult {
 
 const dedupeKey = (input: ReportTriggerInput, now: string): string => {
   const bucket = now.slice(0, 16);
-  const id = input.eventId ?? `${input.targetId}:${bucket}`;
+  const id =
+    input.eventId ??
+    `missing-event:${input.targetId}:count-${input.reportCount ?? 'unknown'}:${bucket}`;
   return key(input.subreddit ?? 'unknown', `report:dedupe:${id}`);
 };
 
 const safeIdPart = (value: string): string => value.replace(/[^a-zA-Z0-9_]+/g, '-');
 
 const auditIdPart = (input: ReportTriggerInput, now: string): string =>
-  safeIdPart(input.eventId ?? `${input.targetId}-${Date.parse(now)}`);
+  safeIdPart(
+    input.eventId ?? `${input.targetId}-count-${input.reportCount ?? 'unknown'}-${Date.parse(now)}`,
+  );
 
 const reportAuditId = (
   prefix: string,

@@ -161,6 +161,77 @@ describe('update triggers', () => {
     ]);
   });
 
+  it('does not double-count two sequential reopen-capable updates for one lock', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([
+      target({ body: 'Edited body', flairText: 'News', edited: true }),
+    ]);
+
+    const first = await handleUpdateTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', triggerKind: 'post_update' },
+    );
+    const second = await handleUpdateTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', triggerKind: 'post_flair_update' },
+    );
+
+    expect(first.action).toBe('reopened');
+    expect(second.action).toBe('no_lock');
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await listOpenReopenEvents(redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('does not double-count two concurrent reopen-capable updates for one lock', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([
+      target({ body: 'Edited body', flairText: 'News', edited: true }),
+    ]);
+    const dependencies = {
+      redis,
+      reddit,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    };
+
+    const results = await Promise.all([
+      handleUpdateTrigger(dependencies, { targetId: 't3_post', triggerKind: 'post_update' }),
+      handleUpdateTrigger(dependencies, {
+        targetId: 't3_post',
+        triggerKind: 'post_flair_update',
+      }),
+    ]);
+    const actions = results.map((result) => result.action);
+
+    expect(actions).toContain('reopened');
+    expect(actions).toContain('no_lock');
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await listOpenReopenEvents(redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(1);
+  });
+
   it('reopens comment edits', async () => {
     const comment: ReviewLockTarget = {
       id: 't1_comment',

@@ -23,7 +23,7 @@
 - [x] Wave 20 - Hardening Pass 1
 - [x] Wave 21 - Devvit Config and Registration Hardening
 - [x] Wave 22 - API Contract and Client Integration Hardening
-- [ ] Wave 23 - Trigger Idempotency Hardening
+- [x] Wave 23 - Trigger Idempotency Hardening
 - [ ] Wave 24 - Data Namespace and Migration Hardening
 - [ ] Wave 25 - Safety and Privacy Hardening
 - [ ] Wave 26 - Performance and High-Volume Hardening

@@ -9,6 +9,7 @@ import { getDailyMetrics, getTargetMetrics } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { fingerprintTarget } from './fingerprint';
 import { handleReportTrigger } from './reportTriggers';
+import { handleUpdateTrigger } from './updateTriggers';
 
 const target = (body = 'Reviewed body'): ReviewLockTarget => ({
   id: 't3_post',
@@ -139,6 +140,62 @@ describe('handleReportTrigger', () => {
       reportsSuppressed: 1,
     });
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('dedupes duplicate changed-content report event ids before reopening twice', async () => {
+    const dependencies = await deps(target('Edited body'));
+    const first = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-reopen-duplicate',
+    });
+    const duplicate = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-reopen-duplicate',
+    });
+
+    expect(first.action).toBe('reopen_changed');
+    expect(duplicate.action).toBe('duplicate');
+    expect(dependencies.reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+      reportsSuppressed: 0,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('uses report count to avoid undercounting distinct no-id report deliveries', async () => {
+    const dependencies = await deps();
+    const first = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 5,
+    });
+    const duplicateSameCount = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 5,
+    });
+    const nextReportCount = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 6,
+    });
+
+    expect(first.action).toBe('suppress_unchanged');
+    expect(duplicateSameCount.action).toBe('duplicate');
+    expect(nextReportCount.action).toBe('suppress_unchanged');
+    expect(dependencies.reddit.calls).toEqual(['ignoreReports:t3_post', 'ignoreReports:t3_post']);
+    expect(await getLock(dependencies.redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 2,
+      lastReportCount: 6,
+    });
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 2,
+      locksReopened: 0,
+    });
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      reportsSuppressed: 2,
+      locksReopened: 0,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(2);
   });
 
   it('suppresses unchanged comment reports with the comment moderation operation', async () => {
@@ -298,5 +355,49 @@ describe('handleReportTrigger', () => {
       warnings: ['redis_write_failed'],
     });
     expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+  });
+
+  it('keeps report-then-update ordering idempotent for changed content', async () => {
+    const dependencies = await deps(target('Edited body'));
+    const reportResult = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-report-first',
+    });
+    const updateResult = await handleUpdateTrigger(dependencies, {
+      targetId: 't3_post',
+      triggerKind: 'post_update',
+    });
+
+    expect(reportResult.action).toBe('reopen_changed');
+    expect(updateResult.action).toBe('no_lock');
+    expect(dependencies.reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+      reportsSuppressed: 0,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('keeps update-then-report ordering idempotent for changed content', async () => {
+    const dependencies = await deps(target('Edited body'));
+    const updateResult = await handleUpdateTrigger(dependencies, {
+      targetId: 't3_post',
+      triggerKind: 'post_update',
+    });
+    const reportResult = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-report-second',
+    });
+
+    expect(updateResult.action).toBe('reopened');
+    expect(reportResult.action).toBe('no_lock');
+    expect(dependencies.reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+      reportsSuppressed: 0,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
   });
 });
