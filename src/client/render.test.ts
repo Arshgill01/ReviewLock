@@ -8,7 +8,12 @@ import { renderRuntimeBanner } from './components/RuntimeBanner';
 import { renderDashboardPage } from './pages/DashboardPage';
 import { ReviewLockApiClient } from './state/api';
 import { ReviewLockStore } from './state/store';
-import type { AuditEvent, ReopenEvent, ReviewLockRecord, RuntimeProofStatus } from '../shared/schema';
+import type {
+  AuditEvent,
+  ReopenEvent,
+  ReviewLockRecord,
+  RuntimeProofStatus,
+} from '../shared/schema';
 
 const forbiddenCopy = ['not reportable', 'disable reports', 'blocked reports'];
 
@@ -116,7 +121,9 @@ describe('client render helpers', () => {
     expect(renderRuntimeBanner(runtime())).toContain('Runtime proof/status');
     expect(renderRuntimeBanner(runtime())).toContain('ignoreReports');
     expect(renderRuntimeBanner(runtime(), 'Runtime proof refreshed.')).toContain('Verify runtime');
-    expect(renderRuntimeBanner(runtime(), 'Runtime proof refreshed.')).toContain('Runtime proof refreshed.');
+    expect(renderRuntimeBanner(runtime(), 'Runtime proof refreshed.')).toContain(
+      'Runtime proof refreshed.',
+    );
   });
 
   it('renders audit timeline', () => {
@@ -147,6 +154,31 @@ describe('client render helpers', () => {
     expect(html).toContain('Reports suppressed');
     expect(html).toContain('Reopened after edit');
     expect(html).toContain('Demo mode');
+    expectSafeCopy(html);
+  });
+
+  it('keeps stale dashboard data honest when refresh fails', () => {
+    const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock', false);
+    store.overview = {
+      activeLockCount: 1,
+      reportsSuppressed: 7,
+      reopenedAfterEditCount: 1,
+      latestReopenEvent: reopen(),
+      topChurnTargets: [],
+      runtimeStatus: runtime(),
+    };
+    store.locks = [lock()];
+    store.reopenQueue = [reopen()];
+    store.auditEvents = [audit()];
+    store.runtimeStatus = runtime();
+    store.error = 'API error: Service unavailable';
+
+    const html = renderDashboardPage(store);
+
+    expect(html).toContain('Dashboard refresh failed.');
+    expect(html).toContain('API error: Service unavailable');
+    expect(html).toContain('Retry');
+    expect(html).toContain('Active locks');
     expectSafeCopy(html);
   });
 });

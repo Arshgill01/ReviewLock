@@ -251,3 +251,25 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Race guarantees are locally verified against the adapter contract; live Devvit trigger delivery timing and Reddit moderation operations still require controlled playtest proof.
+
+## 2026-05-24 - Wave 18
+
+- Audited dashboard rendering across empty live, demo seeded, active lock, reopened after edit, runtime failed/unverified, high-volume active locks, and high-volume report churn states at desktop and mobile widths.
+- Added `docs/UI_AUDIT.md` with browser evidence for all required states.
+- Added a visible stale-data error banner when dashboard refresh fails after data has already loaded.
+- Fixed mobile/high-volume overflow by allowing dashboard columns and panels to shrink around horizontally scrollable active-lock tables.
+- Added wrapping for long table, queue, audit, churn, and latest-event text.
+- Added a render test proving stale dashboard data is visibly marked when refresh fails.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/client/state/store.test.ts src/client/render.test.ts`
+  - `npm run build`
+  - `npx vite --host 127.0.0.1 --port 5173`
+  - `python3 -m http.server 5173 --bind 127.0.0.1 --directory dist/client`
+  - `npx --yes --package=playwright node <<'NODE' ... NODE`
+  - `lsof -ti tcp:5173 | xargs -r kill`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - Browser evidence used mocked dashboard API responses against the built client bundle; live Devvit WebView rendering and live moderation operations still require controlled playtest proof.
+  - Plain Vite dev serving is blocked by the Devvit Vite plugin, so the browser audit used the built client served statically.

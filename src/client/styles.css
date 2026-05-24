@@ -1,7 +1,13 @@
 :root {
   color: #20211d;
   background: #f6f7f2;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Helvetica Neue',
+    sans-serif;
   font-size: 16px;
   --bg: #f6f7f2;
   --surface: #ffffff;
@@ -135,6 +141,7 @@ a:hover {
   background: var(--surface);
   border: 1px solid var(--line);
   padding: 14px;
+  min-width: 0;
 }
 
 .panel-tight {
@@ -143,6 +150,21 @@ a:hover {
 
 .panel-error {
   width: min(520px, 100%);
+}
+
+.panel-error-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  border-color: #e6b8b3;
+  background: #fff4f2;
+}
+
+.panel-error-inline span {
+  min-width: 0;
+  flex: 1;
+  color: var(--red);
 }
 
 .panel-heading {
@@ -175,6 +197,7 @@ a:hover {
   display: grid;
   gap: 12px;
   align-content: start;
+  min-width: 0;
 }
 
 .latest-panel {
@@ -354,6 +377,24 @@ td strong {
   min-width: 0;
 }
 
+.queue-row strong,
+.queue-row span,
+.queue-row p,
+.audit-row strong,
+.audit-row span,
+.audit-row p,
+.churn-row strong,
+.churn-row span,
+td,
+.latest-grid strong {
+  overflow-wrap: anywhere;
+}
+
+.queue-row p,
+.audit-row p {
+  margin: 4px 0 0;
+}
+
 .runtime-warnings {
   margin-top: 10px;
   color: var(--amber);
@@ -399,5 +440,14 @@ code {
 
   .latest-grid {
     grid-template-columns: 1fr;
+  }
+
+  .panel-error-inline,
+  .queue-row,
+  .audit-row,
+  .churn-row,
+  .capability-row {
+    display: grid;
+    justify-items: start;
   }
 }

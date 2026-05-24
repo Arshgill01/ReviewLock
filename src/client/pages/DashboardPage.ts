@@ -81,6 +81,16 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
         </div>
       </header>
 
+      ${
+        store.error
+          ? `<section class="panel panel-error-inline" role="alert">
+              <strong>Dashboard refresh failed.</strong>
+              <span>${text(store.error)}</span>
+              <button class="button button-secondary" data-action="retry-fetch">Retry</button>
+            </section>`
+          : ''
+      }
+
       <section class="first-viewport" aria-label="Dashboard overview">
         ${renderMetricStrip(store.overview)}
         ${renderLatestReopenEvent(store.overview?.latestReopenEvent)}
