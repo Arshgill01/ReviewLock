@@ -91,6 +91,7 @@
 - [x] Add live trigger proof runbook for S01/S02 controlled execution.
 - [x] Record report-trigger moderation rollback failures in runtime proof and audit.
 - [x] Normalize bare Devvit menu/report/update target ids before refetch.
+- [x] Record S01 live post permalink and thing id in proof docs.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

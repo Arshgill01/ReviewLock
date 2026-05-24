@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 01:35 IST.
+Last updated: 2026-05-25 01:39 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -10,7 +10,12 @@ is explicitly selected.
 
 - Controlled live scenario matrix: `docs/LIVE_SCENARIO_MATRIX.md`.
 - Exact controlled content: `docs/LIVE_SCENARIO_CONTENT.md`.
-- S01 is drafted in Zen but has not been posted.
+- S01 has been posted in `r/reviewlock_dev`:
+  `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
+  (`t3_1tmmeo6`, author `u/BrightyBrainiac`).
+- Zen is currently on the S01 post page; the lock form must be reopened after
+  action-time confirmation because playtest rebuilds closed the earlier form.
+- Current playtest reached `v0.0.2.82`.
 - No live `PostReport`, `CommentReport`, `PostUpdate`, `CommentUpdate`,
   `PostNsfwUpdate`, `PostSpoilerUpdate`, or `PostFlairUpdate` trigger delivery
   has been proven yet.
@@ -45,20 +50,23 @@ and retry log capture immediately.
 
 S01 proves unchanged post report suppression.
 
-1. Confirm the drafted S01 post in Zen is still:
+1. Confirm the posted S01 post in Zen is still:
    `[ReviewLock proof S01] Reviewed unchanged policy context`.
-2. Click `Post` only after action-time confirmation.
-3. Record the created Reddit permalink and thing id.
-4. Start or refresh playtest:
+2. Confirm the S01 permalink and thing id:
+   `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
+   and `t3_1tmmeo6`.
+3. Start or refresh playtest:
    `npm run dev -- reviewlock_dev`.
-5. Open the S01 post with `?playtest=reviewlock`.
-6. Use the post menu action `Lock review`.
-7. Submit the lock form with reason `reviewed_policy_compliant`.
-8. Open the ReviewLock dashboard and verify S01 appears as an active lock.
-9. Capture runtime status before reports.
-10. Submit one controlled report against S01 only after action-time
+4. Open the S01 post with `?playtest=reviewlock`.
+5. Use the post menu action `Lock review`.
+6. Submit the lock form with reason `reviewed_policy_compliant` only after
+   action-time confirmation because it approves where supported, calls
+   `ignoreReports()`, and writes ReviewLock state.
+7. Open the ReviewLock dashboard and verify S01 appears as an active lock.
+8. Capture runtime status before reports.
+9. Submit one controlled report against S01 only after action-time
     confirmation.
-11. Capture Devvit logs and dashboard after the report.
+10. Capture Devvit logs and dashboard after the report.
 
 Expected proof:
 

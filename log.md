@@ -1261,3 +1261,23 @@
 - Open risks:
   - Live trigger payload shape still needs `devvit logs` evidence from
     controlled S01/S02 actions.
+
+## 2026-05-25 - Wave 33 S01 live post proof state update
+
+- Recorded that S01 has been posted in `r/reviewlock_dev`.
+- Captured live target details:
+  - permalink:
+    `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
+  - thing id: `t3_1tmmeo6`
+  - author: `u/BrightyBrainiac`
+- Updated the S01 runbook steps to start from the posted target and noted that
+  the lock form must be reopened after action-time confirmation because
+  playtest rebuilds closed the earlier form.
+- Commands run:
+  - `sed -n '1,70p' docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`
+  - `sed -n '1,100p' docs/LIVE_SCENARIO_CONTENT.md`
+  - Zen browser state inspection on the S01 post page.
+- Pass/fail status: PASS for proof-state documentation.
+- Open risks:
+  - S01 has not been locked through ReviewLock in the current live pass.
+  - No controlled report or edit trigger has been generated yet.
