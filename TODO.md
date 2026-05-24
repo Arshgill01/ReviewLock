@@ -22,7 +22,7 @@
 - [x] Wave 19 - Full Scenario Walkthrough
 - [x] Wave 20 - Hardening Pass 1
 - [x] Wave 21 - Devvit Config and Registration Hardening
-- [ ] Wave 22 - API Contract and Client Integration Hardening
+- [x] Wave 22 - API Contract and Client Integration Hardening
 - [ ] Wave 23 - Trigger Idempotency Hardening
 - [ ] Wave 24 - Data Namespace and Migration Hardening
 - [ ] Wave 25 - Safety and Privacy Hardening

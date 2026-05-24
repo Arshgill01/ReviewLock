@@ -27,6 +27,23 @@ export interface DemoModeStatus {
   reopenEventCount: number;
 }
 
+type JsonObject = Record<string, unknown>;
+
+const isObject = (value: unknown): value is JsonObject =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const hasBoolean = (data: JsonObject, key: string): boolean => typeof data[key] === 'boolean';
+
+const hasArray = (data: JsonObject, key: string): boolean => Array.isArray(data[key]);
+
+const hasObject = (data: JsonObject, key: string): boolean => isObject(data[key]);
+
+const errorText = (data: unknown): string | undefined =>
+  isObject(data) && typeof data.error === 'string' ? data.error : undefined;
+
+const contractError = (endpoint: string, message: string): Error =>
+  new Error(`API contract error at ${endpoint}: ${message}`);
+
 export class ReviewLockApiClient {
   private baseUrl: string;
 
@@ -38,11 +55,93 @@ export class ReviewLockApiClient {
     return `?subreddit=${encodeURIComponent(subreddit)}&demo=${demo ? 'true' : 'false'}`;
   }
 
+  private async requestJson(endpoint: string, init?: RequestInit): Promise<JsonObject> {
+    const res = await fetch(`${this.baseUrl}${endpoint}`, init);
+    let data: unknown;
+
+    try {
+      data = await res.json();
+    } catch {
+      if (!res.ok) {
+        throw new Error(`API error: ${res.statusText || res.status}`);
+      }
+      throw contractError(endpoint, 'response was not valid JSON');
+    }
+
+    if (!res.ok) {
+      throw new Error(`API error: ${errorText(data) ?? (res.statusText || String(res.status))}`);
+    }
+
+    if (!isObject(data)) {
+      throw contractError(endpoint, 'response JSON was not an object');
+    }
+
+    return data;
+  }
+
+  private expectOk(data: JsonObject, endpoint: string): void {
+    if (data.ok !== true) {
+      throw new Error(errorText(data) ?? `Failed request to ${endpoint}`);
+    }
+  }
+
+  private expectDashboardOverview(data: JsonObject, endpoint: string): DashboardOverview {
+    if (!hasObject(data, 'overview')) {
+      throw contractError(endpoint, 'missing overview object');
+    }
+
+    const overview = data.overview as JsonObject;
+    if (
+      typeof overview.activeLockCount !== 'number' ||
+      typeof overview.reportsSuppressed !== 'number' ||
+      typeof overview.reopenedAfterEditCount !== 'number' ||
+      !Array.isArray(overview.topChurnTargets) ||
+      !isObject(overview.runtimeStatus)
+    ) {
+      throw contractError(endpoint, 'overview object is missing required dashboard fields');
+    }
+
+    return overview as unknown as DashboardOverview;
+  }
+
+  private expectArray<T>(data: JsonObject, endpoint: string, key: string): T[] {
+    if (!hasArray(data, key)) {
+      throw contractError(endpoint, `missing ${key} array`);
+    }
+
+    return data[key] as T[];
+  }
+
+  private expectDemoStatus(data: JsonObject, endpoint: string): DemoModeStatus {
+    if (!hasObject(data, 'status')) {
+      throw contractError(endpoint, 'missing status object');
+    }
+
+    const status = data.status as JsonObject;
+    if (
+      typeof status.subreddit !== 'string' ||
+      typeof status.enabled !== 'boolean' ||
+      typeof status.demo !== 'boolean' ||
+      typeof status.lockCount !== 'number' ||
+      typeof status.reopenEventCount !== 'number'
+    ) {
+      throw contractError(endpoint, 'status object is missing required demo fields');
+    }
+
+    return status as unknown as DemoModeStatus;
+  }
+
   async fetchRuntimeContext(): Promise<{ subreddit?: string }> {
-    const res = await fetch(`${this.baseUrl}/api/context`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch runtime context');
+    const endpoint = '/api/context';
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    if (
+      data.subreddit !== null &&
+      data.subreddit !== undefined &&
+      typeof data.subreddit !== 'string'
+    ) {
+      throw contractError(endpoint, 'subreddit must be a string, null, or omitted');
+    }
     return { subreddit: data.subreddit ?? undefined };
   }
 
@@ -50,37 +149,34 @@ export class ReviewLockApiClient {
     subreddit: string,
     demo: boolean,
   ): Promise<DashboardOverview & { demo: boolean }> {
-    const res = await fetch(`${this.baseUrl}/api/overview${this.getQueryString(subreddit, demo)}`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch overview');
-    return { ...data.overview, demo: data.demo };
+    const endpoint = `/api/overview${this.getQueryString(subreddit, demo)}`;
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    if (!hasBoolean(data, 'demo')) {
+      throw contractError(endpoint, 'missing demo boolean');
+    }
+    return { ...this.expectDashboardOverview(data, endpoint), demo: data.demo as boolean };
   }
 
   async fetchLocks(subreddit: string, demo: boolean): Promise<ReviewLockRecord[]> {
-    const res = await fetch(`${this.baseUrl}/api/locks${this.getQueryString(subreddit, demo)}`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch locks');
-    return data.locks;
+    const endpoint = `/api/locks${this.getQueryString(subreddit, demo)}`;
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    return this.expectArray<ReviewLockRecord>(data, endpoint, 'locks');
   }
 
   async fetchReopenQueue(subreddit: string, demo: boolean): Promise<ReopenEvent[]> {
-    const res = await fetch(
-      `${this.baseUrl}/api/reopen-queue${this.getQueryString(subreddit, demo)}`,
-    );
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch reopen queue');
-    return data.events;
+    const endpoint = `/api/reopen-queue${this.getQueryString(subreddit, demo)}`;
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    return this.expectArray<ReopenEvent>(data, endpoint, 'events');
   }
 
   async fetchAuditLog(subreddit: string, demo: boolean): Promise<AuditEvent[]> {
-    const res = await fetch(`${this.baseUrl}/api/audit${this.getQueryString(subreddit, demo)}`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch audit log');
-    return data.events;
+    const endpoint = `/api/audit${this.getQueryString(subreddit, demo)}`;
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    return this.expectArray<AuditEvent>(data, endpoint, 'events');
   }
 
   async fetchRuntimeStatus(
@@ -91,59 +187,63 @@ export class ReviewLockApiClient {
     dailyMetrics: DailyMetrics[];
     topChurnTargets: TargetMetrics[];
   }> {
-    const res = await fetch(`${this.baseUrl}/api/runtime${this.getQueryString(subreddit, demo)}`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to fetch runtime status');
+    const endpoint = `/api/runtime${this.getQueryString(subreddit, demo)}`;
+    const data = await this.requestJson(endpoint);
+    this.expectOk(data, endpoint);
+    if (!hasObject(data, 'runtime')) {
+      throw contractError(endpoint, 'missing runtime object');
+    }
     return {
-      runtime: data.runtime,
-      dailyMetrics: data.dailyMetrics,
-      topChurnTargets: data.topChurnTargets,
+      runtime: data.runtime as unknown as RuntimeProofStatus,
+      dailyMetrics: this.expectArray<DailyMetrics>(data, endpoint, 'dailyMetrics'),
+      topChurnTargets: this.expectArray<TargetMetrics>(data, endpoint, 'topChurnTargets'),
     };
   }
 
   async runRuntimeSmoke(subreddit: string): Promise<void> {
     const query = `?subreddit=${encodeURIComponent(subreddit)}`;
     const checks = await Promise.all([
-      fetch(`${this.baseUrl}/api/smoke/redis${query}`, { method: 'POST' }),
-      fetch(`${this.baseUrl}/api/smoke/reddit${query}`, { method: 'POST' }),
+      this.requestJson(`/api/smoke/redis${query}`, { method: 'POST' }),
+      this.requestJson(`/api/smoke/reddit${query}`, { method: 'POST' }),
     ]);
 
-    for (const res of checks) {
-      if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || 'Runtime verification failed');
+    for (const data of checks) {
+      if (data.ok !== true) {
+        throw new Error(errorText(data) ?? 'Runtime verification failed');
+      }
     }
   }
 
   async enableDemoMode(): Promise<DemoModeStatus> {
-    const res = await fetch(`${this.baseUrl}/api/demo/enable`, { method: 'POST' });
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to enable demo mode');
-    return data.status;
+    const endpoint = '/api/demo/enable';
+    const data = await this.requestJson(endpoint, { method: 'POST' });
+    this.expectOk(data, endpoint);
+    return this.expectDemoStatus(data, endpoint);
   }
 
   async disableDemoMode(subreddit: string): Promise<DemoModeStatus> {
     const query = `?subreddit=${encodeURIComponent(subreddit)}`;
-    const res = await fetch(`${this.baseUrl}/api/demo/disable${query}`, { method: 'POST' });
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Failed to disable demo mode');
-    return data.status;
+    const endpoint = `/api/demo/disable${query}`;
+    const data = await this.requestJson(endpoint, { method: 'POST' });
+    this.expectOk(data, endpoint);
+    return this.expectDemoStatus(data, endpoint);
   }
 
   async unlockTarget(targetId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
-    const res = await fetch(`${this.baseUrl}/internal/form/unlock-review-submit`, {
+    const endpoint = '/internal/form/unlock-review-submit';
+    const data = await this.requestJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetId, actor }),
     });
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
     return {
       ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),
-      message: data.message ?? data.showToast?.text,
+      message:
+        typeof data.message === 'string'
+          ? data.message
+          : isObject(data.showToast) && typeof data.showToast.text === 'string'
+            ? data.showToast.text
+            : undefined,
     };
   }
 
@@ -152,16 +252,20 @@ export class ReviewLockApiClient {
     actor: string,
     subreddit: string,
   ): Promise<{ ok: boolean; message?: string }> {
-    const res = await fetch(`${this.baseUrl}/internal/form/reopen-action-submit`, {
+    const endpoint = '/internal/form/reopen-action-submit';
+    const data = await this.requestJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, action: 'dismiss', actor, subreddit }),
     });
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    const data = await res.json();
     return {
       ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),
-      message: data.message ?? data.showToast?.text,
+      message:
+        typeof data.message === 'string'
+          ? data.message
+          : isObject(data.showToast) && typeof data.showToast.text === 'string'
+            ? data.showToast.text
+            : undefined,
     };
   }
 }

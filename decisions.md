@@ -214,3 +214,17 @@ Reason:
 
 - The same `tmp` and `ws` override pattern is already present in the known-good ModMirror workspace.
 - `protobufjs@8.4.2` removes the remaining critical audit finding and survived Devvit build/playtest verification.
+
+### D018 - Treat dashboard API responses as untrusted at the client boundary
+
+Wave 22 found that the dashboard client trusted response bodies after `res.ok` and could pass missing arrays or malformed shapes into render helpers.
+
+Decision:
+
+- Keep lightweight client-side contract checks for dashboard, runtime, demo, smoke, and Devvit form responses.
+- Surface malformed or missing fields as retryable operational errors instead of rendering with undefined data.
+
+Reason:
+
+- Devvit WebView failures, stale bundles, or server-side regressions should never produce a blank moderation dashboard.
+- Moderators need an honest retryable failure state more than optimistic rendering with partial or malformed data.

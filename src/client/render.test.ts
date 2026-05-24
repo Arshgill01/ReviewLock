@@ -200,4 +200,17 @@ describe('client render helpers', () => {
     expect(html).toContain('Active locks');
     expectSafeCopy(html);
   });
+
+  it('renders a retryable error instead of a blank dashboard when initial load fails', () => {
+    const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock', false);
+    store.error = 'API contract error at /api/locks: missing locks array';
+
+    const html = renderDashboardPage(store);
+
+    expect(html).toContain('ReviewLock');
+    expect(html).toContain('API contract error at /api/locks: missing locks array');
+    expect(html).toContain('Retry');
+    expect(html.trim()).not.toBe('');
+    expectSafeCopy(html);
+  });
 });

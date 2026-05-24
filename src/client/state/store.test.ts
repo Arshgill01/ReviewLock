@@ -108,6 +108,27 @@ describe('ReviewLockStore', () => {
     expect(store.overview).toBeNull();
   });
 
+  it('keeps loading state visible while a slow API response is pending', async () => {
+    let resolveOverview: (value: DashboardOverview & { demo: boolean }) => void = () => undefined;
+    apiClient.fetchOverview = vi.fn(
+      () =>
+        new Promise<DashboardOverview & { demo: boolean }>((resolve) => {
+          resolveOverview = resolve;
+        }),
+    );
+
+    const pendingFetch = store.fetchState();
+
+    expect(store.isLoading).toBe(true);
+    expect(store.error).toBeNull();
+
+    resolveOverview({ ...mockOverview(), demo: false });
+    await pendingFetch;
+
+    expect(store.isLoading).toBe(false);
+    expect(store.overview?.activeLockCount).toBe(2);
+  });
+
   it('performs unlock and re-fetches state', async () => {
     await store.fetchState();
     expect(store.locks.length).toBe(1);

@@ -350,3 +350,23 @@
   - `npx devvit view --json` reports `isWebviewEnabled: false` even though playtest serves and connects the ReviewLock WebView; this remains registration metadata to inspect before public submission.
   - Live `approve()`, `ignoreReports()`, `unignoreReports()`, report triggers, and edit/update triggers remain unverified on controlled Reddit content.
   - Playtest observed an existing ReviewLock dashboard WebView connection, but Wave 21 did not drive browser UI to avoid disrupting the user's active Aerospace windows.
+
+## 2026-05-24 - Wave 22
+
+- Added `docs/API_CLIENT_CONTRACT_PROOF.md` mapping every dashboard client endpoint to its server route and covered response shape.
+- Hardened `src/client/state/api.ts` so non-200, malformed JSON, missing overview fields, missing arrays, malformed runtime payloads, malformed demo status, and malformed smoke responses become explicit retryable errors before render helpers receive them.
+- Added client API contract tests for success, empty arrays, non-200 errors, malformed JSON, missing fields, Devvit UI form responses, and runtime smoke endpoint handling.
+- Added route contract tests proving every dashboard client endpoint is routed and returns JSON instead of 404/405.
+- Added store/render tests proving slow responses show loading state and initial API failures render a retryable ReviewLock error surface instead of a blank dashboard.
+- Commands run:
+  - `npm run test -- --run src/client/state/api.test.ts src/client/state/store.test.ts src/client/render.test.ts src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/routes/api.demo.test.ts`
+  - `npx prettier --write src/client/state/api.ts src/client/state/api.test.ts src/client/state/store.test.ts src/client/render.test.ts src/routes/api.contract.test.ts`
+  - `npx prettier --write docs/API_CLIENT_CONTRACT_PROOF.md decisions.md`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - The contract proof is local route/client proof; live Reddit WebView request timing and platform outages still need later browser/runtime regression passes.
+  - Runtime moderation operations remain live-unverified until controlled Reddit report/edit events are exercised.
