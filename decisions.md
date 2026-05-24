@@ -982,3 +982,28 @@ Reason:
 - The demo should show a believable mod-team ledger and the complete
   edit-aware reopen loop without implying that seeded records prove live Reddit
   trigger delivery.
+
+### D063 - Use controlled live scenario data, not arbitrary subreddit data
+
+The dashboard currently shows real live data only from the installed/playtested
+subreddit namespace, and the user asked whether ReviewLock should gather richer
+real data from multiple subreddits or create more varied controlled content.
+
+Decision:
+
+- Treat arbitrary subreddit data as out of scope for proof and product behavior.
+- Use `r/reviewlock_dev` as the primary live proof corpus.
+- Allow additional moderated test subreddits only if ReviewLock is installed or
+  playtested there.
+- Keep seeded demo data in the `reviewlock_demo` namespace and never present it
+  as live trigger evidence.
+- Add `docs/LIVE_SCENARIO_MATRIX.md` as the checklist for controlled posts,
+  comments, report events, edit events, and dashboard observations.
+
+Reason:
+
+- Devvit app runtime and storage are subreddit-scoped. Pulling data from
+  unrelated communities would be technically unsupported, privacy-risky, and
+  outside ReviewLock's no-scraping/no-external-service v1 boundary. A rich
+  controlled corpus gives real proof without weakening the product claim
+  boundary.

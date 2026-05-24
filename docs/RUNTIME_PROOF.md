@@ -218,6 +218,8 @@ Allowed claims:
 - The dashboard live WebView renders under `r/reviewlock_dev` in Zen and its runtime smoke verifies Redis plus Reddit context.
 - Dashboard unlock has live-verified `unignoreReports()` on controlled target `t3_1tm8nak`.
 - Dashboard lock review has live-verified `approve()` and `ignoreReports()` on controlled target `t3_1tm8nak`.
+- A controlled live scenario matrix exists for the next report/edit trigger
+  proof pass in `docs/LIVE_SCENARIO_MATRIX.md`.
 
 Not allowed yet:
 

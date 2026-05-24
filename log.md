@@ -1155,3 +1155,28 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission or controlled edit actions.
+
+## 2026-05-25 - Wave 33 live scenario matrix planning
+
+- Evaluated whether ReviewLock should use arbitrary subreddit data, additional
+  test subreddits, or richer controlled content for live proof.
+- Chose controlled live proof only: `r/reviewlock_dev` first, with additional
+  moderated test subreddits allowed only if ReviewLock is installed or
+  playtested there.
+- Added `docs/LIVE_SCENARIO_MATRIX.md` with 10 controlled post/comment
+  scenarios covering unchanged report suppression, body edits, flair changes,
+  NSFW toggles, spoiler toggles, whitespace normalization, comment locks, high
+  churn, and stale-lock relock.
+- Clarified that seeded demo data remains isolated in `reviewlock_demo` and is
+  not live trigger evidence.
+- Commands run:
+  - `rg -n "DEMO_SUBREDDIT|demo=true|reviewlock_demo|normalizeSubreddit|subreddit" src/shared src/server src/client src/routes | head -n 120`
+  - `sed -n '1,220p' src/shared/constants.ts`
+  - `sed -n '1,220p' devvit.json`
+  - Official Devvit docs reviewed:
+    `https://developers.reddit.com/docs/get-started/playtest` and
+    `https://developers.reddit.com/docs/cli/install`
+- Pass/fail status: PASS for planning/documentation.
+- Open risks:
+  - Live report/edit trigger proof still requires controlled Reddit actions and
+    sanitized log capture.

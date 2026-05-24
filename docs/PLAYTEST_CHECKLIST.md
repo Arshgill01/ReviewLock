@@ -43,6 +43,7 @@ Dev account: `u/BrightyBrainiac`.
 
 ## Report trigger flow
 
+- [x] Define a controlled live scenario matrix before generating real report events.
 - [ ] Generate or simulate a repeated post report against an unchanged locked post.
 - [ ] Confirm `PostReport` reaches `/internal/triggers/on-post-report`.
 - [ ] Confirm active lock is loaded.
