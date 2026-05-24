@@ -3,6 +3,9 @@ import type { ReopenEvent } from '../../shared/schema';
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
+const attr = (value: string | undefined): string =>
+  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+
 const date = (value: string): string => new Date(value).toLocaleString();
 
 const reason = (value: string): string => value.replace(/_/g, ' ');
@@ -40,7 +43,7 @@ export const renderLatestReopenEvent = (event: ReopenEvent | undefined): string 
         </div>
       </div>
       <p>${text(event.summary)}</p>
-      <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${text(event.id)}">
+      <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
         Dismiss reopen
       </button>
     </section>
@@ -57,7 +60,7 @@ export const renderReopenQueue = (events: ReopenEvent[]): string => {
             <span>${reason(event.reason)} · ${date(event.createdAt)}</span>
             <p>${text(event.summary)}</p>
           </div>
-          <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${text(event.id)}">
+          <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
             Dismiss
           </button>
         </li>

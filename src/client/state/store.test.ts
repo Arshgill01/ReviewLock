@@ -36,21 +36,41 @@ describe('ReviewLockStore', () => {
       ...mockOverview(),
       demo: false,
     });
-    apiClient.fetchLocks = vi.fn().mockResolvedValue([
-      { id: 'lock-1', targetId: 't3_1', status: 'active', suppressedReportCount: 5, demo: false },
-    ]);
-    apiClient.fetchReopenQueue = vi.fn().mockResolvedValue([
-      { id: 'reopen-1', lockId: 'lock-2', reason: 'content_changed', demo: false },
-    ]);
-    apiClient.fetchAuditLog = vi.fn().mockResolvedValue([
-      { id: 'audit-1', kind: 'lock_created', actor: 'mod', message: 'Locked', demo: false },
-    ]);
+    apiClient.fetchLocks = vi
+      .fn()
+      .mockResolvedValue([
+        { id: 'lock-1', targetId: 't3_1', status: 'active', suppressedReportCount: 5, demo: false },
+      ]);
+    apiClient.fetchReopenQueue = vi
+      .fn()
+      .mockResolvedValue([
+        { id: 'reopen-1', lockId: 'lock-2', reason: 'content_changed', demo: false },
+      ]);
+    apiClient.fetchAuditLog = vi
+      .fn()
+      .mockResolvedValue([
+        { id: 'audit-1', kind: 'lock_created', actor: 'mod', message: 'Locked', demo: false },
+      ]);
     apiClient.fetchRuntimeStatus = vi.fn().mockResolvedValue({
       runtime: mockRuntimeStatus(),
       dailyMetrics: [],
       topChurnTargets: [],
     });
     apiClient.runRuntimeSmoke = vi.fn().mockResolvedValue(undefined);
+    apiClient.enableDemoMode = vi.fn().mockResolvedValue({
+      subreddit: 'reviewlock_demo',
+      enabled: true,
+      demo: true,
+      lockCount: 8,
+      reopenEventCount: 3,
+    });
+    apiClient.disableDemoMode = vi.fn().mockResolvedValue({
+      subreddit: 'reviewlock_demo',
+      enabled: false,
+      demo: true,
+      lockCount: 0,
+      reopenEventCount: 0,
+    });
 
     apiClient.unlockTarget = vi.fn().mockResolvedValue({ ok: true });
     apiClient.dismissReopen = vi.fn().mockResolvedValue({ ok: true });
@@ -104,7 +124,7 @@ describe('ReviewLockStore', () => {
 
     await store.dismissReopen('reopen-1');
 
-    expect(apiClient.dismissReopen).toHaveBeenCalledWith('reopen-1', 'moderator');
+    expect(apiClient.dismissReopen).toHaveBeenCalledWith('reopen-1', 'moderator', 'test_subreddit');
     expect(apiClient.fetchOverview).toHaveBeenCalledTimes(2);
   });
 
@@ -125,5 +145,25 @@ describe('ReviewLockStore', () => {
 
     expect(apiClient.runRuntimeSmoke).not.toHaveBeenCalled();
     expect(store.error).toBe('Runtime verification runs in live mode only.');
+  });
+
+  it('seeds demo data and switches to the deterministic demo namespace', async () => {
+    await store.setDemo(true);
+
+    expect(apiClient.enableDemoMode).toHaveBeenCalled();
+    expect(store.demo).toBe(true);
+    expect(store.subreddit).toBe('reviewlock_demo');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_demo', true);
+  });
+
+  it('returns to the live subreddit when demo mode is disabled', async () => {
+    store.updateSubredditContext('reviewlock_dev');
+    await store.setDemo(true);
+    await store.setDemo(false);
+
+    expect(apiClient.disableDemoMode).toHaveBeenCalledWith('reviewlock_demo');
+    expect(store.demo).toBe(false);
+    expect(store.subreddit).toBe('reviewlock_dev');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_dev', false);
   });
 });

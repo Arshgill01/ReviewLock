@@ -5,7 +5,9 @@ import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
 import type { LockReasonPreset } from '../shared/schema';
+import { appendAuditEvent } from '../server/services/audit';
 import { lockReviewedContent } from '../server/services/lockFlow';
+import { dismissReopenEvent } from '../server/services/reopenQueue';
 import { unlockReviewedContent } from '../server/services/unlockFlow';
 
 interface RouteDeps {
@@ -25,6 +27,13 @@ interface LockSubmitBody {
 interface UnlockSubmitBody {
   targetId?: string;
   actor?: string;
+}
+
+interface ReopenActionBody {
+  eventId?: string;
+  action?: 'dismiss';
+  actor?: string;
+  subreddit?: string;
 }
 
 const readJson = async <T>(context: Context): Promise<T> => {
@@ -105,7 +114,9 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     await readJson(context);
 
     if (!deps.reddit?.submitDashboardPost) {
-      return context.json<UiResponse>(uiToast('ReviewLock dashboard launch is not available in this runtime.'));
+      return context.json<UiResponse>(
+        uiToast('ReviewLock dashboard launch is not available in this runtime.'),
+      );
     }
 
     const subredditName = (await deps.reddit.getCurrentSubredditName()) ?? 'reviewlock_dev';
@@ -125,14 +136,46 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       },
     });
   });
-  router.post('/reopen-action-submit', (context) =>
-    context.json<UiResponse>({
-      showToast: {
-        text: 'ReviewLock reopen action received.',
-        appearance: 'neutral',
-      },
-    }),
-  );
+  router.post('/reopen-action-submit', async (context) => {
+    if (!deps.reddit || !deps.redis || !deps.clock) {
+      return context.json<UiResponse>(uiToast('ReviewLock dependencies are not configured.'));
+    }
+
+    const body = await readJson<ReopenActionBody>(context);
+
+    if (!body.eventId || body.action !== 'dismiss' || !body.subreddit) {
+      return context.json<UiResponse>(uiToast('Reopen event, action, and subreddit are required.'));
+    }
+
+    const actor = await actorFromReddit(deps.reddit, body.actor);
+    const dismissed = await dismissReopenEvent(
+      deps.redis,
+      body.subreddit,
+      body.eventId,
+      deps.clock.now(),
+      actor,
+    );
+
+    if (!dismissed) {
+      return context.json<UiResponse>(uiToast('Reopen event was not found.'));
+    }
+
+    await appendAuditEvent(deps.redis, {
+      id: `audit-reopen-dismissed-${Date.parse(dismissed.dismissedAt ?? deps.clock.now())}-${dismissed.id}`,
+      kind: 'reopen_dismissed',
+      subreddit: dismissed.subreddit,
+      targetId: dismissed.targetId,
+      targetKind: dismissed.targetKind,
+      lockId: dismissed.lockId,
+      actor,
+      createdAt: dismissed.dismissedAt ?? deps.clock.now(),
+      message: 'Reopened item dismissed from the ReviewLock queue.',
+      data: { reopenReason: dismissed.reason },
+      demo: dismissed.demo,
+    });
+
+    return context.json<UiResponse>(uiToast('ReviewLock dismissed this reopened item.', 'success'));
+  });
 
   return router;
 };

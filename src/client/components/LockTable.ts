@@ -3,6 +3,9 @@ import type { ReviewLockRecord } from '../../shared/schema';
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
+const attr = (value: string | undefined): string =>
+  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+
 const reason = (value: string): string => value.replace(/_/g, ' ');
 
 export const renderLockTable = (locks: ReviewLockRecord[]): string => {
@@ -13,7 +16,7 @@ export const renderLockTable = (locks: ReviewLockRecord[]): string => {
       (lock) => `
         <tr>
           <td>
-            <a href="${text(lock.permalink)}" target="_blank" rel="noreferrer">${lock.targetKind} ${text(lock.targetId)}</a>
+            <a href="${attr(lock.permalink)}" target="_blank" rel="noreferrer">${lock.targetKind} ${text(lock.targetId)}</a>
           </td>
           <td>u/${text(lock.targetAuthor)}</td>
           <td>
@@ -24,7 +27,7 @@ export const renderLockTable = (locks: ReviewLockRecord[]): string => {
           <td class="number-cell">${lock.suppressedReportCount}</td>
           <td>${new Date(lock.lockedAt).toLocaleDateString()}</td>
           <td>
-            <button class="button button-secondary" data-action="unlock" data-lock-id="${text(lock.id)}" data-target-id="${text(lock.targetId)}">
+            <button class="button button-secondary" data-action="unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
               Unlock
             </button>
           </td>

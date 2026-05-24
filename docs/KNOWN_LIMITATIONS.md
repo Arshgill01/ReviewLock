@@ -24,4 +24,4 @@ Last updated: 2026-05-24 16:21 IST.
 
 - ReviewLock must not be described as making content unreportable.
 - ReviewLock must not claim to disable user reporting.
-- ReviewLock must not claim live report suppression or edit reopening until Wave 15 runtime proof demonstrates those paths.
+- ReviewLock must not claim live report suppression or edit reopening until controlled playtest demonstrates those paths.

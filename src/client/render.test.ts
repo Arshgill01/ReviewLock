@@ -25,7 +25,7 @@ const expectSafeCopy = (html: string): void => {
   }
 };
 
-const lock = (): ReviewLockRecord => ({
+const lock = (overrides: Partial<ReviewLockRecord> = {}): ReviewLockRecord => ({
   id: 'lock-1',
   subreddit: 'reviewlock',
   targetId: 't3_reviewed',
@@ -45,9 +45,10 @@ const lock = (): ReviewLockRecord => ({
   suppressedReportCount: 7,
   runtimeWarnings: [],
   demo: false,
+  ...overrides,
 });
 
-const reopen = (): ReopenEvent => ({
+const reopen = (overrides: Partial<ReopenEvent> = {}): ReopenEvent => ({
   id: 'reopen-1',
   lockId: 'lock-1',
   subreddit: 'reviewlock',
@@ -60,6 +61,7 @@ const reopen = (): ReopenEvent => ({
   summary: 'Post body changed after review.',
   runtimeWarnings: [],
   demo: false,
+  ...overrides,
 });
 
 const runtime = (): RuntimeProofStatus => ({
@@ -106,6 +108,23 @@ describe('client render helpers', () => {
     expect(html).toContain('Unlock');
     expect(renderLockTable([])).toContain('No active locks.');
     expectSafeCopy(html);
+  });
+
+  it('escapes dynamic values used inside HTML attributes', () => {
+    const html = [
+      renderLockTable([
+        lock({
+          id: 'lock-1" data-leak="x',
+          permalink: 'https://reddit.example/item" onclick="alert(1)',
+        }),
+      ]),
+      renderReopenQueue([reopen({ id: 'reopen-1" data-leak="x' })]),
+    ].join('');
+
+    expect(html).toContain('&quot;');
+    expect(html).not.toContain('data-lock-id="lock-1" data-leak="x');
+    expect(html).not.toContain('data-event-id="reopen-1" data-leak="x');
+    expect(html).not.toContain('onclick="alert');
   });
 
   it('renders reopened queue and latest reopen states', () => {

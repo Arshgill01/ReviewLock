@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { fixedClock } from '../server/adapters/clock';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
-import type { ReviewLockTarget } from '../shared/schema';
+import { listAuditEvents } from '../server/services/audit';
+import {
+  enqueueReopenEvent,
+  getReopenEvent,
+  listOpenReopenEvents,
+} from '../server/services/reopenQueue';
+import type { ReopenEvent, ReviewLockTarget } from '../shared/schema';
 import { createFormsRouter } from './forms';
 
 const target = (): ReviewLockTarget => ({
@@ -15,6 +21,21 @@ const target = (): ReviewLockTarget => ({
   body: 'Reviewed body',
   edited: false,
   reportCount: 4,
+});
+
+const reopenEvent = (): ReopenEvent => ({
+  id: 'reopen-1',
+  lockId: 'lock-1',
+  subreddit: 'alpha',
+  targetId: 't3_post',
+  targetKind: 'post',
+  oldContentHash: 'old',
+  newContentHash: 'new',
+  reason: 'content_changed',
+  createdAt: '2026-05-24T00:30:00.000Z',
+  summary: 'Content changed after review.',
+  runtimeWarnings: [],
+  demo: false,
 });
 
 describe('form routes', () => {
@@ -73,5 +94,44 @@ describe('form routes', () => {
         text: 'Opening ReviewLock dashboard',
       },
     });
+  });
+
+  it('dismisses a reopened item and records audit output', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-action-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        action: 'dismiss',
+        actor: 'mod',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        appearance: 'success',
+        text: 'ReviewLock dismissed this reopened item.',
+      },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
+    expect(await getReopenEvent(redis, 'alpha', 'reopen-1')).toMatchObject({
+      dismissedAt: '2026-05-24T01:00:00.000Z',
+      dismissedBy: 'mod',
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'reopen_dismissed',
+        targetId: 't3_post',
+        actor: 'mod',
+      }),
+    ]);
   });
 });

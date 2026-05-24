@@ -18,6 +18,15 @@ export interface DashboardFullData {
   topChurnTargets: TargetMetrics[];
 }
 
+export interface DemoModeStatus {
+  subreddit: string;
+  enabled: boolean;
+  demo: boolean;
+  seededAt?: string;
+  lockCount: number;
+  reopenEventCount: number;
+}
+
 export class ReviewLockApiClient {
   private baseUrl: string;
 
@@ -37,7 +46,10 @@ export class ReviewLockApiClient {
     return { subreddit: data.subreddit ?? undefined };
   }
 
-  async fetchOverview(subreddit: string, demo: boolean): Promise<DashboardOverview & { demo: boolean }> {
+  async fetchOverview(
+    subreddit: string,
+    demo: boolean,
+  ): Promise<DashboardOverview & { demo: boolean }> {
     const res = await fetch(`${this.baseUrl}/api/overview${this.getQueryString(subreddit, demo)}`);
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
     const data = await res.json();
@@ -54,7 +66,9 @@ export class ReviewLockApiClient {
   }
 
   async fetchReopenQueue(subreddit: string, demo: boolean): Promise<ReopenEvent[]> {
-    const res = await fetch(`${this.baseUrl}/api/reopen-queue${this.getQueryString(subreddit, demo)}`);
+    const res = await fetch(
+      `${this.baseUrl}/api/reopen-queue${this.getQueryString(subreddit, demo)}`,
+    );
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Failed to fetch reopen queue');
@@ -69,7 +83,10 @@ export class ReviewLockApiClient {
     return data.events;
   }
 
-  async fetchRuntimeStatus(subreddit: string, demo: boolean): Promise<{
+  async fetchRuntimeStatus(
+    subreddit: string,
+    demo: boolean,
+  ): Promise<{
     runtime: RuntimeProofStatus;
     dailyMetrics: DailyMetrics[];
     topChurnTargets: TargetMetrics[];
@@ -99,6 +116,23 @@ export class ReviewLockApiClient {
     }
   }
 
+  async enableDemoMode(): Promise<DemoModeStatus> {
+    const res = await fetch(`${this.baseUrl}/api/demo/enable`, { method: 'POST' });
+    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to enable demo mode');
+    return data.status;
+  }
+
+  async disableDemoMode(subreddit: string): Promise<DemoModeStatus> {
+    const query = `?subreddit=${encodeURIComponent(subreddit)}`;
+    const res = await fetch(`${this.baseUrl}/api/demo/disable${query}`, { method: 'POST' });
+    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to disable demo mode');
+    return data.status;
+  }
+
   async unlockTarget(targetId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
     const res = await fetch(`${this.baseUrl}/internal/form/unlock-review-submit`, {
       method: 'POST',
@@ -107,17 +141,27 @@ export class ReviewLockApiClient {
     });
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
     const data = await res.json();
-    return { ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo), message: data.message ?? data.showToast?.text };
+    return {
+      ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),
+      message: data.message ?? data.showToast?.text,
+    };
   }
 
-  async dismissReopen(eventId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
+  async dismissReopen(
+    eventId: string,
+    actor: string,
+    subreddit: string,
+  ): Promise<{ ok: boolean; message?: string }> {
     const res = await fetch(`${this.baseUrl}/internal/form/reopen-action-submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId, action: 'dismiss', actor }),
+      body: JSON.stringify({ eventId, action: 'dismiss', actor, subreddit }),
     });
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
     const data = await res.json();
-    return { ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo), message: data.message ?? data.showToast?.text };
+    return {
+      ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),
+      message: data.message ?? data.showToast?.text,
+    };
   }
 }

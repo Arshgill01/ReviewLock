@@ -12,6 +12,7 @@ import type {
 export class ReviewLockStore {
   private api: ReviewLockApiClient;
   private listeners: Set<() => void> = new Set();
+  private liveSubreddit: string = 'reviewlock';
 
   public subreddit: string = 'reviewlock';
   public demo: boolean = false;
@@ -28,9 +29,14 @@ export class ReviewLockStore {
   public isVerifyingRuntime: boolean = false;
   public runtimeVerificationMessage: string | null = null;
 
-  constructor(api: ReviewLockApiClient, initialSubreddit: string = 'reviewlock', initialDemo: boolean = false) {
+  constructor(
+    api: ReviewLockApiClient,
+    initialSubreddit: string = 'reviewlock',
+    initialDemo: boolean = false,
+  ) {
     this.api = api;
     this.subreddit = initialSubreddit;
+    this.liveSubreddit = initialDemo ? 'reviewlock' : initialSubreddit;
     this.demo = initialDemo;
   }
 
@@ -68,7 +74,8 @@ export class ReviewLockStore {
       this.topChurnTargets = runtimeData.topChurnTargets;
       this.error = null;
     } catch (err) {
-      this.error = err instanceof Error ? err.message : 'An error occurred fetching dashboard state';
+      this.error =
+        err instanceof Error ? err.message : 'An error occurred fetching dashboard state';
     } finally {
       this.isLoading = false;
       this.notify();
@@ -104,14 +111,17 @@ export class ReviewLockStore {
     this.notify();
 
     try {
-      const res = await this.api.dismissReopen(eventId, 'moderator');
+      const res = await this.api.dismissReopen(eventId, 'moderator', this.subreddit);
       if (!res.ok) {
         throw new Error(res.message || 'Failed to dismiss reopen event');
       }
 
       this.reopenQueue = this.reopenQueue.filter((e) => e.id !== eventId);
       if (this.overview) {
-        this.overview.reopenedAfterEditCount = Math.max(0, this.overview.reopenedAfterEditCount - 1);
+        this.overview.reopenedAfterEditCount = Math.max(
+          0,
+          this.overview.reopenedAfterEditCount - 1,
+        );
         if (this.overview.latestReopenEvent?.id === eventId) {
           this.overview.latestReopenEvent = this.reopenQueue[0];
         }
@@ -154,11 +164,47 @@ export class ReviewLockStore {
 
   async setSubreddit(subreddit: string) {
     this.subreddit = subreddit;
+    if (!this.demo) {
+      this.liveSubreddit = subreddit;
+    }
     await this.fetchState();
   }
 
+  updateSubredditContext(subreddit: string) {
+    this.subreddit = subreddit;
+    if (!this.demo) {
+      this.liveSubreddit = subreddit;
+    }
+    this.notify();
+  }
+
   async setDemo(demo: boolean) {
-    this.demo = demo;
-    await this.fetchState();
+    if (demo === this.demo) {
+      await this.fetchState();
+      return;
+    }
+
+    this.isLoading = true;
+    this.error = null;
+    this.notify();
+
+    try {
+      if (demo) {
+        const status = await this.api.enableDemoMode();
+        this.demo = true;
+        this.subreddit = status.subreddit;
+      } else {
+        const demoSubreddit = this.subreddit;
+        this.demo = false;
+        this.subreddit = this.liveSubreddit;
+        await this.api.disableDemoMode(demoSubreddit);
+      }
+
+      await this.fetchState();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'An error occurred toggling demo mode';
+      this.isLoading = false;
+      this.notify();
+    }
   }
 }

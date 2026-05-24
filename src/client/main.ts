@@ -23,7 +23,8 @@ const render = (): void => {
 store.subscribe(render);
 
 app?.addEventListener('click', (event) => {
-  const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-action]') : null;
+  const target =
+    event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-action]') : null;
 
   if (!target) {
     return;
@@ -70,13 +71,13 @@ void (async () => {
   if (!requestedSubreddit) {
     const embeddedSubreddit = inferEmbeddedSubreddit(window.location.href, document.referrer);
     if (embeddedSubreddit) {
-      store.subreddit = embeddedSubreddit;
+      store.updateSubredditContext(embeddedSubreddit);
     }
 
     try {
       const runtimeContext = await api.fetchRuntimeContext();
       if (runtimeContext.subreddit) {
-        store.subreddit = runtimeContext.subreddit;
+        store.updateSubredditContext(runtimeContext.subreddit);
       }
     } catch {
       // Dashboard data loading below will surface runtime connectivity failures.

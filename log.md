@@ -292,3 +292,26 @@
 - Open risks:
   - Scenario proof is an integration harness, not live Devvit report delivery.
   - Real Reddit moderation calls and live report/update trigger payloads still require controlled playtest proof before live behavior can be claimed verified.
+
+## 2026-05-24 - Wave 20
+
+- Completed the first whole-repo hardening audit across `src/`, `docs/`, `README.md`, and root config.
+- Added `docs/HARDENING_PASS_01.md` with audit scope, scan commands, fixes, and remaining documented hits.
+- Replaced the placeholder reopen-dismiss form behavior with real Redis dismissal, queue removal, and `reopen_dismissed` audit output.
+- Hardened dashboard demo mode so the client seeds deterministic demo data and switches to `reviewlock_demo` instead of refetching the live subreddit with an empty demo flag.
+- Added client attribute escaping for dynamic lock/reopen ids and permalinks.
+- Updated stale runtime-proof docs that still referred to Wave 15 as future live trigger proof.
+- Commands run:
+  - `rg -n "TODO|placeholder|stub|coming soon|not implemented|scaffold|hack|FIXME|XXX" src docs README.md package.json devvit.json tsconfig.json vite.config.ts eslint.config.js || true`
+  - `rg -n "not reportable|disable reports|blocked reports|unreportable|ignore reports wrapper|AI decides|automatic removal|remove automatically|report disabling" src docs README.md || true`
+  - `rg -n "catch \\{|catch \\([^)]*\\) \\{|as unknown| as any|throw new Error\\('TODO|return undefined|console\\.log|debugger" src || true`
+  - `rg -n "\\.only\\(|describe\\.skip|it\\.skip|console\\.log|debugger| as any|eslint-disable|ts-ignore|ts-expect-error" src || true`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+  - `rg -n "TODO|placeholder|stub|coming soon|not implemented" src docs README.md || true`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live Reddit report generation and real moderation method proof remain unverified.
+  - Remaining scan hits are documented in `docs/HARDENING_PASS_01.md` and are not unfinished implementation code.
