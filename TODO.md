@@ -27,7 +27,7 @@
 - [x] Wave 24 - Data Namespace and Migration Hardening
 - [x] Wave 25 - Safety and Privacy Hardening
 - [x] Wave 26 - Performance and High-Volume Hardening
-- [ ] Wave 27 - Claim and Copy Hardening
+- [x] Wave 27 - Claim and Copy Hardening
 - [ ] Wave 28 - Browser Regression Hardening
 - [ ] Wave 29 - Install/Deploy Rehearsal Hardening
 - [ ] Wave 30 - Production Trust Audit

@@ -456,3 +456,25 @@
 - Pass/fail status: PASS.
 - Open risks:
   - `overview.activeLockCount` remains a bounded slice count until exact counters or a verified Redis cardinality primitive are added.
+
+## 2026-05-24 - Wave 27
+
+- Added `docs/CLAIM_COPY_AUDIT.md` with a claim status matrix covering verified, verified-locally, implemented-not-live-verified, implemented-not-final-verified, demo-only, and cut claims.
+- Extended rendered dashboard copy tests to reject the full Wave 27 forbidden phrase set: `not reportable`, `disable reports`, `blocked reports`, `ai decides`, `automatic removal`, `permanent`, and `forever`.
+- Confirmed production UI copy preserves `Lock reviewed content until it changes.`, `Reports suppressed`, and `Reopened after edit`.
+- Reviewed forbidden-framing hits manually; hits are guardrails, scan commands, limitation docs, or tests rather than production-facing claims.
+- Logged D024 to require proof-level labels for runtime claims.
+- Commands run:
+  - `rg -n "not reportable|disable reports|blocked reports|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+  - `rg -n "verified|unverified|implemented|live|playtest|suppress|suppressed|reopen|reopened|ignoreReports|unignoreReports|approve\\(\\)|Lock reviewed content until it changes|Reports suppressed|Reopened after edit|demo" README.md docs src/client src/routes src/server | head -n 400`
+  - `rg -n "not reportable|disable reports|blocked reports|unreportable|permanent|forever|AI|automatic|verified|live" src/client README.md docs/*.md || true`
+  - `npx prettier --write docs/CLAIM_COPY_AUDIT.md decisions.md log.md TODO.md src/client/render.test.ts`
+  - `npm run test -- --run src/client/render.test.ts`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+  - `rg -n "not reportable|disable reports|blocked reports|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live report suppression and edit reopening remain implemented-not-live-verified until controlled Reddit events are generated.

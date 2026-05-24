@@ -301,3 +301,18 @@ Reason:
 
 - A report-churn dashboard must stay fast and scan-friendly under load.
 - Exact large-total counts need explicit counters or a verified Redis cardinality primitive, not unbounded reads.
+
+### D024 - Classify runtime claims by proof level
+
+Wave 27 reviewed claim language across README, docs, and client copy.
+
+Decision:
+
+- Runtime behavior claims use one of these statuses: verified, verified locally, implemented-not-live-verified, implemented-not-final-verified, demo-only, or cut.
+- Public copy may claim only verified behavior without a qualifier.
+- Live report suppression, live edit reopening, and live moderation method behavior remain implemented-not-live-verified until controlled Reddit playtest proves them.
+
+Reason:
+
+- ReviewLock's submission strength depends on trust in the edit-aware loop.
+- Inflated runtime claims would be worse than clearly labeled implemented behavior.

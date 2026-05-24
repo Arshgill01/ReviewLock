@@ -15,7 +15,15 @@ import type {
   RuntimeProofStatus,
 } from '../shared/schema';
 
-const forbiddenCopy = ['not reportable', 'disable reports', 'blocked reports'];
+const forbiddenCopy = [
+  'not reportable',
+  'disable reports',
+  'blocked reports',
+  'ai decides',
+  'automatic removal',
+  'permanent',
+  'forever',
+];
 
 const expectSafeCopy = (html: string): void => {
   const normalized = html.toLowerCase();
