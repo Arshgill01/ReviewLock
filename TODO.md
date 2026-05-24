@@ -89,6 +89,7 @@
 - [x] Re-run live WebView demo smoke after seeded demo data expansion.
 - [x] Add controlled live scenario matrix separating demo quality from runtime proof.
 - [x] Add live trigger proof runbook for S01/S02 controlled execution.
+- [x] Record report-trigger moderation rollback failures in runtime proof and audit.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

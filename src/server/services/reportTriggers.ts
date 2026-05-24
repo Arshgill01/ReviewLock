@@ -14,6 +14,7 @@ import {
 import { incrementReopenedMetric, incrementSuppressedReportMetric } from './metrics';
 import { ignoreReportsForReviewLock, unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
+import { recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 import { isTriggerConcurrencyError, withTriggerMutex } from './triggerMutex';
 import { decideReportTriggerAction, type ReportTriggerDecision } from './triggerDecisions';
@@ -140,6 +141,15 @@ const markLockReopenedAfterQueue = async (
   }
 };
 
+const recordRuntimeProof = async (
+  deps: ReportTriggerDependencies,
+  subreddit: string,
+  result: Awaited<ReturnType<typeof ignoreReportsForReviewLock>>,
+  now: string,
+): Promise<void> => {
+  await recordModerationOperationStatus(deps.redis, subreddit, result, now).catch(() => undefined);
+};
+
 export const handleReportTrigger = async (
   deps: ReportTriggerDependencies,
   input: ReportTriggerInput,
@@ -245,6 +255,7 @@ export const handleReportTrigger = async (
 
       if (decision.action === 'suppress_unchanged') {
         const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
+        await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
 
         if (!ignoreResult.ok) {
           await appendAuditEvent(deps.redis, {
@@ -292,17 +303,37 @@ export const handleReportTrigger = async (
             demo: lock.demo,
           });
         } catch (error) {
-          await deps.reddit.unignoreReports(resolution.target).catch(() => undefined);
+          const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+          await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
+
+          if (!rollbackResult.ok) {
+            await appendAuditEvent(deps.redis, {
+              id: reportAuditId('audit-report-rollback-failed', input, now, lock.id),
+              kind: 'runtime_failure',
+              subreddit: lock.subreddit,
+              targetId: lock.targetId,
+              targetKind: lock.targetKind,
+              lockId: lock.id,
+              actor: 'reviewlock',
+              createdAt: now,
+              message:
+                'Redis failed after report suppression and unignoreReports rollback failed.',
+              data: { operation: 'unignoreReports', error: rollbackResult.errorMessage },
+              demo: lock.demo,
+            }).catch(() => undefined);
+          }
+
           await clearDedupe(deps.redis, dedupeInput, now);
 
           return {
             ok: false,
             action: 'runtime_uncertain',
-            message:
-              error instanceof Error
+            message: rollbackResult.ok
+              ? error instanceof Error
                 ? error.message
-                : 'Redis failed after ignoreReports; ReviewLock attempted to unignore reports.',
-            warnings: ['redis_write_failed'],
+                : 'Redis failed after ignoreReports; ReviewLock attempted to unignore reports.'
+              : 'Redis failed after ignoreReports, and unignoreReports rollback failed.',
+            warnings: ['redis_write_failed', ...rollbackResult.warnings],
           };
         }
 
@@ -316,6 +347,7 @@ export const handleReportTrigger = async (
 
       if (decision.action === 'reopen_changed') {
         const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+        await recordRuntimeProof(deps, lock.subreddit, unignoreResult, now);
         const warnings = unignoreResult.warnings;
         const reopenEvent = buildReopenFromReportDecision(lock, resolution.target, now, warnings);
         await enqueueReopenEvent(deps.redis, reopenEvent);

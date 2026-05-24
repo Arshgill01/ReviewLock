@@ -9,6 +9,7 @@ import { getDailyMetrics, getTargetMetrics } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { fingerprintTarget } from './fingerprint';
 import { handleReportTrigger } from './reportTriggers';
+import { loadRuntimeProofStatus } from './runtimeProof';
 import { handleUpdateTrigger } from './updateTriggers';
 import { keys } from './keys';
 
@@ -546,6 +547,57 @@ describe('handleReportTrigger', () => {
       warnings: ['redis_write_failed'],
     });
     expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+  });
+
+  it('records failed unignore rollback when Redis fails after report suppression', async () => {
+    class FailingLockWriteRedisStore extends InMemoryRedisStore {
+      failLockWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failLockWrites && key.includes(':lock:lock-')) {
+          throw new Error('redis down during suppression');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new FailingLockWriteRedisStore();
+    await saveLock(redis, lock());
+    redis.failLockWrites = true;
+    const reddit = new FakeRedditAdapter([target()]);
+    reddit.failOperation('unignoreReports', 'rollback denied');
+
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-rollback-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      message: 'Redis failed after ignoreReports, and unignoreReports rollback failed.',
+      warnings: ['redis_write_failed', 'unignoreReports failed for t3_post'],
+    });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-rollback-fail')).toBe(false);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'Redis failed after report suppression and unignoreReports rollback failed.',
+        data: { operation: 'unignoreReports', error: 'rollback denied' },
+      }),
+    ]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'ignoreReports', status: 'verified' }),
+        expect.objectContaining({ name: 'unignoreReports', status: 'failed' }),
+      ]),
+    });
   });
 
   it('keeps report-then-update ordering idempotent for changed content', async () => {

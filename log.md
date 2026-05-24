@@ -1217,3 +1217,26 @@
 - Open risks:
   - Live trigger proof remains blocked until the controlled S01 post is created
     and reported in `r/reviewlock_dev`.
+
+## 2026-05-25 - Wave 33 report-trigger rollback hardening
+
+- Hardened report-trigger moderation rollback after `ignoreReports()` succeeds
+  but Redis writes fail:
+  - the trigger path now records `ignoreReports` and `unignoreReports` runtime
+    proof from report-trigger moderation calls;
+  - failed `unignoreReports` rollback writes a `runtime_failure` audit event
+    when Redis is still available;
+  - failed rollback warnings are returned to the trigger result instead of
+    being swallowed.
+- Added a regression proving the report dedupe marker is cleared after this
+  runtime-uncertain failure so Devvit retries can run again.
+- Commands run:
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+- Pass/fail status: PASS for focused service and trigger-route tests, lint, and
+  type-check.
+- Open risks:
+  - The live S01 lock form is open but not submitted; live lock/report actions
+    remain paused pending action-time confirmation.

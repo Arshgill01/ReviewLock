@@ -1007,3 +1007,26 @@ Reason:
   outside ReviewLock's no-scraping/no-external-service v1 boundary. A rich
   controlled corpus gives real proof without weakening the product claim
   boundary.
+
+### D064 - Treat report-trigger rollback failure as runtime proof, not noise
+
+Report-trigger suppression can call `ignoreReports()` successfully and then hit
+a Redis write failure before counters and audit are durable.
+
+Decision:
+
+- Roll back with the same `unignoreReportsForReviewLock()` moderation helper
+  used by lock/unlock flows.
+- Record report-trigger moderation operation results in the runtime proof
+  ledger.
+- If rollback fails, write a `runtime_failure` audit event when possible and
+  return the `unignoreReports` warning with the trigger result.
+- Clear the report dedupe marker on this runtime-uncertain path so a Devvit
+  retry can attempt the event again.
+
+Reason:
+
+- A rollback failure can leave Reddit still ignoring reports after ReviewLock
+  failed to persist the suppression ledger. Moderators need that failure visible
+  in proof surfaces, and trigger retries must not be blocked by a stale dedupe
+  marker.
