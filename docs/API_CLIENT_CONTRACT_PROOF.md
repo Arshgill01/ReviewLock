@@ -8,20 +8,20 @@ Date: 2026-05-24
 
 ## Endpoint map
 
-| Client method                              | Method/path                                    | Server route                  | Contract status                                        |
-| ------------------------------------------ | ---------------------------------------------- | ----------------------------- | ------------------------------------------------------ |
-| `fetchRuntimeContext()`                    | `GET /api/context`                             | `src/routes/api.ts`           | Covered by `src/routes/api.contract.test.ts`           |
-| `fetchOverview(subreddit, demo)`           | `GET /api/overview?subreddit=...&demo=...`     | `src/routes/api.dashboard.ts` | Covered by route and client tests                      |
-| `fetchLocks(subreddit, demo)`              | `GET /api/locks?subreddit=...&demo=...`        | `src/routes/api.dashboard.ts` | Covered by route and client tests                      |
-| `fetchReopenQueue(subreddit, demo)`        | `GET /api/reopen-queue?subreddit=...&demo=...` | `src/routes/api.dashboard.ts` | Covered by route and client tests                      |
-| `fetchAuditLog(subreddit, demo)`           | `GET /api/audit?subreddit=...&demo=...`        | `src/routes/api.dashboard.ts` | Covered by route and client tests                      |
-| `fetchRuntimeStatus(subreddit, demo)`      | `GET /api/runtime?subreddit=...&demo=...`      | `src/routes/api.dashboard.ts` | Covered by route and client tests                      |
-| `runRuntimeSmoke(subreddit)`               | `POST /api/smoke/redis?subreddit=...`          | `src/routes/api.ts`           | Covered by route and client tests                      |
-| `runRuntimeSmoke(subreddit)`               | `POST /api/smoke/reddit?subreddit=...`         | `src/routes/api.ts`           | Covered by route and client tests                      |
-| `enableDemoMode()`                         | `POST /api/demo/enable`                        | `src/routes/api.demo.ts`      | Covered by route and client tests                      |
-| `disableDemoMode(subreddit)`               | `POST /api/demo/disable?subreddit=...`         | `src/routes/api.demo.ts`      | Covered by route and client tests                      |
-| `unlockTarget(targetId, actor)`            | `POST /internal/form/unlock-review-submit`     | `src/routes/forms.ts`         | Covered by route presence and client UI-response tests |
-| `dismissReopen(eventId, actor, subreddit)` | `POST /internal/form/reopen-action-submit`     | `src/routes/forms.ts`         | Covered by route presence and client UI-response tests |
+| Client method                              | Method/path                                    | Server route                  | Contract status                              |
+| ------------------------------------------ | ---------------------------------------------- | ----------------------------- | -------------------------------------------- |
+| `fetchRuntimeContext()`                    | `GET /api/context`                             | `src/routes/api.ts`           | Covered by `src/routes/api.contract.test.ts` |
+| `fetchOverview(subreddit, demo)`           | `GET /api/overview?subreddit=...&demo=...`     | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `fetchLocks(subreddit, demo)`              | `GET /api/locks?subreddit=...&demo=...`        | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `fetchReopenQueue(subreddit, demo)`        | `GET /api/reopen-queue?subreddit=...&demo=...` | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `fetchAuditLog(subreddit, demo)`           | `GET /api/audit?subreddit=...&demo=...`        | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `fetchRuntimeStatus(subreddit, demo)`      | `GET /api/runtime?subreddit=...&demo=...`      | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `runRuntimeSmoke(subreddit)`               | `POST /api/smoke/redis?subreddit=...`          | `src/routes/api.ts`           | Covered by route and client tests            |
+| `runRuntimeSmoke(subreddit)`               | `POST /api/smoke/reddit?subreddit=...`         | `src/routes/api.ts`           | Covered by route and client tests            |
+| `enableDemoMode()`                         | `POST /api/demo/enable`                        | `src/routes/api.demo.ts`      | Covered by route and client tests            |
+| `disableDemoMode(subreddit)`               | `POST /api/demo/disable?subreddit=...`         | `src/routes/api.demo.ts`      | Covered by route and client tests            |
+| `unlockTarget(targetId, lockId, actor)`    | `POST /api/locks/unlock`                       | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
+| `dismissReopen(eventId, actor, subreddit)` | `POST /api/reopen-queue/dismiss`               | `src/routes/api.dashboard.ts` | Covered by route and client tests            |
 
 ## Hardened client behavior
 
@@ -35,6 +35,12 @@ Date: 2026-05-24
   `topChurnTargets`;
 - runtime responses must include a runtime object;
 - demo mode responses must include the required status fields;
+- dashboard moderation actions require the exact lock or reopen identity that
+  the moderator confirmed;
+- dashboard and runtime smoke APIs reject client-supplied subreddit namespaces
+  that do not match the Devvit runtime subreddit;
+- dashboard reads reject the seeded `reviewlock_demo` namespace unless demo mode
+  is explicitly enabled;
 - Devvit form endpoints still accept UI responses such as `showToast`.
 
 This prevents `undefined` collections or malformed payloads from reaching
@@ -56,6 +62,8 @@ Tests added or expanded:
   - verifies every endpoint used by the dashboard client is routed and returns
     JSON instead of 404/405;
   - verifies empty dashboard collections return empty arrays;
+  - verifies dashboard and runtime smoke namespace mismatches return structured
+    `403` JSON;
   - verifies missing API dependencies return structured non-200 JSON.
 - `src/client/state/store.test.ts`
   - verifies slow API responses keep `isLoading` visible until data resolves.

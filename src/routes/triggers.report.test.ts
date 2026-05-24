@@ -74,6 +74,26 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
   });
 
+  it('accepts Devvit nested post report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-nested-post',
+        post: { id: 't3_post', numberOfReports: 6 },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+  });
+
   it('accepts comment report payloads and suppresses unchanged comments', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));
@@ -86,6 +106,27 @@ describe('report trigger routes', () => {
     const response = await router.request('/on-comment-report', {
       method: 'POST',
       body: JSON.stringify({ commentId: 't1_comment', eventId: 'evt-comment-route-1' }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
+  it('accepts Devvit nested comment report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-nested-comment',
+        comment: { id: 't1_comment', subredditName: 'alpha', numReports: 3 },
+      }),
     });
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });

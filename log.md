@@ -583,3 +583,92 @@
 - Open risks:
   - Live `approve()`, `ignoreReports()`, and `unignoreReports()` behavior remains unverified on controlled Reddit content.
   - Live report and edit trigger delivery remains unverified because controlled Reddit report/edit events still need to be generated.
+
+## 2026-05-24 - Wave 32 partial moderation-method proof
+
+- Added runtime proof recording for `approve`, `ignoreReports`, and `unignoreReports` results from the lock/unlock service paths.
+- Hardened the dashboard unlock flow after live WebView testing showed that `window.confirm()` was unreliable inside the embedded Devvit WebView.
+- Added inline dashboard confirmation controls for unlock and reopen-dismiss actions.
+- Added dedicated dashboard API routes:
+  - `POST /api/locks/unlock`
+  - `POST /api/reopen-queue/dismiss`
+- Hardened server-side audit actor handling so Reddit runtime username takes precedence over client-supplied actor payloads.
+- Verified through controlled live dashboard unlock that `unignoreReports()` records `unignoreReports verified` for target `t3_1tm8nak`.
+- Opened the live `Lock review` form for `t3_1tm8nak` and confirmed target id, content summary, report count, edit state, permalink, and reason picker rendered.
+- A `Lock review` submit attempt happened during Devvit hot reload and did not create an active lock; treated as inconclusive.
+- Documented the controlled browser automation misclick that removed and then restored `t3_1tm8nak` through Reddit native moderation UI.
+- Added `docs/MODERATION_METHOD_PROOF.md`.
+- Added `docs/ANTIGRAVITY_UI_REFRESH_PROMPT.md` and launched Antigravity/Gemini in tmux for a frontend-only redesign draft.
+- Added `docs/CODEX_REVIEW_AGENT_PROMPT.md` for the planned fresh Codex review agent coordination loop.
+- Commands run so far:
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser live dashboard unlock proof on `r/reviewlock_dev`
+  - Zen browser live `Lock review` form proof on `t3_1tm8nak`
+  - `npx prettier --write src/routes/api.dashboard.ts src/routes/forms.ts`
+  - `npm run test -- --run src/routes/forms.test.ts src/routes/api.dashboard.test.ts src/routes/api.contract.test.ts src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/runtimeProof.test.ts`
+- Pass/fail status: PARTIAL. Targeted local tests passed and live `unignoreReports()` proof passed; live `approve()` and `ignoreReports()` proof remains incomplete.
+- Open risks:
+  - Live `approve()` and `ignoreReports()` still need a successful controlled ReviewLock lock submission after runtime proof instrumentation.
+  - Live report and edit trigger delivery still need controlled proof.
+  - The Antigravity frontend diff must be reviewed before integration.
+
+## 2026-05-24 - Wave 32 continued hardening and reviewer fixes
+
+- Confirmed the second Codex reviewer was active and reviewed `docs/REVIEW_AGENT_FINDINGS.md`.
+- Integrated and corrected the Antigravity/Gemini frontend redesign draft, keeping edits in `src/client/**` and removing external font, inline style, emoji/status-symbol, negative letter-spacing, and oversized-radius violations before accepting it.
+- Live-verified `approve()` and `ignoreReports()` on controlled post target `t3_1tm8nak` through ReviewLock `Lock review`; the dashboard showed an active lock and runtime statuses `approve verified` and `ignoreReports verified`.
+- Hardened partial lock creation failure handling so a post-save audit/metric failure rolls back Reddit `ignoreReports()` and removes active lock records/indexes.
+- Hardened manual unlock failure handling so `unignoreReports()` failure keeps the lock active, adds runtime warnings, writes a runtime failure audit event, and returns a retryable error.
+- Bound dashboard/form unlock requests to the confirmed `lockId` and reject stale confirmations before calling Reddit.
+- Hardened dashboard and runtime smoke namespace handling so Devvit runtime subreddit context is authoritative and mismatched client-supplied namespaces are rejected.
+- Hardened dashboard unlock so it rejects targets outside the Devvit runtime subreddit before any Reddit moderation call.
+- Hardened report/update trigger routes to accept installed Devvit nested `post.id` and `comment.id` payload shapes.
+- Hardened Devvit lock/unlock forms with server-stored Redis form bindings so editable form target IDs cannot redirect the confirmed moderation action.
+- Hardened reopen persistence ordering so reopen events are queued before active lock indexes are removed.
+- Hardened demo namespace reads so `reviewlock_demo` cannot render without demo mode enabled.
+- Validated lock reason submissions against shared presets and escaped rendered reason labels.
+- Added required post/comment `Open ReviewLock` menu actions that route to the dashboard launch flow.
+- Reran Playwright browser regression for the current dashboard bundle across live/demo desktop/mobile states and inline confirmation controls.
+- Updated proof and claim docs to reflect controlled post-target moderation proof while preserving live trigger and comment-target proof boundaries.
+- Commands run:
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser controlled `Lock review` proof on `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+  - `npm run test -- --run src/routes/forms.test.ts src/routes/api.dashboard.test.ts src/routes/api.contract.test.ts src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/runtimeProof.test.ts`
+  - `npm run test -- --run src/client/render.test.ts src/client/state/store.test.ts src/client/state/api.test.ts`
+  - `npm run type-check`
+  - `git diff --check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `npm run test -- --run src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts src/routes/api.contract.test.ts src/client/state/api.test.ts src/client/state/store.test.ts`
+  - `npm run type-check`
+  - `npx prettier --write TODO.md decisions.md docs/API_CLIENT_CONTRACT_PROOF.md docs/SAFETY_PRIVACY_AUDIT.md docs/CLAIM_COPY_AUDIT.md docs/RUNTIME_PROOF.md docs/KNOWN_LIMITATIONS.md docs/PLAYTEST_CHECKLIST.md docs/REVIEW_AGENT_FINDINGS.md log.md src/server/services/locks.ts src/server/services/lockFlow.ts src/server/services/lockFlow.test.ts src/server/services/unlockFlow.ts src/server/services/unlockFlow.test.ts src/routes/api.ts src/routes/api.dashboard.ts src/routes/api.dashboard.test.ts src/routes/api.contract.test.ts src/routes/forms.ts src/routes/forms.test.ts src/routes/triggers.report.ts src/routes/triggers.report.test.ts src/routes/triggers.update.ts src/routes/triggers.update.test.ts src/client/state/api.ts src/client/state/api.test.ts src/client/state/store.ts src/client/state/store.test.ts`
+  - `npm run test -- --run src/integration.test.ts src/routes/api.dashboard.test.ts src/routes/api.contract.test.ts`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `npm run test -- --run src/routes/menu.test.ts src/routes/forms.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts src/routes/api.dashboard.test.ts src/client/render.test.ts src/integration.test.ts`
+  - `npm run type-check`
+  - `npm run test -- --run src/fullScenario.test.ts src/routes/forms.test.ts`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `npm run test -- --run src/routes/api.dashboard.test.ts src/server/services/unlockFlow.test.ts`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `mkdir -p output/playwright`
+  - `npx --yes http-server dist/client -a 127.0.0.1 -p 4173`
+  - `npx --yes --package=playwright node <<'NODE' ... NODE`
+  - `kill 19788`
+- Pass/fail status: PASS. Latest full validation passed with 40 test files and 212 tests.
+- Open risks:
+  - Live report and edit trigger delivery still need controlled proof.
+  - Comment-target moderation method proof is still unverified.
+  - Devvit trigger live delivery remains unverified even though installed nested payload shapes are now covered locally.

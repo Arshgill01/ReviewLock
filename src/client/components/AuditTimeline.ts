@@ -9,8 +9,8 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
       (event) => `
         <li class="audit-row">
           <div>
-            <strong>${event.kind.replace(/_/g, ' ')}</strong>
-            <span>${new Date(event.createdAt).toLocaleString()} · ${text(event.actor)}</span>
+            <strong class="audit-kind">${event.kind.replace(/_/g, ' ')}</strong>
+            <span>${new Date(event.createdAt).toLocaleString()} · <strong>${text(event.actor)}</strong></span>
           </div>
           <p>${text(event.message)}</p>
         </li>

@@ -43,7 +43,16 @@ app?.addEventListener('click', (event) => {
     const lockId = target.dataset.lockId;
     const targetId = target.dataset.targetId;
 
-    if (lockId && targetId && window.confirm('Unlock this ReviewLock item?')) {
+    if (lockId && targetId) {
+      store.requestConfirmation({ action: 'unlock', lockId, targetId });
+    }
+  }
+
+  if (action === 'confirm-unlock') {
+    const lockId = target.dataset.lockId;
+    const targetId = target.dataset.targetId;
+
+    if (lockId && targetId) {
       void store.unlock(lockId, targetId);
     }
   }
@@ -51,9 +60,21 @@ app?.addEventListener('click', (event) => {
   if (action === 'dismiss-reopen') {
     const eventId = target.dataset.eventId;
 
-    if (eventId && window.confirm('Dismiss this reopened item?')) {
+    if (eventId) {
+      store.requestConfirmation({ action: 'dismiss-reopen', eventId });
+    }
+  }
+
+  if (action === 'confirm-dismiss-reopen') {
+    const eventId = target.dataset.eventId;
+
+    if (eventId) {
       void store.dismissReopen(eventId);
     }
+  }
+
+  if (action === 'cancel-confirmation') {
+    store.clearConfirmation();
   }
 
   if (action === 'toggle-mode') {

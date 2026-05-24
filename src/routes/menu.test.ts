@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fixedClock } from '../server/adapters/clock';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockTarget } from '../shared/schema';
@@ -23,13 +24,18 @@ describe('menu routes', () => {
       title: 'Lock review',
       fields: expect.arrayContaining([
         expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+        expect.objectContaining({ name: 'formToken' }),
         expect.objectContaining({ name: 'lockReason' }),
       ]),
     });
   });
 
   it('serves a lock form for post menu requests', async () => {
-    const router = createMenuRouter({ reddit: new FakeRedditAdapter([target()]) });
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
     const response = await router.request('/lock-post', {
       method: 'POST',
       body: JSON.stringify({ targetId: 't3_post' }),
@@ -83,7 +89,11 @@ describe('menu routes', () => {
       demo: false,
     });
 
-    const router = createMenuRouter({ reddit: new FakeRedditAdapter([target()]), redis });
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
     const response = await router.request('/unlock-post', {
       method: 'POST',
       body: JSON.stringify({ targetId: 't3_post' }),
@@ -95,9 +105,26 @@ describe('menu routes', () => {
         form: {
           fields: expect.arrayContaining([
             expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+            expect.objectContaining({ name: 'lockId', defaultValue: 'lock-1' }),
+            expect.objectContaining({ name: 'formToken' }),
           ]),
         },
       },
+    });
+  });
+
+  it('serves target-level Open ReviewLock menu actions', async () => {
+    const router = createMenuRouter();
+
+    await expect(
+      (await router.request('/open-post', { method: 'POST' })).json(),
+    ).resolves.toMatchObject({
+      showForm: { name: 'dashboardLaunch' },
+    });
+    await expect(
+      (await router.request('/open-comment', { method: 'POST' })).json(),
+    ).resolves.toMatchObject({
+      showForm: { name: 'dashboardLaunch' },
     });
   });
 });

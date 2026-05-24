@@ -4,9 +4,10 @@ import type { RedditAdapter } from '../adapters/reddit';
 import type { LockReasonPreset, ReviewLockRecord } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
-import { saveLock, updateLock } from './locks';
+import { removeLock, saveLock, updateLock } from './locks';
 import { recordLockCreatedMetric } from './metrics';
 import { approveForReviewLock, ignoreReportsForReviewLock } from './moderation';
+import { recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 
 export interface LockReviewInput {
@@ -31,6 +32,15 @@ export interface LockFlowResult {
 }
 
 const safeIdPart = (value: string): string => value.replace(/[^a-zA-Z0-9_]+/g, '-');
+
+const recordRuntimeProof = async (
+  deps: LockFlowDependencies,
+  subreddit: string,
+  result: Awaited<ReturnType<typeof approveForReviewLock>>,
+  now: string,
+): Promise<void> => {
+  await recordModerationOperationStatus(deps.redis, subreddit, result, now).catch(() => undefined);
+};
 
 export const createLockRecord = (
   input: LockReviewInput,
@@ -116,6 +126,8 @@ export const lockReviewedContent = async (
       data: { operation: 'ignoreReports', error: ignoreResult.errorMessage },
       demo: false,
     });
+    await recordRuntimeProof(deps, failedLock.subreddit, approveResult, now);
+    await recordRuntimeProof(deps, failedLock.subreddit, ignoreResult, now);
 
     return {
       ok: false,
@@ -125,7 +137,14 @@ export const lockReviewedContent = async (
     };
   }
 
-  const lock = createLockRecord(input, resolution.target, fingerprint.hash, fingerprint.version, now, warnings);
+  const lock = createLockRecord(
+    input,
+    resolution.target,
+    fingerprint.hash,
+    fingerprint.version,
+    now,
+    warnings,
+  );
 
   try {
     await saveLock(deps.redis, lock);
@@ -143,6 +162,8 @@ export const lockReviewedContent = async (
       demo: false,
     });
     await recordLockCreatedMetric(deps.redis, resolution.target, now);
+    await recordRuntimeProof(deps, lock.subreddit, approveResult, now);
+    await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
 
     return {
       ok: true,
@@ -152,6 +173,7 @@ export const lockReviewedContent = async (
     };
   } catch (error) {
     await deps.reddit.unignoreReports(resolution.target).catch(() => undefined);
+    await removeLock(deps.redis, lock).catch(() => undefined);
     return {
       ok: false,
       lock,

@@ -15,10 +15,23 @@ interface TriggerBody {
   targetId?: string;
   postId?: string;
   commentId?: string;
+  id?: string;
   eventId?: string;
   reportedAt?: string;
   reportCount?: number;
-  subreddit?: string;
+  subreddit?: string | { name?: string };
+  post?: {
+    id?: string;
+    subredditName?: string;
+    numberOfReports?: number;
+    numReports?: number;
+  };
+  comment?: {
+    id?: string;
+    subredditName?: string;
+    numberOfReports?: number;
+    numReports?: number;
+  };
 }
 
 const readBody = async (context: Context): Promise<TriggerBody> => {
@@ -29,7 +42,22 @@ const readBody = async (context: Context): Promise<TriggerBody> => {
   }
 };
 
-const targetId = (body: TriggerBody): string | undefined => body.targetId ?? body.postId ?? body.commentId;
+const targetId = (body: TriggerBody): string | undefined =>
+  body.targetId ?? body.postId ?? body.commentId ?? body.post?.id ?? body.comment?.id;
+
+const eventId = (body: TriggerBody): string | undefined => body.eventId ?? body.id;
+
+const subreddit = (body: TriggerBody): string | undefined =>
+  (typeof body.subreddit === 'string' ? body.subreddit : body.subreddit?.name) ??
+  body.post?.subredditName ??
+  body.comment?.subredditName;
+
+const reportCount = (body: TriggerBody): number | undefined =>
+  body.reportCount ??
+  body.post?.numberOfReports ??
+  body.post?.numReports ??
+  body.comment?.numberOfReports ??
+  body.comment?.numReports;
 
 export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
@@ -51,10 +79,10 @@ export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
         { reddit: deps.reddit, redis: deps.redis, clock: deps.clock },
         {
           targetId: id,
-          eventId: body.eventId,
+          eventId: eventId(body),
           reportedAt: body.reportedAt,
-          reportCount: body.reportCount,
-          subreddit: body.subreddit,
+          reportCount: reportCount(body),
+          subreddit: subreddit(body),
         },
       ),
     );

@@ -15,7 +15,15 @@ interface TriggerBody {
   targetId?: string;
   postId?: string;
   commentId?: string;
-  subreddit?: string;
+  subreddit?: string | { name?: string };
+  post?: {
+    id?: string;
+    subredditName?: string;
+  };
+  comment?: {
+    id?: string;
+    subredditName?: string;
+  };
 }
 
 const readBody = async (context: Context): Promise<TriggerBody> => {
@@ -26,9 +34,20 @@ const readBody = async (context: Context): Promise<TriggerBody> => {
   }
 };
 
-const targetId = (body: TriggerBody): string | undefined => body.targetId ?? body.postId ?? body.commentId;
+const targetId = (body: TriggerBody): string | undefined =>
+  body.targetId ?? body.postId ?? body.commentId ?? body.post?.id ?? body.comment?.id;
 
-const registerUpdate = (router: Hono, path: string, triggerKind: UpdateTriggerKind, deps: RouteDeps) => {
+const subreddit = (body: TriggerBody): string | undefined =>
+  (typeof body.subreddit === 'string' ? body.subreddit : body.subreddit?.name) ??
+  body.post?.subredditName ??
+  body.comment?.subredditName;
+
+const registerUpdate = (
+  router: Hono,
+  path: string,
+  triggerKind: UpdateTriggerKind,
+  deps: RouteDeps,
+) => {
   router.post(path, async (context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {
       return context.json({ ok: false, error: 'ReviewLock dependencies are not configured.' }, 503);
@@ -44,7 +63,7 @@ const registerUpdate = (router: Hono, path: string, triggerKind: UpdateTriggerKi
     return context.json(
       await handleUpdateTrigger(
         { reddit: deps.reddit, redis: deps.redis, clock: deps.clock },
-        { targetId: id, subreddit: body.subreddit, triggerKind },
+        { targetId: id, subreddit: subreddit(body), triggerKind },
       ),
     );
   });

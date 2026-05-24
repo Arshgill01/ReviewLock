@@ -4,6 +4,7 @@ import type { FormField, MenuItemRequest, UiResponse } from '@devvit/web/shared'
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
+import { createFormBinding } from '../server/services/formBindings';
 import { getActiveLockByTarget } from '../server/services/locks';
 import { resolveTargetById } from '../server/services/targetResolver';
 
@@ -32,6 +33,7 @@ const targetIdFromBody = (body: ReviewLockMenuRequest): string | undefined =>
 const targetSummary = (target: {
   id: string;
   kind: string;
+  subreddit: string;
   authorName: string;
   reportCount: number;
   edited: boolean;
@@ -48,7 +50,7 @@ const targetSummary = (target: {
     `Preview: ${(target.body ?? target.title ?? '').slice(0, 240)}`,
   ].join('\n');
 
-export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0]) => ({
+export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0], token = '') => ({
   title: 'Lock review',
   description: 'Lock reviewed content until it changes.',
   fields: [
@@ -58,6 +60,21 @@ export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0])
       type: 'string',
       required: true,
       defaultValue: target.id,
+      disabled: true,
+    },
+    {
+      name: 'subreddit',
+      label: 'Subreddit',
+      type: 'string',
+      required: true,
+      defaultValue: target.subreddit,
+    },
+    {
+      name: 'formToken',
+      label: 'Review token',
+      type: 'string',
+      required: true,
+      defaultValue: token,
     },
     {
       name: 'targetSummary',
@@ -74,9 +91,10 @@ export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0])
       defaultValue: ['reviewed_policy_compliant'],
       options: [
         { label: 'Reviewed and policy-compliant', value: 'reviewed_policy_compliant' },
-        { label: 'Repeat false reports', value: 'repeat_false_reports' },
-        { label: 'Context verified', value: 'context_verified' },
-        { label: 'Moderator consensus', value: 'moderator_consensus' },
+        { label: 'Approved with known context', value: 'approved_context_known' },
+        { label: 'Repeat report churn', value: 'repeat_report_churn' },
+        { label: 'Mod team consensus', value: 'mod_team_consensus' },
+        { label: 'Custom reason', value: 'custom' },
       ],
     },
     {
@@ -91,7 +109,12 @@ export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0])
   cancelLabel: 'Cancel',
 });
 
-export const buildUnlockReviewForm = (targetId: string, lockId: string) => ({
+export const buildUnlockReviewForm = (
+  targetId: string,
+  lockId: string,
+  subreddit = '',
+  token = '',
+) => ({
   title: 'Unlock review',
   description: 'Unlock this reviewed item and allow reports to surface again.',
   fields: [
@@ -101,6 +124,7 @@ export const buildUnlockReviewForm = (targetId: string, lockId: string) => ({
       type: 'string',
       required: true,
       defaultValue: targetId,
+      disabled: true,
     },
     {
       name: 'lockId',
@@ -108,6 +132,21 @@ export const buildUnlockReviewForm = (targetId: string, lockId: string) => ({
       type: 'string',
       required: true,
       defaultValue: lockId,
+      disabled: true,
+    },
+    {
+      name: 'subreddit',
+      label: 'Subreddit',
+      type: 'string',
+      required: true,
+      defaultValue: subreddit,
+    },
+    {
+      name: 'formToken',
+      label: 'Review token',
+      type: 'string',
+      required: true,
+      defaultValue: token,
     },
     {
       name: 'confirmation',
@@ -124,10 +163,31 @@ export const buildUnlockReviewForm = (targetId: string, lockId: string) => ({
 export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
 
+  const dashboardLaunchResponse = (): UiResponse => ({
+    showForm: {
+      name: 'dashboardLaunch',
+      form: {
+        title: 'Open ReviewLock dashboard',
+        fields: [
+          {
+            name: 'copy',
+            label: 'ReviewLock',
+            type: 'paragraph',
+            defaultValue:
+              'This creates a visible ReviewLock dashboard custom post in this subreddit. Lock reviewed content until it changes.',
+            disabled: true,
+          },
+        ],
+        acceptLabel: 'Create dashboard post',
+        cancelLabel: 'Cancel',
+      },
+    },
+  });
+
   const lockHandler = async (context: Context) => {
-    if (!deps.reddit) {
+    if (!deps.reddit || !deps.redis || !deps.clock) {
       return context.json<UiResponse>({
-        showToast: { text: 'ReviewLock could not resolve Reddit context.', appearance: 'neutral' },
+        showToast: { text: 'ReviewLock dependencies are not configured.', appearance: 'neutral' },
       });
     }
 
@@ -136,12 +196,25 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
 
     if (!resolution.ok || !resolution.target) {
       return context.json<UiResponse>({
-        showToast: { text: resolution.error ?? 'ReviewLock could not resolve this target.', appearance: 'neutral' },
+        showToast: {
+          text: resolution.error ?? 'ReviewLock could not resolve this target.',
+          appearance: 'neutral',
+        },
       });
     }
 
+    const binding = await createFormBinding(
+      deps.redis,
+      'lock',
+      resolution.target,
+      deps.clock.now(),
+    );
+
     return context.json<UiResponse>({
-      showForm: { name: 'lockReview', form: buildLockReviewForm(resolution.target) },
+      showForm: {
+        name: 'lockReview',
+        form: buildLockReviewForm(resolution.target, binding.token),
+      },
     });
   };
 
@@ -157,20 +230,46 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
 
     if (!resolution.ok || !resolution.target) {
       return context.json<UiResponse>({
-        showToast: { text: resolution.error ?? 'ReviewLock could not resolve this target.', appearance: 'neutral' },
+        showToast: {
+          text: resolution.error ?? 'ReviewLock could not resolve this target.',
+          appearance: 'neutral',
+        },
       });
     }
 
-    const lock = await getActiveLockByTarget(deps.redis, resolution.target.subreddit, resolution.target.id);
+    const lock = await getActiveLockByTarget(
+      deps.redis,
+      resolution.target.subreddit,
+      resolution.target.id,
+    );
 
     if (!lock) {
       return context.json<UiResponse>({
-        showToast: { text: 'No active ReviewLock lock was found for this content.', appearance: 'neutral' },
+        showToast: {
+          text: 'No active ReviewLock lock was found for this content.',
+          appearance: 'neutral',
+        },
       });
     }
 
+    const binding = await createFormBinding(
+      deps.redis,
+      'unlock',
+      resolution.target,
+      deps.clock?.now() ?? new Date().toISOString(),
+      lock.id,
+    );
+
     return context.json<UiResponse>({
-      showForm: { name: 'unlockReview', form: buildUnlockReviewForm(resolution.target.id, lock.id) },
+      showForm: {
+        name: 'unlockReview',
+        form: buildUnlockReviewForm(
+          resolution.target.id,
+          lock.id,
+          resolution.target.subreddit,
+          binding.token,
+        ),
+      },
     });
   };
 
@@ -178,28 +277,9 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
   router.post('/lock-comment', lockHandler);
   router.post('/unlock-post', unlockHandler);
   router.post('/unlock-comment', unlockHandler);
-  router.post('/open-dashboard', (context) =>
-    context.json<UiResponse>({
-      showForm: {
-        name: 'dashboardLaunch',
-        form: {
-          title: 'Open ReviewLock dashboard',
-          fields: [
-            {
-              name: 'copy',
-              label: 'ReviewLock',
-              type: 'paragraph',
-              defaultValue:
-                'This creates a visible ReviewLock dashboard custom post in this subreddit. Lock reviewed content until it changes.',
-              disabled: true,
-            },
-          ],
-          acceptLabel: 'Create dashboard post',
-          cancelLabel: 'Cancel',
-        },
-      },
-    }),
-  );
+  router.post('/open-post', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
+  router.post('/open-comment', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
+  router.post('/open-dashboard', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
 
   return router;
 };

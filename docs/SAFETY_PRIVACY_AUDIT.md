@@ -91,7 +91,12 @@ Evidence:
 
 Runtime boundary:
 
-- Live `unignoreReports()` behavior remains unverified until controlled playtest proof is captured.
+- Live post-target `unignoreReports()` behavior is verified through the
+  controlled dashboard unlock proof in `docs/RUNTIME_PROOF.md` and
+  `docs/MODERATION_METHOD_PROOF.md`.
+- Comment-target `unignoreReports()` behavior and trigger-driven
+  `unignoreReports()` behavior remain unverified until controlled playtest proof
+  is captured.
 - The implemented behavior is non-destructive in local tests and adapter calls.
 
 ## Product Copy Review

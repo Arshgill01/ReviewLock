@@ -3,6 +3,7 @@ import { createApp } from './app';
 import { InMemoryRedisStore } from './server/adapters/redis';
 import { FakeRedditAdapter } from './server/adapters/reddit';
 import { listAuditEvents } from './server/services/audit';
+import { createFormBinding } from './server/services/formBindings';
 import { getActiveLockByTarget, getLock } from './server/services/locks';
 import { getDailyMetrics, getTargetMetrics } from './server/services/metrics';
 import { listOpenReopenEvents } from './server/services/reopenQueue';
@@ -51,10 +52,13 @@ describe('full ReviewLock scenario walkthrough', () => {
       clock: { now: () => currentTime },
     });
 
+    const postBinding = await createFormBinding(redis, 'lock', postTarget(), currentTime);
     const postLockResponse = await app.request(
       '/internal/form/lock-review-submit',
       jsonPost({
         targetId: 't3_scenario_post',
+        subreddit: 'alpha',
+        formToken: postBinding.token,
         actor: 'mod_alex',
         lockReason: 'reviewed_policy_compliant',
       }),
@@ -136,10 +140,13 @@ describe('full ReviewLock scenario walkthrough', () => {
     ]);
 
     currentTime = '2026-05-24T01:03:00.000Z';
+    const commentBinding = await createFormBinding(redis, 'lock', commentTarget(), currentTime);
     const commentLockResponse = await app.request(
       '/internal/form/lock-review-submit',
       jsonPost({
         targetId: 't1_scenario_comment',
+        subreddit: 'alpha',
+        formToken: commentBinding.token,
         actor: 'mod_alex',
         lockReason: 'reviewed_policy_compliant',
       }),

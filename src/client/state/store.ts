@@ -9,6 +9,17 @@ import type {
   RuntimeProofStatus,
 } from '../../shared/schema';
 
+export type DashboardConfirmation =
+  | {
+      action: 'unlock';
+      lockId: string;
+      targetId: string;
+    }
+  | {
+      action: 'dismiss-reopen';
+      eventId: string;
+    };
+
 export class ReviewLockStore {
   private api: ReviewLockApiClient;
   private listeners: Set<() => void> = new Set();
@@ -28,6 +39,7 @@ export class ReviewLockStore {
   public runtimeStatus: RuntimeProofStatus | null = null;
   public isVerifyingRuntime: boolean = false;
   public runtimeVerificationMessage: string | null = null;
+  public confirmation: DashboardConfirmation | null = null;
 
   constructor(
     api: ReviewLockApiClient,
@@ -49,6 +61,16 @@ export class ReviewLockStore {
     for (const listener of this.listeners) {
       listener();
     }
+  }
+
+  requestConfirmation(confirmation: DashboardConfirmation) {
+    this.confirmation = confirmation;
+    this.notify();
+  }
+
+  clearConfirmation() {
+    this.confirmation = null;
+    this.notify();
   }
 
   async fetchState() {
@@ -85,10 +107,11 @@ export class ReviewLockStore {
   async unlock(lockId: string, targetId: string) {
     this.isLoading = true;
     this.error = null;
+    this.confirmation = null;
     this.notify();
 
     try {
-      const res = await this.api.unlockTarget(targetId, 'moderator');
+      const res = await this.api.unlockTarget(targetId, lockId, 'moderator');
       if (!res.ok) {
         throw new Error(res.message || 'Failed to unlock content');
       }
@@ -108,6 +131,7 @@ export class ReviewLockStore {
   async dismissReopen(eventId: string) {
     this.isLoading = true;
     this.error = null;
+    this.confirmation = null;
     this.notify();
 
     try {

@@ -27,6 +27,8 @@ describe('API/client route contract', () => {
       { method: 'POST', path: '/api/smoke/reddit?subreddit=alpha' },
       { method: 'POST', path: '/api/demo/enable' },
       { method: 'POST', path: '/api/demo/disable?subreddit=reviewlock_demo' },
+      { method: 'POST', path: '/api/locks/unlock', body: {} },
+      { method: 'POST', path: '/api/reopen-queue/dismiss', body: {} },
       { method: 'POST', path: '/internal/form/unlock-review-submit', body: {} },
       { method: 'POST', path: '/internal/form/reopen-action-submit', body: {} },
     ];
@@ -48,21 +50,43 @@ describe('API/client route contract', () => {
     const app = createContractApp();
 
     await expect(
-      (await app.request('/api/locks?subreddit=empty&demo=false')).json(),
+      (await app.request('/api/locks?subreddit=alpha&demo=false')).json(),
     ).resolves.toMatchObject({ ok: true, locks: [] });
     await expect(
-      (await app.request('/api/reopen-queue?subreddit=empty&demo=false')).json(),
+      (await app.request('/api/reopen-queue?subreddit=alpha&demo=false')).json(),
     ).resolves.toMatchObject({ ok: true, events: [] });
     await expect(
-      (await app.request('/api/audit?subreddit=empty&demo=false')).json(),
+      (await app.request('/api/audit?subreddit=alpha&demo=false')).json(),
     ).resolves.toMatchObject({ ok: true, events: [] });
     await expect(
-      (await app.request('/api/runtime?subreddit=empty&demo=false')).json(),
+      (await app.request('/api/runtime?subreddit=alpha&demo=false')).json(),
     ).resolves.toMatchObject({
       ok: true,
       runtime: { overall: 'unverified' },
       dailyMetrics: [],
       topChurnTargets: [],
+    });
+  });
+
+  it('rejects dashboard namespaces that do not match the runtime subreddit', async () => {
+    const response = await createContractApp().request('/api/locks?subreddit=other&demo=false');
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Dashboard subreddit scope does not match the Devvit runtime subreddit.',
+    });
+  });
+
+  it('rejects runtime smoke namespaces that do not match the runtime subreddit', async () => {
+    const response = await createContractApp().request('/api/smoke/redis?subreddit=other', {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Runtime smoke subreddit scope does not match the Devvit runtime subreddit.',
     });
   });
 

@@ -59,12 +59,24 @@ export const updateLock = async (
   await saveLock(redis, lock);
 
   if (lock.status !== 'active') {
-    await redis.zRem(keys.activeLocks(lock.subreddit), lock.id);
-    await redis.hdel(keys.activeLocksByTarget(lock.subreddit), lock.targetId);
-    await redis.del(keys.targetLock(lock.subreddit, lock.targetId));
+    await removeActiveLockIndexes(redis, lock);
   }
 
   return lock;
+};
+
+export const removeActiveLockIndexes = async (
+  redis: RedisStore,
+  lock: Pick<ReviewLockRecord, 'subreddit' | 'id' | 'targetId'>,
+): Promise<void> => {
+  await redis.zRem(keys.activeLocks(lock.subreddit), lock.id);
+  await redis.hdel(keys.activeLocksByTarget(lock.subreddit), lock.targetId);
+  await redis.del(keys.targetLock(lock.subreddit, lock.targetId));
+};
+
+export const removeLock = async (redis: RedisStore, lock: ReviewLockRecord): Promise<void> => {
+  await removeActiveLockIndexes(redis, lock);
+  await redis.del(keys.lock(lock.subreddit, lock.id));
 };
 
 export const updateLockStatus = async (

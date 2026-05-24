@@ -29,14 +29,14 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Confirm Devvit accepts the menu response as a valid `UiResponse`.
 - [x] Confirm dashboard launch creates a ReviewLock custom post in `r/reviewlock_dev`.
 - [x] Confirm the custom post WebView renders instead of showing a Devvit error toast.
-- [ ] Re-run dashboard launch after the `/api/context` hardening patch in an isolated browser window.
+- [x] Re-run dashboard launch after the `/api/context` hardening patch in an isolated browser window.
 
 ## Lock flows
 
-- [ ] Create a controlled test post.
-- [ ] Use `Lock review` on the test post.
-- [ ] Confirm lock form shows target summary, reports, edit state, and reason.
-- [ ] Submit lock reason and confirm post approval/ignoreReports behavior.
+- [x] Create or reuse a controlled test post.
+- [x] Use `Lock review` on the test post.
+- [x] Confirm lock form shows target summary, reports, edit state, and reason.
+- [x] Submit lock reason and confirm post approval/ignoreReports behavior.
 - [ ] Create a controlled test comment.
 - [ ] Use `Lock review` on the test comment.
 - [ ] Submit lock reason and confirm comment approval/ignoreReports behavior.
@@ -65,13 +65,20 @@ Dev account: `u/BrightyBrainiac`.
 
 ## Dashboard runtime proof
 
-- [ ] Open the dashboard in the dedicated ReviewLock Zen window only.
-- [ ] Confirm live header shows `r/reviewlock_dev`.
-- [ ] Click `Verify runtime`.
-- [ ] Confirm `redditContext` moves to `verified`.
-- [ ] Confirm `redis` moves to `verified`.
-- [ ] Confirm unverified moderation operations remain labeled unverified until separately tested.
-- [ ] Confirm no product copy says "not reportable", "disable reports", or "blocked reports".
+- [x] Open the dashboard in Zen.
+- [x] Confirm live header shows `r/reviewlock_dev`.
+- [x] Click `Verify runtime`.
+- [x] Confirm `redditContext` moves to `verified`.
+- [x] Confirm `redis` moves to `verified`.
+- [x] Confirm unverified moderation operations remain labeled unverified until separately tested.
+- [x] Confirm dashboard unlock records `unignoreReports verified` on the controlled post target.
+- [x] Confirm lock review records `approve verified` and `ignoreReports verified` on the controlled post target.
+- [x] Confirm no product copy says "not reportable", "disable reports", or "blocked reports".
+
+## Browser safety notes
+
+- [x] Document the controlled browser automation misclick that removed and then restored `t3_1tm8nak`.
+- [ ] Avoid coordinate clicks around Reddit native moderation menu actions in future live proof.
 
 ## Demo mode
 

@@ -229,12 +229,16 @@ export class ReviewLockApiClient {
     return this.expectDemoStatus(data, endpoint);
   }
 
-  async unlockTarget(targetId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
-    const endpoint = '/internal/form/unlock-review-submit';
+  async unlockTarget(
+    targetId: string,
+    lockId: string,
+    actor: string,
+  ): Promise<{ ok: boolean; message?: string }> {
+    const endpoint = '/api/locks/unlock';
     const data = await this.requestJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetId, actor }),
+      body: JSON.stringify({ targetId, lockId, actor }),
     });
     return {
       ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),
@@ -252,11 +256,11 @@ export class ReviewLockApiClient {
     actor: string,
     subreddit: string,
   ): Promise<{ ok: boolean; message?: string }> {
-    const endpoint = '/internal/form/reopen-action-submit';
+    const endpoint = '/api/reopen-queue/dismiss';
     const data = await this.requestJson(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId, action: 'dismiss', actor, subreddit }),
+      body: JSON.stringify({ eventId, actor, subreddit }),
     });
     return {
       ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo),

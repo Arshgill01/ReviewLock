@@ -218,13 +218,13 @@ export const handleReportTrigger = async (
         const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
         const warnings = unignoreResult.warnings;
         const reopenEvent = buildReopenFromReportDecision(lock, resolution.target, now, warnings);
+        await enqueueReopenEvent(deps.redis, reopenEvent);
         await updateLockStatus(deps.redis, lock.subreddit, lock.id, 'reopened', {
           reopenedAt: now,
           reopenReason: 'content_changed',
           reopenEventId: reopenEvent.id,
           runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
         });
-        await enqueueReopenEvent(deps.redis, reopenEvent);
         await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
         await appendAuditEvent(deps.redis, {
           id: reportAuditId('audit-report-reopened', input, now, lock.id),

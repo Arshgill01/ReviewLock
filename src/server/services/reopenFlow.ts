@@ -125,13 +125,13 @@ export const breakLockForChangedContent = async (
       const warnings = unignoreResult.warnings;
       const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
 
+      await enqueueReopenEvent(deps.redis, event);
       await updateLockStatus(deps.redis, lock.subreddit, lock.id, 'reopened', {
         reopenedAt: now,
         reopenReason: reason,
         reopenEventId: event.id,
         runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
       });
-      await enqueueReopenEvent(deps.redis, event);
 
       if (resolution.target) {
         await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);

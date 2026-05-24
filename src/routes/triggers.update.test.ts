@@ -74,6 +74,48 @@ describe('update trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
   });
 
+  it('accepts Devvit nested post update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([target('Edited body')]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({ post: { id: 't3_post', subredditName: 'alpha' } }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+  });
+
+  it('uses Devvit top-level subreddit object for fail-open reopen when refetch fails', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        post: { id: 't3_post' },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'runtime_uncertain',
+      event: { reason: 'runtime_uncertain' },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'runtime_uncertain' }),
+    ]);
+  });
+
   it('accepts comment update payloads and reopens changed comments', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));
@@ -93,6 +135,24 @@ describe('update trigger routes', () => {
     expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({ reason: 'content_changed', targetKind: 'comment' }),
     ]);
+  });
+
+  it('accepts Devvit nested comment update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({ comment: { id: 't1_comment', subredditName: 'alpha' } }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
   });
 
   it('maps flair update route to flair_changed reopen reason', async () => {

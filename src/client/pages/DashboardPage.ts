@@ -18,8 +18,10 @@ export const renderTopChurnTargets = (targets: TargetMetrics[]): string => {
       (target) => `
         <li class="churn-row">
           <div>
-            <strong>${target.targetKind} ${text(target.targetId)}</strong>
-            <span>${new Date(target.lastActivityAt).toLocaleDateString()}</span>
+            <code>${target.targetKind}:${text(target.targetId.replace('t1_', '').replace('t3_', ''))}</code>
+            <span class="churn-date">
+              Last active: ${new Date(target.lastActivityAt).toLocaleDateString()}
+            </span>
           </div>
           <span class="number-pill">${target.reportsSuppressed}</span>
         </li>
@@ -45,7 +47,9 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
   if (store.isLoading && !store.overview) {
     return `
       <main class="shell shell-centered">
-        <p>Loading ReviewLock.</p>
+        <div class="panel loading-panel">
+          <strong>Loading ReviewLock.</strong>
+        </div>
       </main>
     `;
   }
@@ -86,20 +90,20 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
           ? `<section class="panel panel-error-inline" role="alert">
               <strong>Dashboard refresh failed.</strong>
               <span>${text(store.error)}</span>
-              <button class="button button-secondary" data-action="retry-fetch">Retry</button>
+              <button class="button button-secondary button-compact" data-action="retry-fetch">Retry</button>
             </section>`
           : ''
       }
 
       <section class="first-viewport" aria-label="Dashboard overview">
         ${renderMetricStrip(store.overview)}
-        ${renderLatestReopenEvent(store.overview?.latestReopenEvent)}
+        ${renderLatestReopenEvent(store.overview?.latestReopenEvent, store.confirmation)}
       </section>
 
       <div class="content-grid">
         <div class="main-column">
-          ${renderLockTable(store.locks)}
-          ${renderReopenQueue(store.reopenQueue)}
+          ${renderLockTable(store.locks, store.confirmation)}
+          ${renderReopenQueue(store.reopenQueue, store.confirmation)}
         </div>
         <div class="side-column">
           ${renderTopChurnTargets(store.topChurnTargets)}

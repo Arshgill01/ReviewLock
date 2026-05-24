@@ -1,4 +1,5 @@
 import type { ReopenEvent } from '../../shared/schema';
+import type { DashboardConfirmation } from '../state/store';
 
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -10,7 +11,50 @@ const date = (value: string): string => new Date(value).toLocaleString();
 
 const reason = (value: string): string => value.replace(/_/g, ' ');
 
-export const renderLatestReopenEvent = (event: ReopenEvent | undefined): string => {
+const shortHash = (value: string): string => text(value.slice(0, 8));
+
+const renderHashTransition = (event: ReopenEvent): string => `
+  <div class="hash-transition">
+    <span class="field-label">Hash transition</span>
+    <code>${shortHash(event.oldContentHash)}</code>
+    <span class="hash-arrow">to</span>
+    <code class="hash-new">${shortHash(event.newContentHash)}</code>
+  </div>
+`;
+
+const renderDismissAction = (
+  event: ReopenEvent,
+  confirmation: DashboardConfirmation | null,
+  label: string,
+): string => {
+  const isConfirming =
+    confirmation?.action === 'dismiss-reopen' && confirmation.eventId === event.id;
+
+  if (isConfirming) {
+    return `
+      <div class="confirm-actions" role="group" aria-label="Confirm dismiss reopen">
+        <span>Confirm dismiss?</span>
+        <button class="button" data-action="confirm-dismiss-reopen" data-event-id="${attr(event.id)}">
+          Confirm
+        </button>
+        <button class="button button-secondary" data-action="cancel-confirmation">
+          Cancel
+        </button>
+      </div>
+    `;
+  }
+
+  return `
+    <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
+      ${label}
+    </button>
+  `;
+};
+
+export const renderLatestReopenEvent = (
+  event: ReopenEvent | undefined,
+  confirmation: DashboardConfirmation | null = null,
+): string => {
   if (!event) {
     return `
       <section class="panel latest-panel">
@@ -35,7 +79,7 @@ export const renderLatestReopenEvent = (event: ReopenEvent | undefined): string 
         </div>
         <div>
           <span class="field-label">Reason</span>
-          <strong>${reason(event.reason)}</strong>
+          <strong>${text(reason(event.reason))}</strong>
         </div>
         <div>
           <span class="field-label">Created</span>
@@ -43,26 +87,30 @@ export const renderLatestReopenEvent = (event: ReopenEvent | undefined): string 
         </div>
       </div>
       <p>${text(event.summary)}</p>
-      <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
-        Dismiss reopen
-      </button>
+      ${renderHashTransition(event)}
+      ${renderDismissAction(event, confirmation, 'Dismiss reopen')}
     </section>
   `;
 };
 
-export const renderReopenQueue = (events: ReopenEvent[]): string => {
+export const renderReopenQueue = (
+  events: ReopenEvent[],
+  confirmation: DashboardConfirmation | null = null,
+): string => {
   const rows = events
     .map(
       (event) => `
         <li class="queue-row">
           <div>
-            <strong>${event.targetKind} ${text(event.targetId)}</strong>
-            <span>${reason(event.reason)} · ${date(event.createdAt)}</span>
+            <div class="queue-row-heading">
+              <strong>${event.targetKind} ${text(event.targetId)}</strong>
+              <span class="status status-reopened">${text(reason(event.reason))}</span>
+              <span>${date(event.createdAt)}</span>
+            </div>
             <p>${text(event.summary)}</p>
+            ${renderHashTransition(event)}
           </div>
-          <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
-            Dismiss
-          </button>
+          ${renderDismissAction(event, confirmation, 'Dismiss')}
         </li>
       `,
     )

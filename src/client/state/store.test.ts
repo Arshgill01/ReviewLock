@@ -81,6 +81,23 @@ describe('ReviewLockStore', () => {
     expect(store.demo).toBe(false);
     expect(store.isLoading).toBe(false);
     expect(store.error).toBeNull();
+    expect(store.confirmation).toBeNull();
+  });
+
+  it('tracks dashboard confirmation state explicitly', () => {
+    const callback = vi.fn();
+    store.subscribe(callback);
+
+    store.requestConfirmation({ action: 'unlock', lockId: 'lock-1', targetId: 't3_1' });
+    expect(store.confirmation).toEqual({
+      action: 'unlock',
+      lockId: 'lock-1',
+      targetId: 't3_1',
+    });
+
+    store.clearConfirmation();
+    expect(store.confirmation).toBeNull();
+    expect(callback).toHaveBeenCalledTimes(2);
   });
 
   it('fetches full state and notifies subscribers', async () => {
@@ -135,8 +152,9 @@ describe('ReviewLockStore', () => {
 
     await store.unlock('lock-1', 't3_1');
 
-    expect(apiClient.unlockTarget).toHaveBeenCalledWith('t3_1', 'moderator');
+    expect(apiClient.unlockTarget).toHaveBeenCalledWith('t3_1', 'lock-1', 'moderator');
     expect(apiClient.fetchOverview).toHaveBeenCalledTimes(2); // Initial + after unlock
+    expect(store.confirmation).toBeNull();
   });
 
   it('dismisses reopen event and re-fetches state', async () => {
@@ -147,6 +165,7 @@ describe('ReviewLockStore', () => {
 
     expect(apiClient.dismissReopen).toHaveBeenCalledWith('reopen-1', 'moderator', 'test_subreddit');
     expect(apiClient.fetchOverview).toHaveBeenCalledTimes(2);
+    expect(store.confirmation).toBeNull();
   });
 
   it('runs runtime verification in live mode and refreshes proof status', async () => {

@@ -4,6 +4,7 @@ import type {
   RuntimeProofCapability,
   RuntimeProofStatus,
 } from '../../shared/schema';
+import type { ModerationOperationResult } from './moderation';
 import { keys } from './keys';
 
 const defaultCapabilityNames = ['approve', 'ignoreReports', 'unignoreReports', 'redis', 'triggers'];
@@ -93,3 +94,26 @@ export const recordCapabilityStatus = async (
 
   return saveRuntimeProofStatus(redis, subreddit, next);
 };
+
+export const recordModerationOperationStatus = (
+  redis: RedisStore,
+  subreddit: string,
+  result: ModerationOperationResult,
+  now = new Date().toISOString(),
+): Promise<RuntimeProofStatus> =>
+  recordCapabilityStatus(
+    redis,
+    subreddit,
+    {
+      name: result.operation,
+      status: result.ok ? 'verified' : 'failed',
+      checkedAt: now,
+      evidence: `${result.operation} on ${result.targetId}`,
+      notes: result.ok
+        ? [`${result.operation} succeeded for ${result.targetId}.`]
+        : [
+            `${result.operation} failed for ${result.targetId}: ${result.errorMessage ?? 'unknown error'}.`,
+          ],
+    },
+    now,
+  );

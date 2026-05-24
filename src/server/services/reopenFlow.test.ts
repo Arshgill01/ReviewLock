@@ -123,6 +123,33 @@ describe('breakLockForChangedContent', () => {
     });
   });
 
+  it('keeps a reopen event visible if removing active indexes fails', async () => {
+    class ActiveIndexFailingRedisStore extends InMemoryRedisStore {
+      override async hdel(): Promise<void> {
+        throw new Error('active index down');
+      }
+    }
+    const redis = new ActiveIndexFailingRedisStore();
+    await saveLock(redis, lock());
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+  });
+
   it('keeps report and update races idempotent for the same edited target', async () => {
     const dependencies = await deps(target({ body: 'Edited body', edited: true }));
     const [reportResult, updateResult] = await Promise.all([

@@ -346,3 +346,213 @@ Reason:
 
 - Runtime proof and Redis smoke must write under the controlled test subreddit namespace.
 - A moderation dashboard showing the wrong subreddit is a trust failure even if the surrounding Reddit page is correct.
+
+### D027 - Record moderation method proof from the service path
+
+Wave 32 found that runtime proof remained unverified even after moderation methods were exercised unless the lock/unlock orchestration path explicitly recorded the operation result.
+
+Decision:
+
+- Record `approve`, `ignoreReports`, and `unignoreReports` results in the runtime proof ledger from the lock/unlock service path.
+- Treat proof-ledger write failures as non-blocking for the moderation action itself.
+- Record failures as `failed` when the moderation operation returns a failed result.
+
+Reason:
+
+- Moderators need the dashboard to distinguish implemented behavior from live-proven behavior.
+- A runtime-proof Redis write problem should not turn a completed moderation action into a second operational failure.
+
+### D028 - Use in-dashboard confirmations for WebView destructive actions
+
+Wave 32 found that `window.confirm()` was unreliable inside the Devvit WebView during dashboard unlock testing.
+
+Decision:
+
+- Use inline dashboard confirmation controls for unlock and reopen-dismiss actions.
+- Keep the confirmation state local to the client store and clear it after action, cancel, refresh, or failure.
+
+Reason:
+
+- Human confirmation remains mandatory, but it must be visible and reliable in the Devvit WebView.
+- Native browser modal behavior is not a trustworthy dependency for embedded moderation actions.
+
+### D029 - Keep dashboard actions on dashboard API routes
+
+Wave 32 found that the embedded dashboard attempted to call `/internal/form/unlock-review-submit` and received a 404.
+
+Decision:
+
+- Dashboard unlock uses `/api/locks/unlock`.
+- Dashboard reopen dismissal uses `/api/reopen-queue/dismiss`.
+- Internal form endpoints remain for Devvit menu/form callbacks.
+
+Reason:
+
+- Devvit internal endpoints and WebView dashboard API endpoints have different callers and response contracts.
+- The dashboard client should receive normal JSON API responses instead of Devvit `UiResponse` objects.
+
+### D030 - Prefer Reddit runtime actor identity over client payloads
+
+Wave 32 found that dashboard action requests included a client-supplied actor string.
+
+Decision:
+
+- Server-side form and dashboard action routes prefer `reddit.getCurrentUsername()` for audit actors.
+- Client-supplied actor values are fallback only when runtime username lookup is unavailable.
+
+Reason:
+
+- The client payload is not authoritative identity.
+- Audit logs are moderation traceability records and should use the Reddit runtime identity whenever Devvit exposes it.
+
+### D031 - Roll back partially persisted locks when post-persistence writes fail
+
+Wave 32 reviewer analysis found that lock creation could save the active lock
+and indexes, then fail on audit or metric writes and only roll back Reddit
+`ignoreReports()`.
+
+Decision:
+
+- If any post-save Redis write fails during lock creation, attempt
+  `unignoreReports()` and remove the lock record plus active indexes.
+- Treat cleanup failure as a runtime risk but do not leave a locally successful
+  result when persistence failed.
+
+Reason:
+
+- A dashboard lock without matching Reddit report-ignore state is misleading.
+- ReviewLock should fail visibly rather than leaving a half-created reviewed
+  content lock.
+
+### D032 - Keep locks active when manual unlock cannot unignore reports
+
+Wave 32 reviewer analysis found that manual unlock removed active indexes even
+when Reddit `unignoreReports()` failed.
+
+Decision:
+
+- If `unignoreReports()` fails, keep the lock active, add runtime warnings,
+  write a `runtime_failure` audit event, and return a retryable failure.
+- Remove active lock indexes only after `unignoreReports()` succeeds.
+
+Reason:
+
+- Reports must not remain ignored without an active ReviewLock record and retry
+  surface.
+- Keeping the lock active preserves the edit-aware reopen guardrail until
+  reports are returned to normal handling.
+
+### D033 - Bind unlock confirmation to the exact lock id
+
+Wave 32 reviewer analysis found that stale dashboard/form unlock submissions
+could unlock whichever active lock currently existed for a target.
+
+Decision:
+
+- Dashboard and form unlock requests must include `lockId`.
+- The unlock service rejects stale confirmations when the submitted `lockId`
+  does not match the current active lock.
+
+Reason:
+
+- Human confirmation applies to the specific lock the moderator saw.
+- A newer lock should not be removed by an older confirmation surface.
+
+### D034 - Reject mismatched client-supplied subreddit namespaces
+
+Wave 32 reviewer analysis found that dashboard and runtime smoke routes trusted
+client-supplied `subreddit` values.
+
+Decision:
+
+- Prefer the Devvit runtime subreddit from server context or Reddit context.
+- Reject dashboard API and runtime smoke requests whose query/body subreddit
+  does not match the runtime subreddit.
+- Reject dashboard unlock requests when the resolved target subreddit does not
+  match the runtime subreddit.
+- Keep demo endpoints isolated under their explicit demo namespace.
+
+Reason:
+
+- Moderation ledger data must not be read from or written to another subreddit
+  namespace because a WebView client changed a query string or request body.
+
+### D035 - Bind Devvit form submissions with server-stored form tokens
+
+Reviewer analysis found that lock and unlock form target IDs were editable and
+then trusted by the submit routes.
+
+Decision:
+
+- Menu routes create short-lived Redis form bindings with action, subreddit,
+  target ID, and lock ID where applicable.
+- Form submit routes require the binding token and reject target or lock changes
+  before calling moderation flows.
+
+Reason:
+
+- The moderator confirmation is for the target summary that ReviewLock showed,
+  not for a mutable text field submitted later.
+
+### D036 - Queue reopen events before removing active lock indexes
+
+Reviewer analysis found that a Redis failure after setting lock status to
+`reopened` could remove an item from active locks before it appeared in the
+reopen queue.
+
+Decision:
+
+- Reopen flows enqueue the reopen event before updating lock status and removing
+  active indexes.
+- If later persistence fails, the reopen queue still contains a moderator-visible
+  event.
+
+Reason:
+
+- The edit-break loop must fail recoverably and visibly.
+
+### D037 - Treat the demo namespace as intrinsically demo-labeled
+
+Reviewer analysis found that seeded demo records could be requested with
+`demo=false`.
+
+Decision:
+
+- Dashboard API reads reject `reviewlock_demo` unless demo mode is enabled.
+- Demo mode may still intentionally read `reviewlock_demo` even when the Devvit
+  runtime subreddit is a live test subreddit.
+
+Reason:
+
+- Demo data must never render as live proof.
+
+### D038 - Validate and escape reason labels at the boundary
+
+Reviewer analysis found that reason strings could be persisted outside the
+shared preset enum and rendered without escaping.
+
+Decision:
+
+- Devvit menu reason options now use `LOCK_REASON_PRESETS`.
+- Form submit validates the selected reason against `LOCK_REASON_PRESETS`.
+- Dashboard reason labels are escaped before rendering.
+
+Reason:
+
+- Redis data and direct form posts are not trusted UI input.
+
+### D039 - Add target-level Open ReviewLock menu actions
+
+Reviewer analysis found that the manifest had only the subreddit dashboard
+launcher, not the required post/comment `Open ReviewLock` actions.
+
+Decision:
+
+- Add post and comment menu items labeled `Open ReviewLock`.
+- Route both target-level open actions to the same dashboard launch form as the
+  subreddit action.
+
+Reason:
+
+- Moderators need a direct target-context path into ReviewLock while reviewing a
+  post or comment.

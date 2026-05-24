@@ -3,12 +3,14 @@ import { fixedClock } from '../server/adapters/clock';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import { listAuditEvents } from '../server/services/audit';
+import { createFormBinding } from '../server/services/formBindings';
+import { getActiveLockByTarget, saveLock } from '../server/services/locks';
 import {
   enqueueReopenEvent,
   getReopenEvent,
   listOpenReopenEvents,
 } from '../server/services/reopenQueue';
-import type { ReopenEvent, ReviewLockTarget } from '../shared/schema';
+import type { ReopenEvent, ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
 import { createFormsRouter } from './forms';
 
 const target = (): ReviewLockTarget => ({
@@ -38,17 +40,43 @@ const reopenEvent = (): ReopenEvent => ({
   demo: false,
 });
 
+const lock = (): ReviewLockRecord => ({
+  id: 'lock-1',
+  subreddit: 'alpha',
+  targetId: 't3_post',
+  targetKind: 'post',
+  targetAuthor: 'u_author',
+  permalink: '/r/alpha/comments/post',
+  title: 'Reviewed post',
+  contentPreview: 'Reviewed body',
+  contentHash: 'hash',
+  fingerprintVersion: 'content-v1',
+  lockedBy: 'mod',
+  lockedAt: '2026-05-24T00:00:00.000Z',
+  lockReason: 'reviewed_policy_compliant',
+  status: 'active',
+  lastKnownEdited: false,
+  lastReportCount: 4,
+  suppressedReportCount: 0,
+  runtimeWarnings: [],
+  demo: false,
+});
+
 describe('form routes', () => {
   it('submits a lock review form through orchestration', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
     const router = createFormsRouter({
       reddit: new FakeRedditAdapter([target()]),
-      redis: new InMemoryRedisStore(),
+      redis,
       clock: fixedClock('2026-05-24T00:00:00.000Z'),
     });
     const response = await router.request('/lock-review-submit', {
       method: 'POST',
       body: JSON.stringify({
         targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
         actor: 'mod',
         lockReason: 'reviewed_policy_compliant',
       }),
@@ -62,7 +90,7 @@ describe('form routes', () => {
     });
   });
 
-  it('validates required lock fields', async () => {
+  it('validates required lock form token and reason fields', async () => {
     const router = createFormsRouter({
       reddit: new FakeRedditAdapter([target()]),
       redis: new InMemoryRedisStore(),
@@ -75,7 +103,57 @@ describe('form routes', () => {
 
     expect(await response.json()).toMatchObject({
       showToast: {
-        text: 'Target and reason are required.',
+        text: 'ReviewLock form token and reason are required.',
+      },
+    });
+  });
+
+  it('rejects changed lock form target identity', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target(), { ...target(), id: 't3_other' }]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_other',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form target changed. Reopen the menu and try again.',
+      },
+    });
+  });
+
+  it('rejects unknown lock reasons', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'repeat_false_reports',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock lock reason is not valid.',
       },
     });
   });
@@ -96,6 +174,80 @@ describe('form routes', () => {
     });
   });
 
+  it('submits an unlock form only for the confirmed lock id', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockId: 'lock-1',
+        actor: 'client_supplied_actor',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        appearance: 'success',
+        text: 'ReviewLock unlocked this reviewed content.',
+      },
+    });
+    expect(reddit.calls).toContain('unignoreReports:t3_post');
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
+  it('rejects stale unlock form submissions', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockId: 'old-lock',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form target changed. Reopen the menu and try again.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({ id: 'lock-1' });
+  });
+
   it('dismisses a reopened item and records audit output', async () => {
     const redis = new InMemoryRedisStore();
     await enqueueReopenEvent(redis, reopenEvent());
@@ -110,7 +262,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         eventId: 'reopen-1',
         action: 'dismiss',
-        actor: 'mod',
+        actor: 'client_supplied_actor',
         subreddit: 'alpha',
       }),
     });
@@ -124,13 +276,13 @@ describe('form routes', () => {
     expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
     expect(await getReopenEvent(redis, 'alpha', 'reopen-1')).toMatchObject({
       dismissedAt: '2026-05-24T01:00:00.000Z',
-      dismissedBy: 'mod',
+      dismissedBy: 'mod_test',
     });
     expect(await listAuditEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({
         kind: 'reopen_dismissed',
         targetId: 't3_post',
-        actor: 'mod',
+        actor: 'mod_test',
       }),
     ]);
   });

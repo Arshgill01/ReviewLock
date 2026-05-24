@@ -1,4 +1,5 @@
 import type { ReviewLockRecord } from '../../shared/schema';
+import type { DashboardConfirmation } from '../state/store';
 
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -8,7 +9,40 @@ const attr = (value: string | undefined): string =>
 
 const reason = (value: string): string => value.replace(/_/g, ' ');
 
-export const renderLockTable = (locks: ReviewLockRecord[]): string => {
+const renderUnlockAction = (
+  lock: ReviewLockRecord,
+  confirmation: DashboardConfirmation | null,
+): string => {
+  const isConfirming =
+    confirmation?.action === 'unlock' &&
+    confirmation.lockId === lock.id &&
+    confirmation.targetId === lock.targetId;
+
+  if (isConfirming) {
+    return `
+      <div class="confirm-actions" role="group" aria-label="Confirm unlock">
+        <span>Confirm unlock?</span>
+        <button class="button" data-action="confirm-unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
+          Confirm
+        </button>
+        <button class="button button-secondary" data-action="cancel-confirmation">
+          Cancel
+        </button>
+      </div>
+    `;
+  }
+
+  return `
+    <button class="button button-secondary" data-action="unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
+      Unlock
+    </button>
+  `;
+};
+
+export const renderLockTable = (
+  locks: ReviewLockRecord[],
+  confirmation: DashboardConfirmation | null = null,
+): string => {
   const activeLocks = locks.filter((lock) => lock.status === 'active');
 
   const rows = activeLocks
@@ -16,20 +50,32 @@ export const renderLockTable = (locks: ReviewLockRecord[]): string => {
       (lock) => `
         <tr>
           <td>
-            <a href="${attr(lock.permalink)}" target="_blank" rel="noreferrer">${lock.targetKind} ${text(lock.targetId)}</a>
+            <a href="${attr(lock.permalink)}" target="_blank" rel="noreferrer">
+              <code>${lock.targetKind}:${text(lock.targetId.replace('t1_', '').replace('t3_', ''))}</code>
+            </a>
           </td>
-          <td>u/${text(lock.targetAuthor)}</td>
           <td>
-            <strong>${text(lock.title ?? lock.targetId)}</strong>
-            <span>${text(lock.contentPreview)}</span>
+            <span class="target-author">u/${text(lock.targetAuthor)}</span>
           </td>
-          <td>${reason(lock.lockReason)}</td>
-          <td class="number-cell">${lock.suppressedReportCount}</td>
-          <td>${new Date(lock.lockedAt).toLocaleDateString()}</td>
           <td>
-            <button class="button button-secondary" data-action="unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
-              Unlock
-            </button>
+            <div class="content-summary">
+              <strong>${text(lock.title ?? lock.targetId)}</strong>
+              <span class="content-preview" title="${attr(lock.contentPreview)}">
+                ${text(lock.contentPreview)}
+              </span>
+            </div>
+          </td>
+          <td>
+            <span class="count-badge reason-badge">${text(reason(lock.lockReason))}</span>
+          </td>
+          <td class="number-cell">
+            <span class="number-pill">${lock.suppressedReportCount}</span>
+          </td>
+          <td class="date-cell">
+            ${new Date(lock.lockedAt).toLocaleDateString()}
+          </td>
+          <td>
+            ${renderUnlockAction(lock, confirmation)}
           </td>
         </tr>
       `,

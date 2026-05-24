@@ -22,6 +22,59 @@ interface ApiDeps {
 export const createApiRouter = (deps: ApiDeps = {}): Hono => {
   const router = new Hono();
 
+  const currentSubredditFromRuntime = async (): Promise<string | undefined> => {
+    const configured = deps.getCurrentSubredditName?.();
+
+    if (configured) {
+      return configured;
+    }
+
+    try {
+      return await deps.reddit?.getCurrentSubredditName();
+    } catch {
+      return undefined;
+    }
+  };
+
+  const resolveSmokeSubreddit = async (
+    requested: string | null | undefined,
+  ): Promise<{ ok: true; subreddit: string } | { ok: false; response: Response }> => {
+    let clientSubreddit: string | undefined;
+    let runtimeSubreddit: string | undefined;
+
+    try {
+      clientSubreddit = requested ? normalizeRuntimeSubreddit(requested) : undefined;
+      const current = await currentSubredditFromRuntime();
+      runtimeSubreddit = current ? normalizeRuntimeSubreddit(current) : undefined;
+    } catch (error) {
+      return {
+        ok: false,
+        response: new Response(
+          JSON.stringify({
+            ok: false,
+            error: error instanceof Error ? error.message : 'Invalid subreddit scope.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        ),
+      };
+    }
+
+    if (runtimeSubreddit && clientSubreddit && runtimeSubreddit !== clientSubreddit) {
+      return {
+        ok: false,
+        response: new Response(
+          JSON.stringify({
+            ok: false,
+            error: 'Runtime smoke subreddit scope does not match the Devvit runtime subreddit.',
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        ),
+      };
+    }
+
+    return { ok: true, subreddit: runtimeSubreddit ?? clientSubreddit ?? 'reviewlock_dev' };
+  };
+
   router.get('/health', (context) =>
     context.json({
       ok: true,
@@ -31,7 +84,8 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
   );
 
   router.get('/context', async (context) => {
-    const subreddit = deps.getCurrentSubredditName?.() ?? (await deps.reddit?.getCurrentSubredditName());
+    const subreddit =
+      deps.getCurrentSubredditName?.() ?? (await deps.reddit?.getCurrentSubredditName());
 
     return context.json({
       ok: true,
@@ -47,7 +101,13 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
     const checkedAt = deps.clock?.now() ?? new Date().toISOString();
 
     try {
-      const subreddit = normalizeRuntimeSubreddit(context.req.query('subreddit'));
+      const scope = await resolveSmokeSubreddit(context.req.query('subreddit'));
+
+      if (!scope.ok) {
+        return scope.response;
+      }
+
+      const subreddit = scope.subreddit;
       const smokeKey = key(subreddit, `runtime:smoke:${Date.parse(checkedAt)}`);
       const value = `reviewlock-smoke:${checkedAt}`;
 
@@ -78,7 +138,12 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         checkedAt,
       );
 
-      return context.json({ ok: true, subreddit, capability: result.capability, status: result.status });
+      return context.json({
+        ok: true,
+        subreddit,
+        capability: result.capability,
+        status: result.status,
+      });
     } catch (error) {
       const result = failedSmokeResult(
         'redis',
@@ -87,7 +152,10 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         checkedAt,
       );
 
-      return context.json({ ok: false, capability: result.capability, status: result.status, error: result.notes[0] }, 500);
+      return context.json(
+        { ok: false, capability: result.capability, status: result.status, error: result.notes[0] },
+        500,
+      );
     }
   });
 
@@ -99,7 +167,13 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
     const checkedAt = deps.clock?.now() ?? new Date().toISOString();
 
     try {
-      const subreddit = normalizeRuntimeSubreddit(context.req.query('subreddit'));
+      const scope = await resolveSmokeSubreddit(context.req.query('subreddit'));
+
+      if (!scope.ok) {
+        return scope.response;
+      }
+
+      const subreddit = scope.subreddit;
       const username = await deps.reddit.getCurrentUsername();
 
       if (!username) {
@@ -143,7 +217,10 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         checkedAt,
       );
 
-      return context.json({ ok: false, capability: result.capability, status: result.status, error: result.notes[0] }, 500);
+      return context.json(
+        { ok: false, capability: result.capability, status: result.status, error: result.notes[0] },
+        500,
+      );
     }
   });
 

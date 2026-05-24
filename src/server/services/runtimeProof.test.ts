@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
-import { loadRuntimeProofStatus, recordCapabilityStatus } from './runtimeProof';
+import {
+  loadRuntimeProofStatus,
+  recordCapabilityStatus,
+  recordModerationOperationStatus,
+} from './runtimeProof';
 import { keys } from './keys';
 
 describe('runtime proof status', () => {
@@ -53,6 +57,32 @@ describe('runtime proof status', () => {
     expect(await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T00:00:00.000Z')).toMatchObject({
       overall: 'unverified',
       capabilities: expect.arrayContaining([expect.objectContaining({ name: 'redis' })]),
+    });
+  });
+
+  it('records moderation operation proof with target-level evidence', async () => {
+    const redis = new InMemoryRedisStore();
+
+    const status = await recordModerationOperationStatus(
+      redis,
+      'alpha',
+      {
+        ok: true,
+        operation: 'ignoreReports',
+        targetId: 't3_post',
+        warnings: [],
+      },
+      '2026-05-24T03:00:00.000Z',
+    );
+
+    expect(status).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'ignoreReports',
+          status: 'verified',
+          evidence: 'ignoreReports on t3_post',
+        }),
+      ]),
     });
   });
 });

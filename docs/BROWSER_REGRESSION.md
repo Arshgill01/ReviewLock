@@ -98,3 +98,61 @@ No visual or interaction regression needed a client code fix in Wave 28. The das
 ## Boundary
 
 This is real-browser proof of the built client bundle with mocked ReviewLock API responses. It is not live Reddit WebView proof and does not verify live Reddit moderation methods or live trigger delivery.
+
+## Wave 32 Current UI Rerun
+
+After the Antigravity-assisted dashboard redesign and the inline confirmation
+hardening, the browser regression was rerun against the current built client
+bundle.
+
+Commands:
+
+- `npm run build`
+- `mkdir -p output/playwright`
+- `npx --yes http-server dist/client -a 127.0.0.1 -p 4173`
+- `npx --yes --package=playwright node <<'NODE' ... NODE`
+- `kill 19788`
+
+The Playwright script mocked ReviewLock API responses and exercised:
+
+- live desktop dashboard;
+- runtime verification action;
+- inline unlock confirmation;
+- demo mode switch;
+- inline reopen-dismiss confirmation;
+- demo mobile dashboard;
+- return to live mobile dashboard.
+
+Assertions repeated for each captured state:
+
+- required first-viewport phrases are present;
+- forbidden copy is absent;
+- no horizontal document overflow;
+- no nested panels;
+- no `undefined` or `NaN` visible text;
+- no clipped button text.
+
+Generated screenshot paths:
+
+- `output/playwright/wave32-live-desktop-current.png`
+- `output/playwright/wave32-runtime-verified-desktop-current.png`
+- `output/playwright/wave32-unlock-confirm-desktop-current.png`
+- `output/playwright/wave32-demo-desktop-current.png`
+- `output/playwright/wave32-dismiss-confirm-demo-desktop-current.png`
+- `output/playwright/wave32-demo-mobile-current.png`
+- `output/playwright/wave32-live-mobile-current.png`
+
+Browser run output:
+
+```txt
+live-desktop-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-live-desktop-current.png text=1257
+runtime-verified-desktop-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-runtime-verified-desktop-current.png text=1255
+unlock-confirm-desktop-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-unlock-confirm-desktop-current.png text=1309
+demo-desktop-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-demo-desktop-current.png text=1309
+dismiss-confirm-demo-desktop-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-dismiss-confirm-demo-desktop-current.png text=1363
+demo-mobile-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-demo-mobile-current.png text=1363
+live-mobile-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/wave32-live-mobile-current.png text=1363
+```
+
+Result: PASS for the current dashboard bundle. This remains local browser proof
+with mocked API responses, not live Reddit trigger proof.

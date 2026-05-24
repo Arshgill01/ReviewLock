@@ -136,14 +136,14 @@ describe('ReviewLockApiClient contract handling', () => {
     );
   });
 
-  it('accepts Devvit UI responses from internal form endpoints', async () => {
+  it('submits dashboard moderation actions through API endpoints', async () => {
     const fetchMock = stubFetch(
-      jsonResponse({ showToast: { text: 'ReviewLock unlocked this reviewed content.' } }),
-      jsonResponse({ showToast: { text: 'ReviewLock dismissed this reopened item.' } }),
+      jsonResponse({ ok: true, message: 'ReviewLock unlocked this reviewed content.' }),
+      jsonResponse({ ok: true, message: 'ReviewLock dismissed this reopened item.' }),
     );
     const api = new ReviewLockApiClient();
 
-    await expect(api.unlockTarget('t3_reviewed', 'mod')).resolves.toEqual({
+    await expect(api.unlockTarget('t3_reviewed', 'lock-1', 'mod')).resolves.toEqual({
       ok: true,
       message: 'ReviewLock unlocked this reviewed content.',
     });
@@ -151,7 +151,16 @@ describe('ReviewLockApiClient contract handling', () => {
       ok: true,
       message: 'ReviewLock dismissed this reopened item.',
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/locks/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetId: 't3_reviewed', lockId: 'lock-1', actor: 'mod' }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/reopen-queue/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: 'reopen-1', actor: 'mod', subreddit: 'alpha' }),
+    });
   });
 
   it('checks both runtime smoke endpoints and surfaces malformed smoke output', async () => {

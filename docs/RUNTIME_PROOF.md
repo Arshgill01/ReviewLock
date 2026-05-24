@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-24 18:58 IST.
+Last updated: 2026-05-24 22:41 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -23,10 +23,17 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - `npm run dev -- reviewlock_dev`
   - Result: PASS, playtest served `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.
   - Latest observed hot reload in the Wave 31 live WebView smoke pass: `v0.0.2.6`.
+  - Latest observed hot reload in the controlled moderation method pass: `v0.0.2.39`.
 - Zen browser embedded WebView smoke
   - Result: PASS, the ReviewLock dashboard rendered inside Reddit at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
   - Result: PASS, the header showed `r/reviewlock_dev` after the WebView context fix.
   - Result: PASS, `Verify runtime` completed and showed `redditContext verified` and `redis verified`.
+- Zen browser dashboard unlock proof
+  - Result: PASS, the dashboard inline `Unlock` confirmation called `/api/locks/unlock`, removed the active lock, wrote audit, and runtime status showed `unignoreReports verified`.
+  - Controlled target: `t3_1tm8nak`.
+- Zen browser lock form proof
+  - Result: PASS, the `Lock review` form opened and showed target id, content summary, report count, edit state, permalink, and reason picker for `t3_1tm8nak`.
+  - Result: PASS, submitting the form created an active lock, wrote audit, and runtime status showed `approve verified` and `ignoreReports verified`.
 - `npm run type-check`
   - Result: PASS after runtime hardening patches.
 - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
@@ -60,9 +67,9 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | Redis smoke from authorized WebView          | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redis verified` and `Runtime proof refreshed.`                                                        | The successful run occurred after the `r/reviewlock_dev` context fix.                                            |
 | Reddit context smoke from authorized WebView | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redditContext verified` and `Runtime proof refreshed.`                                                | The successful run occurred after the `r/reviewlock_dev` context fix.                                            |
 | Direct terminal WebView API smoke            | blocked    | Direct API calls to Devvit WebView routes are not authorized without Reddit-injected WebView headers.                                                                            | Smoke endpoints are intentionally meant to run from the embedded dashboard.                                      |
-| `approve()` live behavior                    | unverified | Adapter and tests exist.                                                                                                                                                         | Must be tested on controlled test post and comment.                                                              |
-| `ignoreReports()` live behavior              | unverified | Adapter and tests exist.                                                                                                                                                         | Must be tested separately before claiming live report suppression.                                               |
-| `unignoreReports()` live behavior            | unverified | Adapter and tests exist.                                                                                                                                                         | Must be tested separately before claiming edit-aware reopen runtime behavior.                                    |
+| `approve()` live behavior                    | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock, wrote audit, and runtime status showed `approve verified`.                                          | Verified for a controlled post target; comment target remains unverified.                                        |
+| `ignoreReports()` live behavior              | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock and runtime status showed `ignoreReports verified`.                                                  | Verified for a controlled post target; comment target remains unverified.                                        |
+| `unignoreReports()` live behavior            | verified   | Dashboard `Unlock` on controlled target `t3_1tm8nak` removed the lock, wrote audit, and runtime status showed `unignoreReports verified`.                                        | Verified through ReviewLock dashboard API and Reddit adapter path.                                               |
 | Report trigger delivery                      | unverified | `devvit.json` registers `onPostReport` and `onCommentReport`; routes and services are locally tested.                                                                            | Need live or controlled trigger proof in a dedicated playtest pass.                                              |
 | Update trigger delivery                      | unverified | `devvit.json` registers post/comment update, NSFW, spoiler, and flair update triggers; routes and services are locally tested.                                                   | Need live or controlled trigger proof in a dedicated playtest pass.                                              |
 | Devvit logs                                  | verified   | After stopping playtest, `devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime` connected for `reviewlock` on `r/reviewlock_dev`.                   | No trigger payload logs captured yet.                                                                            |
@@ -79,6 +86,46 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Hardened by adding `/api/context`, using Devvit server `context.subredditName`, preferring Devvit-injected WebView context on the client, and falling back to URL/referrer inference only when stronger context is absent.
 - Runtime smoke status could only be proven from an authorized Reddit WebView.
   - Hardened by making smoke checks dashboard-driven and storing capability results in ReviewLock runtime status.
+- Devvit WebView dashboard actions cannot rely on `window.confirm()` for destructive confirmations.
+  - Hardened by replacing browser confirm dialogs with inline confirmation controls for unlock and dismiss actions.
+- The embedded dashboard could not call internal form endpoints for dashboard actions.
+  - Hardened by adding dashboard API routes for unlock and reopen-dismiss actions.
+- Client-supplied dashboard actors are not authoritative.
+  - Hardened by preferring the Reddit runtime username for audit actors and using request body actors only as fallback.
+- Lock creation could previously leave a partial active lock if audit or metric
+  writes failed after the lock record was saved.
+  - Hardened by rolling back Reddit `ignoreReports()` and removing the lock
+    record plus active indexes when post-save persistence fails.
+- Dashboard/form unlock could previously remove an active lock even if
+  `unignoreReports()` failed.
+  - Hardened by keeping the lock active, recording a runtime failure audit
+    event, and returning a retryable error until Reddit returns reports to
+    normal handling.
+- Dashboard/form unlock confirmations could previously unlock a newer active
+  lock after a stale UI confirmation.
+  - Hardened by requiring the submitted `lockId` to match the current active
+    lock before calling Reddit.
+- Dashboard and runtime smoke routes previously trusted client-supplied
+  subreddit namespaces.
+  - Hardened by preferring Devvit runtime subreddit context and rejecting
+    mismatched client-supplied namespaces.
+- Dashboard unlock previously did not enforce the Devvit runtime subreddit
+  before resolving and unlocking a target.
+  - Hardened by passing the expected subreddit into the unlock service and
+    rejecting cross-subreddit targets before any Reddit moderation call.
+- Devvit trigger routes previously accepted only synthetic top-level target
+  ids.
+  - Hardened by accepting installed Devvit nested `post.id` and `comment.id`
+    payload shapes for report and update callbacks.
+- Devvit form submissions previously trusted editable target ID fields.
+  - Hardened by storing server-side Redis form bindings and rejecting submitted
+    target or lock mismatches.
+- Reopen persistence previously removed active indexes before writing the reopen
+  queue event.
+  - Hardened by queueing the reopen event before updating lock status.
+- Demo data could previously be requested from the demo namespace without
+  `demo=true`.
+  - Hardened by rejecting unlabeled dashboard reads of `reviewlock_demo`.
 
 ## Current Claim Boundary
 
@@ -89,10 +136,12 @@ Allowed claims:
 - The Devvit app can be playtested in `r/reviewlock_dev`.
 - The dashboard menu can open a ReviewLock custom post.
 - The dashboard live WebView renders under `r/reviewlock_dev` in Zen and its runtime smoke verifies Redis plus Reddit context.
+- Dashboard unlock has live-verified `unignoreReports()` on controlled target `t3_1tm8nak`.
+- Dashboard lock review has live-verified `approve()` and `ignoreReports()` on controlled target `t3_1tm8nak`.
 
 Not allowed yet:
 
 - Do not claim live report suppression is verified.
 - Do not claim live edit-trigger reopening is verified.
-- Do not claim `approve()`, `ignoreReports()`, or `unignoreReports()` are verified in production-like Devvit runtime.
+- Do not claim comment-target `approve()`, `ignoreReports()`, or `unignoreReports()` are verified in production-like Devvit runtime.
 - Do not claim `devvit logs` has been captured for trigger payloads.

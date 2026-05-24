@@ -1,14 +1,13 @@
 import type { RuntimeCapabilityStatus, RuntimeProofStatus } from '../../shared/schema';
 
-const statusLabel = (status: RuntimeCapabilityStatus): string =>
-  status.replace(/_/g, ' ');
+const statusLabel = (status: RuntimeCapabilityStatus): string => status.replace(/_/g, ' ');
 
 export const renderRuntimeBanner = (
   status: RuntimeProofStatus | null,
   verificationMessage: string | null = null,
   isVerifying: boolean = false,
 ): string => {
-  const verifyLabel = isVerifying ? 'Verifying' : 'Verify runtime';
+  const verifyLabel = isVerifying ? 'Verifying...' : 'Verify runtime';
 
   if (!status) {
     return `
@@ -33,9 +32,7 @@ export const renderRuntimeBanner = (
     )
     .join('');
 
-  const warnings = status.warnings
-    .map((warning) => `<li>${warning}</li>`)
-    .join('');
+  const warnings = status.warnings.map((warning) => `<li>${warning}</li>`).join('');
 
   return `
     <section class="panel panel-tight">
@@ -46,7 +43,7 @@ export const renderRuntimeBanner = (
           <button class="button button-secondary" data-action="verify-runtime" ${isVerifying ? 'disabled' : ''}>${verifyLabel}</button>
         </div>
       </div>
-      ${verificationMessage ? `<p class="runtime-note">${verificationMessage}</p>` : ''}
+      ${verificationMessage ? `<p class="runtime-note runtime-note-success">${verificationMessage}</p>` : ''}
       <ul class="capability-list">${capabilities}</ul>
       ${
         status.warnings.length

@@ -118,6 +118,24 @@ describe('client render helpers', () => {
     expectSafeCopy(html);
   });
 
+  it('renders in-dashboard confirmations for destructive dashboard actions', () => {
+    const lockHtml = renderLockTable([lock()], {
+      action: 'unlock',
+      lockId: 'lock-1',
+      targetId: 't3_reviewed',
+    });
+    const reopenHtml = renderReopenQueue([reopen()], {
+      action: 'dismiss-reopen',
+      eventId: 'reopen-1',
+    });
+
+    expect(lockHtml).toContain('Confirm unlock?');
+    expect(lockHtml).toContain('data-action="confirm-unlock"');
+    expect(reopenHtml).toContain('Confirm dismiss?');
+    expect(reopenHtml).toContain('data-action="confirm-dismiss-reopen"');
+    expectSafeCopy(lockHtml + reopenHtml);
+  });
+
   it('escapes dynamic values used inside HTML attributes', () => {
     const html = [
       renderLockTable([
@@ -133,6 +151,26 @@ describe('client render helpers', () => {
     expect(html).not.toContain('data-lock-id="lock-1" data-leak="x');
     expect(html).not.toContain('data-event-id="reopen-1" data-leak="x');
     expect(html).not.toContain('onclick="alert');
+  });
+
+  it('escapes dynamic reason labels before rendering', () => {
+    const html = [
+      renderLockTable([
+        lock({
+          lockReason: 'custom_<img src=x onerror=alert(1)>' as ReviewLockRecord['lockReason'],
+        }),
+      ]),
+      renderReopenQueue([
+        reopen({
+          reason: 'content_changed_<script>alert(1)</script>' as ReopenEvent['reason'],
+        }),
+      ]),
+    ].join('');
+
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<script>');
   });
 
   it('renders reopened queue and latest reopen states', () => {
