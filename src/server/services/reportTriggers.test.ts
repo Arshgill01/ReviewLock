@@ -86,8 +86,14 @@ describe('handleReportTrigger', () => {
 
   it('suppresses unchanged content and increments metrics once', async () => {
     const dependencies = await deps();
-    const first = await handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-1' });
-    const duplicate = await handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-1' });
+    const first = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-1',
+    });
+    const duplicate = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-1',
+    });
 
     expect(first.action).toBe('suppress_unchanged');
     expect(duplicate.action).toBe('duplicate');
@@ -114,9 +120,33 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('does not double-count concurrent duplicate report deliveries', async () => {
+    const dependencies = await deps();
+    const results = await Promise.all([
+      handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-race' }),
+      handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-race' }),
+    ]);
+
+    expect(results.map((result) => result.action).sort()).toEqual([
+      'duplicate',
+      'suppress_unchanged',
+    ]);
+    expect(dependencies.reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getLock(dependencies.redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 1,
+    });
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
   it('suppresses unchanged comment reports with the comment moderation operation', async () => {
     const dependencies = await deps(commentTarget());
-    const result = await handleReportTrigger(dependencies, { targetId: 't1_comment', eventId: 'evt-comment-1' });
+    const result = await handleReportTrigger(dependencies, {
+      targetId: 't1_comment',
+      eventId: 'evt-comment-1',
+    });
 
     expect(result.action).toBe('suppress_unchanged');
     expect(dependencies.reddit.calls).toEqual(['ignoreReports:t1_comment']);
@@ -136,7 +166,10 @@ describe('handleReportTrigger', () => {
 
   it('reopens changed content and removes active lock index', async () => {
     const dependencies = await deps(target('Edited body'));
-    const result = await handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-2' });
+    const result = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-2',
+    });
 
     expect(result.action).toBe('reopen_changed');
     expect(result.reopenEvent).toMatchObject({ reason: 'content_changed' });
@@ -166,7 +199,10 @@ describe('handleReportTrigger', () => {
 
   it('reopens changed comment reports with the comment moderation operation', async () => {
     const dependencies = await deps(commentTarget('Edited comment'));
-    const result = await handleReportTrigger(dependencies, { targetId: 't1_comment', eventId: 'evt-comment-2' });
+    const result = await handleReportTrigger(dependencies, {
+      targetId: 't1_comment',
+      eventId: 'evt-comment-2',
+    });
 
     expect(result.action).toBe('reopen_changed');
     expect(dependencies.reddit.calls).toEqual(['unignoreReports:t1_comment']);
@@ -204,7 +240,9 @@ describe('handleReportTrigger', () => {
 
     expect(result).toMatchObject({ ok: false, action: 'runtime_uncertain' });
     expect(reddit.calls).toEqual([]);
-    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({ status: 'active' });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+    });
     expect(await listAuditEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({ kind: 'runtime_failure' }),
     ]);
@@ -220,9 +258,45 @@ describe('handleReportTrigger', () => {
       ok: false,
       action: 'runtime_uncertain',
     });
-    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({ status: 'active' });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+    });
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual([
       expect.objectContaining({ kind: 'runtime_failure' }),
     ]);
+  });
+
+  it('rolls back ignoreReports when Redis fails after suppression', async () => {
+    class FailingLockWriteRedisStore extends InMemoryRedisStore {
+      failLockWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failLockWrites && key.includes(':lock:lock-')) {
+          throw new Error('redis down during suppression');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new FailingLockWriteRedisStore();
+    await saveLock(redis, lock());
+    redis.failLockWrites = true;
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-redis-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
   });
 });

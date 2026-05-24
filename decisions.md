@@ -128,3 +128,47 @@ Reason:
 
 - Redis keys and runtime proof must be namespaced by the actual subreddit installation.
 - A hardcoded or guessed subreddit risks mixing demo, local, and live proof data.
+
+### D012 - Serialize trigger mutations per target with Redis NX
+
+Report and update triggers can be delivered more than once or overlap on the same target.
+
+Decision:
+
+- Use a short-lived per-target mutex key acquired with Redis NX semantics before mutating lock state, metrics, or reopen queues.
+- Treat a failed mutex acquisition as an idempotent duplicate/concurrent no-op rather than a runtime failure.
+
+Reason:
+
+- Duplicate trigger delivery is normal platform behavior.
+- Moderators need one coherent lock state, not double-counted suppressions or two reopen events for the same edit.
+
+### D013 - Roll back report suppression when Redis persistence fails
+
+A report trigger can call `ignoreReports()` successfully and then fail while writing the suppression ledger.
+
+Decision:
+
+- Return `runtime_uncertain` with `redis_write_failed`.
+- Attempt `unignoreReports()` when Redis fails after `ignoreReports()` succeeds.
+- Do not increment suppression metrics or claim successful suppression without durable Redis state.
+
+Reason:
+
+- ReviewLock's value depends on an honest reviewed-content ledger.
+- A moderation-side lock without the Redis state needed to reopen later is unsafe.
+
+### D014 - Reopen races are single-writer and fail open
+
+A report trigger and an update trigger can both observe the same changed locked item.
+
+Decision:
+
+- Allow exactly one trigger path to reopen the lock and write metrics/audit/reopen queue state.
+- The losing trigger exits as a duplicate/concurrent no-op or observes that no active lock remains.
+- If Redis fails during reopen, return `runtime_uncertain` instead of claiming the reopen is fully recorded.
+
+Reason:
+
+- Reopen is non-destructive, but duplicate reopen events erode moderator trust.
+- The safe fallback is to avoid suppression and surface uncertainty rather than create contradictory active/reopened state.

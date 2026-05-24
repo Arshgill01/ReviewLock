@@ -1,7 +1,12 @@
 import type { Clock } from '../adapters/clock';
 import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
-import type { ReopenEvent, ReopenReason, ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
+import type {
+  ReopenEvent,
+  ReopenReason,
+  ReviewLockRecord,
+  ReviewLockTarget,
+} from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { compareFingerprints, fingerprintTarget } from './fingerprint';
 import { getActiveLockByTarget, updateLockStatus } from './locks';
@@ -9,6 +14,7 @@ import { incrementReopenedMetric } from './metrics';
 import { unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
 import { resolveTargetById } from './targetResolver';
+import { isTriggerConcurrencyError, withTriggerMutex } from './triggerMutex';
 
 export interface ReopenFlowDependencies {
   reddit: RedditAdapter;
@@ -55,7 +61,9 @@ const buildReopenEvent = (
   targetId: lock.targetId,
   targetKind: lock.targetKind,
   oldContentHash: lock.contentHash,
-  newContentHash: currentTarget ? (fingerprintTarget(currentTarget, now)?.hash ?? 'runtime_uncertain') : 'runtime_uncertain',
+  newContentHash: currentTarget
+    ? (fingerprintTarget(currentTarget, now)?.hash ?? 'runtime_uncertain')
+    : 'runtime_uncertain',
   reason,
   createdAt: now,
   summary:
@@ -83,69 +91,95 @@ export const breakLockForChangedContent = async (
     };
   }
 
-  const lock = await getActiveLockByTarget(deps.redis, subreddit, input.targetId);
+  try {
+    return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
+      const lock = await getActiveLockByTarget(deps.redis, subreddit, input.targetId);
 
-  if (!lock) {
+      if (!lock) {
+        return {
+          ok: true,
+          action: 'no_lock',
+          message: 'No active ReviewLock lock exists for this update.',
+          warnings: [],
+        };
+      }
+
+      const comparison = resolution.target
+        ? fingerprintComparison(lock, resolution.target)
+        : 'uncertain';
+
+      if (comparison === 'unchanged') {
+        return {
+          ok: true,
+          action: 'unchanged',
+          message: 'Reviewed content is unchanged; lock remains active.',
+          warnings: [],
+        };
+      }
+
+      const reason =
+        comparison === 'uncertain' ? 'runtime_uncertain' : (input.reasonHint ?? 'content_changed');
+      const unignoreResult = resolution.target
+        ? await unignoreReportsForReviewLock(deps.reddit, resolution.target)
+        : { ok: false, warnings: ['target_resolution_failed'] };
+      const warnings = unignoreResult.warnings;
+      const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
+
+      await updateLockStatus(deps.redis, lock.subreddit, lock.id, 'reopened', {
+        reopenedAt: now,
+        reopenReason: reason,
+        reopenEventId: event.id,
+        runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
+      });
+      await enqueueReopenEvent(deps.redis, event);
+
+      if (resolution.target) {
+        await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
+      }
+
+      await appendAuditEvent(deps.redis, {
+        id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
+        kind: 'lock_reopened',
+        subreddit: lock.subreddit,
+        targetId: lock.targetId,
+        targetKind: lock.targetKind,
+        lockId: lock.id,
+        actor: 'reviewlock',
+        createdAt: now,
+        message: 'Lock reopened after reviewed content changed or became uncertain.',
+        data: { reason, unignoreReportsOk: unignoreResult.ok },
+        demo: lock.demo,
+      });
+
+      return {
+        ok: true,
+        action: comparison === 'uncertain' ? 'runtime_uncertain' : 'reopened',
+        message:
+          comparison === 'uncertain'
+            ? 'Lock reopened because current content could not be verified.'
+            : 'Lock reopened because reviewed content changed.',
+        event,
+        warnings,
+      };
+    });
+  } catch (error) {
+    if (isTriggerConcurrencyError(error)) {
+      return {
+        ok: true,
+        action: 'no_lock',
+        message: 'Concurrent trigger ignored while ReviewLock is already processing this target.',
+        warnings: ['concurrent_trigger_in_progress'],
+      };
+    }
+
     return {
-      ok: true,
-      action: 'no_lock',
-      message: 'No active ReviewLock lock exists for this update.',
-      warnings: [],
+      ok: false,
+      action: 'runtime_uncertain',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Redis failed while processing the update trigger.',
+      warnings: ['redis_write_failed'],
     };
   }
-
-  const comparison = resolution.target ? fingerprintComparison(lock, resolution.target) : 'uncertain';
-
-  if (comparison === 'unchanged') {
-    return {
-      ok: true,
-      action: 'unchanged',
-      message: 'Reviewed content is unchanged; lock remains active.',
-      warnings: [],
-    };
-  }
-
-  const reason = comparison === 'uncertain' ? 'runtime_uncertain' : (input.reasonHint ?? 'content_changed');
-  const unignoreResult = resolution.target
-    ? await unignoreReportsForReviewLock(deps.reddit, resolution.target)
-    : { ok: false, warnings: ['target_resolution_failed'] };
-  const warnings = unignoreResult.warnings;
-  const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
-
-  await updateLockStatus(deps.redis, lock.subreddit, lock.id, 'reopened', {
-    reopenedAt: now,
-    reopenReason: reason,
-    reopenEventId: event.id,
-    runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
-  });
-  await enqueueReopenEvent(deps.redis, event);
-
-  if (resolution.target) {
-    await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
-  }
-
-  await appendAuditEvent(deps.redis, {
-    id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
-    kind: 'lock_reopened',
-    subreddit: lock.subreddit,
-    targetId: lock.targetId,
-    targetKind: lock.targetKind,
-    lockId: lock.id,
-    actor: 'reviewlock',
-    createdAt: now,
-    message: 'Lock reopened after reviewed content changed or became uncertain.',
-    data: { reason, unignoreReportsOk: unignoreResult.ok },
-    demo: lock.demo,
-  });
-
-  return {
-    ok: true,
-    action: comparison === 'uncertain' ? 'runtime_uncertain' : 'reopened',
-    message:
-      comparison === 'uncertain'
-        ? 'Lock reopened because current content could not be verified.'
-        : 'Lock reopened because reviewed content changed.',
-    event,
-    warnings,
-  };
 };

@@ -24,4 +24,12 @@ describe('InMemoryRedisStore', () => {
     expect(await redis.hgetall('hash')).toEqual({ count: '2' });
     expect(await redis.zRange('set', 0, -1)).toEqual([{ member: 'target', score: 3 }]);
   });
+
+  it('sets a string only when the key does not already exist', async () => {
+    const redis = new InMemoryRedisStore();
+
+    expect(await redis.setIfNotExists('dedupe', 'first')).toBe(true);
+    expect(await redis.setIfNotExists('dedupe', 'second')).toBe(false);
+    expect(await redis.get('dedupe')).toBe('first');
+  });
 });

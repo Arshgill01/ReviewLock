@@ -5,7 +5,8 @@ import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
 import { fingerprintTarget } from './fingerprint';
 import { getActiveLockByTarget, saveLock } from './locks';
-import { getTargetMetrics } from './metrics';
+import { getDailyMetrics, getTargetMetrics } from './metrics';
+import { handleReportTrigger } from './reportTriggers';
 import { breakLockForChangedContent } from './reopenFlow';
 import { listOpenReopenEvents } from './reopenQueue';
 
@@ -117,6 +118,29 @@ describe('breakLockForChangedContent', () => {
     const dependencies = await deps(target({ body: 'Edited body', edited: true }));
     await breakLockForChangedContent(dependencies, { targetId: 't3_post' });
 
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      locksReopened: 1,
+    });
+  });
+
+  it('keeps report and update races idempotent for the same edited target', async () => {
+    const dependencies = await deps(target({ body: 'Edited body', edited: true }));
+    const [reportResult, updateResult] = await Promise.all([
+      handleReportTrigger(dependencies, { targetId: 't3_post', eventId: 'evt-update-report-race' }),
+      breakLockForChangedContent(dependencies, { targetId: 't3_post' }),
+    ]);
+    const actions = [reportResult.action, updateResult.action];
+
+    expect(actions.some((action) => action === 'reopen_changed' || action === 'reopened')).toBe(
+      true,
+    );
+    expect(actions.some((action) => action === 'duplicate' || action === 'no_lock')).toBe(true);
+    expect(dependencies.reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+    });
     expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
       locksReopened: 1,
     });

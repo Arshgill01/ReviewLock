@@ -17,7 +17,7 @@
 - [x] Wave 13 - Runtime Proof and Hardening
 - [x] Wave 15 - End-to-End Trigger Proof
 - [x] Wave 16 - Edit-Fingerprint Stress
-- [ ] Wave 17 - Redis Failure and Race Conditions
+- [x] Wave 17 - Redis Failure and Race Conditions
 - [ ] Wave 18 - UI and Dashboard Audit
 - [ ] Wave 19 - Full Scenario Walkthrough
 - [ ] Wave 20 - Hardening Pass 1

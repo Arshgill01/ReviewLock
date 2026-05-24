@@ -35,7 +35,10 @@ describe('lockReviewedContent', () => {
       lockReason: 'reviewed_policy_compliant',
     });
 
-    expect(result).toMatchObject({ ok: true, message: 'Reviewed content locked until it changes.' });
+    expect(result).toMatchObject({
+      ok: true,
+      message: 'Reviewed content locked until it changes.',
+    });
     expect(reddit.calls).toEqual(['approve:t3_post', 'ignoreReports:t3_post']);
     expect(await getLock(dependencies.redis, 'alpha', result.lock?.id ?? '')).toMatchObject({
       contentHash: expect.any(String),
@@ -63,7 +66,10 @@ describe('lockReviewedContent', () => {
       lockReason: 'reviewed_policy_compliant',
     });
 
-    expect(result).toMatchObject({ ok: false, message: 'Reports were not locked because ignoreReports failed.' });
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'Reports were not locked because ignoreReports failed.',
+    });
     expect(await getLock(dependencies.redis, 'alpha', result.lock?.id ?? '')).toMatchObject({
       status: 'failed',
     });
@@ -86,6 +92,14 @@ describe('lockReviewedContent', () => {
     );
 
     expect(result.ok).toBe(false);
-    expect(reddit.calls).toContain('unignoreReports:t3_post');
+    expect(result).toMatchObject({
+      message: 'redis down',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
   });
 });

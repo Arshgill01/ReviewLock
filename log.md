@@ -231,3 +231,23 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Fingerprints remain v1 normalization rules; future live payload fields may require new material fields if Devvit exposes more moderation-relevant state.
+
+## 2026-05-24 - Wave 17
+
+- Added Redis NX-style `setIfNotExists()` and `expire()` adapter operations so trigger dedupe and per-target mutexes can use Redis-like atomic acquisition.
+- Added a per-subreddit, per-target trigger mutex for report/update critical sections.
+- Hardened report suppression so Redis failure after `ignoreReports()` returns `runtime_uncertain` and attempts `unignoreReports()` rollback.
+- Hardened report/update reopen races so exactly one trigger path records the reopen and the other exits idempotently.
+- Added direct mutex tests, duplicate report race tests, report/update reopen race tests, Redis suppression rollback tests, and strengthened lock creation rollback proof.
+- Added `docs/REDIS_RACE_PROOF.md` and logged Wave 17 decisions D012-D014.
+- Commands run:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/adapters/redis.test.ts src/server/services/lockFlow.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts`
+  - `npm run test -- --run src/server/adapters/redis.test.ts src/server/services/lockFlow.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/server/services/triggerMutex.test.ts`
+  - `npx prettier --write docs/REDIS_RACE_PROOF.md decisions.md src/server/adapters/redis.ts src/server/adapters/redis.test.ts src/server/services/lockFlow.test.ts src/server/services/reportTriggers.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.ts src/server/services/reopenFlow.test.ts src/server/services/triggerMutex.ts src/server/services/triggerMutex.test.ts`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Race guarantees are locally verified against the adapter contract; live Devvit trigger delivery timing and Reddit moderation operations still require controlled playtest proof.

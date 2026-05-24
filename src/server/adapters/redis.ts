@@ -6,8 +6,10 @@ export interface SortedSetEntry {
 export interface RedisStore {
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<void>;
+  setIfNotExists(key: string, value: string): Promise<boolean>;
   del(key: string): Promise<void>;
   exists(key: string): Promise<boolean>;
+  expire(key: string, seconds: number): Promise<void>;
   hgetall(key: string): Promise<Record<string, string>>;
   hset(key: string, values: Record<string, string>): Promise<void>;
   hdel(key: string, field: string): Promise<void>;
@@ -23,6 +25,10 @@ export class InMemoryRedisStore implements RedisStore {
   private readonly hashes = new Map<string, Map<string, string>>();
   private readonly sortedSets = new Map<string, Map<string, number>>();
 
+  private hasKey(key: string): boolean {
+    return this.strings.has(key) || this.hashes.has(key) || this.sortedSets.has(key);
+  }
+
   async get(key: string): Promise<string | undefined> {
     return this.strings.get(key);
   }
@@ -31,14 +37,27 @@ export class InMemoryRedisStore implements RedisStore {
     this.strings.set(key, value);
   }
 
+  async setIfNotExists(key: string, value: string): Promise<boolean> {
+    if (this.hasKey(key)) {
+      return false;
+    }
+
+    this.strings.set(key, value);
+    return true;
+  }
+
   async del(key: string): Promise<void> {
     this.strings.delete(key);
     this.hashes.delete(key);
     this.sortedSets.delete(key);
   }
 
+  async expire(): Promise<void> {
+    // In-memory tests do not simulate wall-clock expiry. Production Redis applies the lease TTL.
+  }
+
   async exists(key: string): Promise<boolean> {
-    return this.strings.has(key) || this.hashes.has(key) || this.sortedSets.has(key);
+    return this.hasKey(key);
   }
 
   async hgetall(key: string): Promise<Record<string, string>> {
@@ -103,9 +122,10 @@ export class InMemoryRedisStore implements RedisStore {
 
 interface DevvitRedisClient {
   get(key: string): Promise<string | undefined | null>;
-  set(key: string, value: string): Promise<unknown>;
+  set(key: string, value: string, options?: { nx?: boolean }): Promise<unknown>;
   del(key: string): Promise<unknown>;
   exists(key: string): Promise<number | boolean>;
+  expire(key: string, seconds: number): Promise<unknown>;
   hGetAll(key: string): Promise<Record<string, string>>;
   hSet(key: string, values: Record<string, string>): Promise<unknown>;
   hDel(key: string, fields: string[]): Promise<unknown>;
@@ -128,12 +148,19 @@ export const createDevvitRedisStore = (client: DevvitRedisClient): RedisStore =>
   async set(key, value) {
     await client.set(key, value);
   },
+  async setIfNotExists(key, value) {
+    const result = await client.set(key, value, { nx: true });
+    return result !== undefined && result !== null && result !== false;
+  },
   async del(key) {
     await client.del(key);
   },
   async exists(key) {
     const result = await client.exists(key);
     return typeof result === 'boolean' ? result : result > 0;
+  },
+  async expire(key, seconds) {
+    await client.expire(key, seconds);
   },
   async hgetall(key) {
     return client.hGetAll(key);
