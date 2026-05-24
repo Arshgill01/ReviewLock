@@ -216,3 +216,18 @@
 - Open risks:
   - Live Devvit trigger payloads have not been captured yet; local route payloads remain representative fixtures.
   - Live `ignoreReports()` and `unignoreReports()` trigger behavior still requires controlled Reddit events.
+
+## 2026-05-24 - Wave 16
+
+- Added fingerprint stress tests for outer whitespace-only edits, space/tab runs, markdown line break changes, post body cleared/rewritten, comment body cleared/rewritten, title changes, URL changes, flair text/template changes, NSFW toggles, spoiler toggles, and missing-current-content uncertainty.
+- Added content-change classification tests for the same material/non-material boundaries.
+- Added `docs/FINGERPRINT_STRESS.md` with the expected behavior matrix and result.
+- No fingerprint engine code changes were required; the current engine already avoided the tested false positives and false negatives.
+- Commands run so far:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/fingerprint.test.ts src/server/services/contentChange.test.ts`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Fingerprints remain v1 normalization rules; future live payload fields may require new material fields if Devvit exposes more moderation-relevant state.
