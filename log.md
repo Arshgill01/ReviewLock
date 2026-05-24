@@ -966,3 +966,30 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
+
+## 2026-05-25 - Wave 33 Devvit target model mapping hardening
+
+- Compared ReviewLock's Reddit adapter against installed Devvit `PostV2` and
+  `CommentV2` typings.
+- Hardened post mapping to preserve `selftext`, `numReports`, and `authorId`
+  fields when those are the available Devvit model names.
+- Hardened comment mapping to preserve `author` when `authorName` is absent.
+- Added adapter regression tests for installed trigger/nested model-shaped
+  inputs.
+- Commands run:
+  - `nl -ba node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts | sed -n '1,90p'`
+  - `nl -ba node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts | sed -n '1,90p'`
+  - `npm run test -- src/server/adapters/reddit.test.ts --reporter verbose`
+  - `npx prettier --write src/server/adapters/reddit.ts src/server/adapters/reddit.test.ts RESEARCH.md TODO.md decisions.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+  - `npm run test`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled" src docs README.md || true`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 231
+  tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.

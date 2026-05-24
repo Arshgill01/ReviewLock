@@ -237,3 +237,37 @@ Implementation conclusions:
 - ReviewLock should read the embedded subreddit from Devvit server `context.subredditName` and only fall back to Reddit API or client URL inference when context is unavailable.
 - Internal menu/form endpoints must not return `{ ok: true }` because Devvit treats unknown `UiResponse` keys as runtime failures.
 - Runtime smoke endpoints should be executed from the embedded WebView, not direct unauthenticated terminal requests.
+
+## 2026-05-25 - Devvit target model mapping hardening
+
+Commands:
+
+- `nl -ba node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts | sed -n '1,90p'`
+- `nl -ba node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts | sed -n '1,90p'`
+
+Installed typing evidence:
+
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:24`
+  declares `PostV2`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:28`
+  uses `selftext` for post body text.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:30`
+  uses `authorId`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:32`
+  uses `numReports`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:43`
+  uses `isSpoiler`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts:49`
+  exposes `linkFlair`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts:7`
+  declares `CommentV2`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts:11`
+  uses `author`.
+- `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts:12`
+  uses `numReports`.
+
+Implementation conclusion:
+
+- ReviewLock's Reddit adapter should preserve both Reddit-client model fields and
+  trigger/nested model field names so fingerprint inputs and report metrics do
+  not silently degrade when Devvit returns a typed `PostV2`/`CommentV2` shape.

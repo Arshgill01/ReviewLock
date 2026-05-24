@@ -8,13 +8,17 @@ export interface RedditAdapter {
   unignoreReports(target: ReviewLockTarget): Promise<void>;
   getCurrentUsername(): Promise<string | undefined>;
   getCurrentSubredditName(): Promise<string | undefined>;
-  submitDashboardPost?(input: { subredditName: string; title: string }): Promise<{ permalink: string }>;
+  submitDashboardPost?(input: {
+    subredditName: string;
+    title: string;
+  }): Promise<{ permalink: string }>;
 }
 
 interface ModeratableModel {
   id: string;
   title?: string;
   body?: string;
+  selftext?: string;
   url?: string;
   edited?: boolean;
   ignoringReports?: boolean;
@@ -25,6 +29,8 @@ interface ModeratableModel {
   permalink?: string;
   subredditName?: string;
   authorName?: string;
+  author?: string;
+  authorId?: string;
   postId?: string;
   parentId?: string;
   flair?: { text?: string; templateId?: string };
@@ -64,24 +70,25 @@ export const mapPostModel = (post: ModeratableModel): ReviewLockTarget => ({
   id: normalizeThingId('post', post.id),
   kind: 'post',
   subreddit: post.subredditName ?? 'unknown',
-  authorName: post.authorName ?? 'unknown',
+  authorName: post.authorName ?? post.author ?? post.authorId ?? 'unknown',
   permalink: post.permalink ?? '',
   title: post.title,
-  body: post.body,
+  body: post.body ?? post.selftext,
   url: post.url,
   flairText: post.flair?.text ?? post.linkFlair?.text,
   flairTemplateId: post.flair?.templateId ?? post.linkFlair?.templateId,
   isNsfw: post.nsfw ?? (typeof post.isNsfw === 'function' ? post.isNsfw() : post.isNsfw),
-  isSpoiler: post.spoiler ?? (typeof post.isSpoiler === 'function' ? post.isSpoiler() : post.isSpoiler),
+  isSpoiler:
+    post.spoiler ?? (typeof post.isSpoiler === 'function' ? post.isSpoiler() : post.isSpoiler),
   edited: post.edited === true,
-  reportCount: post.numberOfReports ?? 0,
+  reportCount: post.numberOfReports ?? post.numReports ?? 0,
 });
 
 export const mapCommentModel = (comment: ModeratableModel): ReviewLockTarget => ({
   id: normalizeThingId('comment', comment.id),
   kind: 'comment',
   subreddit: comment.subredditName ?? 'unknown',
-  authorName: comment.authorName ?? 'unknown',
+  authorName: comment.authorName ?? comment.author ?? 'unknown',
   permalink: comment.permalink ?? '',
   body: comment.body,
   edited: comment.edited === true,
@@ -123,7 +130,10 @@ export class DevvitRedditAdapter implements RedditAdapter {
     return (await this.client.getCurrentSubreddit?.())?.name;
   }
 
-  async submitDashboardPost(input: { subredditName: string; title: string }): Promise<{ permalink: string }> {
+  async submitDashboardPost(input: {
+    subredditName: string;
+    title: string;
+  }): Promise<{ permalink: string }> {
     return this.client.submitCustomPost({
       subredditName: input.subredditName,
       title: input.title,
@@ -194,7 +204,10 @@ export class FakeRedditAdapter implements RedditAdapter {
     return this.subredditName;
   }
 
-  async submitDashboardPost(input: { subredditName: string; title: string }): Promise<{ permalink: string }> {
+  async submitDashboardPost(input: {
+    subredditName: string;
+    title: string;
+  }): Promise<{ permalink: string }> {
     this.calls.push(`submitDashboardPost:${input.subredditName}:${input.title}`);
     return { permalink: `/r/${input.subredditName}/comments/reviewlock_dashboard/` };
   }
@@ -209,5 +222,6 @@ export class FakeRedditAdapter implements RedditAdapter {
   }
 }
 
-export const createRedditAdapterFromContext = (context: { reddit: DevvitRedditClient }): RedditAdapter =>
-  new DevvitRedditAdapter(context.reddit);
+export const createRedditAdapterFromContext = (context: {
+  reddit: DevvitRedditClient;
+}): RedditAdapter => new DevvitRedditAdapter(context.reddit);

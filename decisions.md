@@ -877,3 +877,22 @@ Reason:
   dashboard state the moderator is looking at. Explicit client scope gives the
   server another mismatch check and prevents hidden fallback behavior in weaker
   or local runtime contexts.
+
+### D058 - Preserve Devvit typed target fields in adapter mapping
+
+Installed Devvit `PostV2` and `CommentV2` typings use field names that differ
+from the higher-level Reddit client model names for some ReviewLock-critical
+data.
+
+Decision:
+
+- Post mapping accepts `selftext` as the body fallback, `numReports` as the
+  report-count fallback, and `author`/`authorId` as author fallbacks.
+- Comment mapping accepts `author` as the author fallback.
+- Existing Reddit-client model names remain preferred when present.
+
+Reason:
+
+- Fingerprints and report churn metrics must not silently lose body text,
+  report counts, flair, or author context if Devvit returns a nested trigger
+  model shape instead of the higher-level Reddit client shape.
