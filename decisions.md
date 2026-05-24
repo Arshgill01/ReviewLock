@@ -937,3 +937,27 @@ Reason:
 - Runtime proof should never invent a production write namespace. A missing
   subreddit context is an operational problem that moderators and proof docs
   should see directly.
+
+### D061 - Review and constrain Antigravity UI output before integration
+
+The dashboard needed a stronger operational visual pass, and Antigravity/Gemini
+was delegated only the frontend-owned UI refresh scope.
+
+Decision:
+
+- Keep the accepted changes limited to `src/client/**` and client render tests.
+- Remove Antigravity output that added external font imports, inline styles,
+  dark one-note dashboard styling, non-ASCII glyphs, or exaggerated dashboard
+  patterns.
+- Preserve the reviewed-content loop in the first viewport with the exact
+  product language: "Lock reviewed content until it changes", "Reports
+  suppressed", and "Reopened after edit".
+- Keep demo actions visibly read-only and avoid forbidden report-disabling
+  framing.
+
+Reason:
+
+- Gemini is useful for widening frontend exploration, but ReviewLock's product
+  thesis and proof boundary need stricter review than an autonomous UI agent can
+  provide. The integrated result must remain a moderator operations tool, not a
+  decorative SaaS landing page.

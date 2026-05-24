@@ -1,6 +1,6 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-25 00:11 IST.
+Last updated: 2026-05-25 01:28 IST.
 
 ## Scope
 
@@ -25,6 +25,7 @@ This pass does not prove live moderation methods or live report/edit trigger del
 - Fixed WebView version observed in Zen: `reviewlock-i1a3xr-0-0-2-6-webview.devvit.net/index.html`.
 - Latest post-hardening playtest version observed in Zen: `v0.0.2.62`.
 - Latest trigger-wrapper hardening playtest version observed in Zen: `v0.0.2.64`.
+- Latest dashboard UI hardening playtest version observed in Zen: `v0.0.2.66`.
 
 ## Failure Found
 
@@ -113,6 +114,37 @@ After Reddit adapter mapping and trigger wrapper payload hardening:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Dashboard UI Hardening Recheck
+
+After the reviewed Antigravity frontend refresh was cleaned and integrated:
+
+- Playtest version: `v0.0.2.66`.
+- Existing Zen tab was used on the ReviewLock dashboard post.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed the product thesis, active locks, reports suppressed,
+  reopened after edit, latest edit-break empty state, active lock table, and
+  runtime proof/status.
+- Metric stages read:
+  - `1. Reviewed and locked`
+  - `2. Reports suppressed`
+  - `3. Reopened after edit`
+- Demo mode was opened from the same WebView and showed the visible `Demo mode`
+  banner, `r/reviewlock_demo` scope, 8 active locks, 17 reports suppressed, 3
+  reopened after edit, latest edit-break event, read-only demo actions, report
+  churn, runtime status, and audit timeline.
+- Live mode was reopened and `Verify runtime` completed from the embedded
+  WebView with `Runtime proof refreshed.`
+- Runtime panel still showed:
+  - `redditContext verified`
+  - `redis verified`
+  - `approve verified`
+  - `ignoreReports verified`
+  - `unignoreReports verified`
+  - `triggers unverified`
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Commands Run
 
 - `npm run dev -- reviewlock_dev`
@@ -139,6 +171,10 @@ performed in this recheck.
   - Result: PASS, live dashboard rendered, `Verify runtime` completed, and demo mode showed visibly labeled seeded data under `reviewlock_demo`.
 - `npx devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
   - Result: PARTIAL, CLI reported `listen EADDRINUSE: address already in use :::5678` and then connected to the log stream; no trigger payload logs were emitted during the sample window.
+- `npm run dev -- reviewlock_dev`
+  - Result: PASS, playtest reached `v0.0.2.66`.
+- Zen browser live WebView runtime and demo recheck
+  - Result: PASS, live dashboard rendered with the polished metric loop, demo mode showed visibly labeled seeded data under `reviewlock_demo`, and `Verify runtime` completed with `Runtime proof refreshed.`
 
 ## Open Risks
 

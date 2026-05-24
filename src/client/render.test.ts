@@ -106,6 +106,8 @@ describe('client render helpers', () => {
     expect(html).toContain('Active locks');
     expect(html).toContain('Reports suppressed');
     expect(html).toContain('Reopened after edit');
+    expect(html).toContain('1. Reviewed and locked');
+    expect(html).toContain('2. Reports suppressed');
     expectSafeCopy(html);
   });
 

@@ -1,29 +1,30 @@
 :root {
-  --bg: #f8fafc;
-  --surface: #ffffff;
-  --surface-muted: #f1f5f9;
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
-  --text: #0f172a;
-  --muted: #475569;
-  --light: #64748b;
+  --bg: #f4f6f3;
+  --surface: #fffefb;
+  --surface-muted: #eef3ef;
+  --line: #d8ded6;
+  --line-strong: #bac5bb;
+  --text: #151c18;
+  --muted: #526057;
+  --light: #6f7c72;
   --primary: #0f766e;
   --primary-hover: #0d5e58;
-  --primary-light: #ccfbf1;
-  --blue: #1d4ed8;
-  --blue-hover: #1e40af;
-  --blue-light: #dbeafe;
-  --blue-border: #bfdbfe;
-  --amber: #b45309;
-  --amber-light: #fef3c7;
-  --amber-border: #fde047;
-  --red: #b91c1c;
-  --red-hover: #991b1b;
-  --red-light: #fee2e2;
-  --red-border: #fca5a5;
-  --green: #15803d;
-  --green-light: #dcfce7;
-  --green-border: #bbf7d0;
+  --primary-light: #d8f3ee;
+  --primary-border: #9bd7cc;
+  --blue: #315c9a;
+  --blue-hover: #244676;
+  --blue-light: #e2eaf6;
+  --blue-border: #b8c9e4;
+  --amber: #9a6a00;
+  --amber-light: #fff3cf;
+  --amber-border: #e5c25a;
+  --red: #b42318;
+  --red-hover: #8f1d15;
+  --red-light: #fde8e5;
+  --red-border: #efaaa3;
+  --green: #14763d;
+  --green-light: #ddf4e6;
+  --green-border: #a6d9bb;
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -115,7 +116,7 @@ a:hover {
 
 .app-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.55rem;
   font-weight: 800;
   letter-spacing: 0;
   color: var(--text);
@@ -161,16 +162,17 @@ a:hover {
   border-radius: var(--radius-lg);
   background: var(--surface);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  box-shadow: 0 1px 3px rgb(21 28 24 / 6%);
 }
 
 .metric-cell {
   position: relative;
-  min-height: 120px;
+  min-height: 130px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: 24px;
+  transition: background-color 0.2s ease;
 }
 
 .metric-cell:not(:last-child)::after {
@@ -187,12 +189,13 @@ a:hover {
 }
 
 .metric-value {
-  font-size: 2.25rem;
+  font-size: 2.4rem;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0;
   color: var(--text);
   margin-bottom: 6px;
+  font-family: var(--font-mono);
 }
 
 .metric-label {
@@ -207,7 +210,7 @@ a:hover {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  box-shadow: 0 1px 3px rgb(21 28 24 / 6%);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -231,6 +234,7 @@ a:hover {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
+  letter-spacing: 0;
   color: var(--text);
   display: flex;
   align-items: center;
@@ -293,6 +297,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  border-left: 4px solid var(--red);
 }
 
 .latest-grid {
@@ -316,22 +321,29 @@ a:hover {
 }
 
 .latest-panel strong {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: var(--text);
+}
+
+.latest-reason {
+  align-self: flex-start;
+  min-height: auto;
+  margin-top: 2px;
+  padding: 1px 6px;
 }
 
 .latest-panel p {
   margin: 0 0 12px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: var(--surface-muted);
-  border-left: 3px solid var(--red);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
-  color: var(--muted);
+  color: var(--light);
+  border: 1px solid var(--line);
 }
 
 .empty-text {
-  color: var(--light);
+  color: var(--muted);
   font-style: italic;
   margin: 0;
   font-size: 0.875rem;
@@ -404,7 +416,7 @@ a:hover {
 
 .confirm-actions {
   background: var(--red-light);
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: var(--radius-md);
   border: 1px solid var(--red-border);
 }
@@ -485,12 +497,12 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 24px;
+  padding: 10px 24px;
   background: var(--amber-light);
   border-bottom: 1px solid var(--amber-border);
   color: var(--amber);
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .demo-banner strong {
@@ -506,6 +518,7 @@ a:hover {
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: var(--surface);
 }
 
 table {
@@ -567,7 +580,7 @@ td strong {
   display: inline-block;
   max-width: 320px;
   overflow: hidden;
-  color: var(--light);
+  color: var(--muted);
   font-size: 0.8rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -582,6 +595,7 @@ td strong {
   color: var(--light);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
 }
 
 .queue-list,
@@ -631,6 +645,17 @@ td strong {
   min-width: 0;
 }
 
+.queue-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queue-row-action {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 .queue-row strong,
 .audit-row strong,
 .churn-row strong {
@@ -643,11 +668,11 @@ td strong {
 .audit-row span,
 .churn-row span {
   font-size: 0.75rem;
-  color: var(--light);
+  color: var(--muted);
 }
 
 .queue-row p {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.825rem;
   color: var(--muted);
   background: var(--surface-muted);
@@ -667,6 +692,15 @@ td strong {
 .hash-transition {
   margin-top: 6px;
   font-size: 0.75rem;
+  align-items: center;
+}
+
+.hash-transition-wrap {
+  margin-bottom: 16px;
+}
+
+.latest-action {
+  display: flex;
 }
 
 .latest-panel .hash-transition {
@@ -685,15 +719,15 @@ td strong {
 }
 
 .capability-list {
-  background: #13211f;
+  background: #f2fbf8;
   border-radius: var(--radius-md);
   padding: 12px 16px;
-  border: 1px solid #243a37;
+  border: 1px solid #ccebe3;
 }
 
 .capability-row {
-  border-color: #243a37;
-  color: #b7c7c4;
+  border-color: #ccebe3;
+  color: #31514a;
 }
 
 .capability-row span:first-child {
@@ -725,7 +759,7 @@ td strong {
 
 .audit-list {
   position: relative;
-  padding-left: 16px;
+  padding-left: 20px;
 }
 
 .audit-list::before {
@@ -799,7 +833,6 @@ code {
   font-size: 1.2rem;
 }
 
-/* Responsive Overrides */
 @media (max-width: 900px) {
   .shell {
     padding: 16px;
@@ -821,7 +854,7 @@ code {
   }
 
   .metric-cell {
-    min-height: 88px;
+    min-height: 98px;
     padding: 14px;
   }
 
@@ -858,7 +891,7 @@ code {
   }
 
   .metric-cell {
-    min-height: 70px;
+    min-height: 75px;
     padding: 12px;
   }
 

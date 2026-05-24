@@ -15,7 +15,7 @@ const shortHash = (value: string): string => text(value.slice(0, 8));
 
 const renderHashTransition = (event: ReopenEvent): string => `
   <div class="hash-transition">
-    <span class="field-label">Hash transition</span>
+    <span class="field-label">Content change fingerprint</span>
     <code>${shortHash(event.oldContentHash)}</code>
     <span class="hash-arrow">to</span>
     <code class="hash-new">${shortHash(event.newContentHash)}</code>
@@ -81,11 +81,11 @@ export const renderLatestReopenEvent = (
       <div class="latest-grid">
         <div>
           <span class="field-label">Target</span>
-          <strong>${event.targetKind} ${text(event.targetId)}</strong>
+          <strong><code>${event.targetKind}:${text(event.targetId.replace('t1_', '').replace('t3_', ''))}</code></strong>
         </div>
         <div>
           <span class="field-label">Reason</span>
-          <strong>${text(reason(event.reason))}</strong>
+          <strong class="status status-reopened latest-reason">${text(reason(event.reason))}</strong>
         </div>
         <div>
           <span class="field-label">Created</span>
@@ -93,8 +93,12 @@ export const renderLatestReopenEvent = (
         </div>
       </div>
       <p>${text(event.summary)}</p>
-      ${renderHashTransition(event)}
-      ${renderDismissAction(event, confirmation, 'Dismiss reopen', readOnly)}
+      <div class="hash-transition-wrap">
+        ${renderHashTransition(event)}
+      </div>
+      <div class="latest-action">
+        ${renderDismissAction(event, confirmation, 'Dismiss Reopen', readOnly)}
+      </div>
     </section>
   `;
 };
@@ -108,16 +112,18 @@ export const renderReopenQueue = (
     .map(
       (event) => `
         <li class="queue-row">
-          <div>
+          <div class="queue-row-body">
             <div class="queue-row-heading">
-              <strong>${event.targetKind} ${text(event.targetId)}</strong>
+              <code>${event.targetKind}:${text(event.targetId.replace('t1_', '').replace('t3_', ''))}</code>
               <span class="status status-reopened">${text(reason(event.reason))}</span>
-              <span>${date(event.createdAt)}</span>
+              <span class="date-cell">${date(event.createdAt)}</span>
             </div>
             <p>${text(event.summary)}</p>
             ${renderHashTransition(event)}
           </div>
-          ${renderDismissAction(event, confirmation, 'Dismiss', readOnly)}
+          <div class="queue-row-action">
+            ${renderDismissAction(event, confirmation, 'Dismiss', readOnly)}
+          </div>
         </li>
       `,
     )

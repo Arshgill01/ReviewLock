@@ -1079,3 +1079,45 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission or controlled edit actions.
+
+## 2026-05-25 - Wave 33 dashboard UI hardening with reviewed Antigravity output
+
+- Delegated a frontend-only dashboard refresh to Antigravity/Gemini using the
+  checked prompt in `docs/ANTIGRAVITY_UI_REFRESH_PROMPT.md`.
+- Reviewed the generated diff before integration and kept changes limited to
+  `src/client/**` and the client render test.
+- Removed rejected UI output patterns from the Antigravity diff: external Google
+  Fonts import, inline styles, dark one-note palette, non-ASCII arrows, and
+  elevated landing-page styling.
+- Refined the first viewport metrics to read as the ReviewLock loop:
+  `1. Reviewed and locked`, `2. Reports suppressed`, and
+  `3. Reopened after edit`.
+- Tightened reopened-event presentation with compact target identifiers, clear
+  edit-break status treatment, and "Content change fingerprint" copy.
+- Started a fresh Devvit playtest for `r/reviewlock_dev`.
+- Observed playtest version `v0.0.2.66`.
+- Used Zen on the existing ReviewLock dashboard post.
+- Confirmed live mode rendered under `r/reviewlock_dev` with active locks,
+  reports suppressed, reopened after edit, latest edit-break empty state, active
+  lock table, and runtime status visible.
+- Opened demo mode and confirmed visible `Demo mode` labeling,
+  `r/reviewlock_demo` scope, seeded active locks, reports suppressed, reopened
+  after edit, latest edit-break event, report churn, read-only demo actions,
+  runtime status, and audit timeline.
+- Switched back to live mode and clicked `Verify runtime`; the dashboard showed
+  `Runtime proof refreshed.`
+- Commands run:
+  - `tmux new-window -n agy-ui 'cd /Users/arshdeepsingh/Developer/ReviewLock && agy --dangerously-skip-permissions < docs/ANTIGRAVITY_UI_REFRESH_PROMPT.md'`
+  - `npx prettier --write src/client/components/MetricStrip.ts src/client/components/ReopenQueue.ts src/client/render.test.ts src/client/styles.css`
+  - `npm run test -- --run src/client/render.test.ts src/client/state/store.test.ts src/client/state/api.test.ts`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+  - `npm run build`
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser live WebView runtime and demo recheck on `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+- Pass/fail status: PASS for local frontend validation, build, live WebView
+  render, runtime smoke, and demo mode.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission or controlled edit actions.
