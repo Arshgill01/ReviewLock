@@ -5,6 +5,9 @@ Last updated: 2026-05-25 01:24 IST.
 This file defines how ReviewLock should gather real runtime proof without
 confusing seeded demo data with live evidence.
 
+Exact controlled post and comment copy lives in
+`docs/LIVE_SCENARIO_CONTENT.md`.
+
 ## Feasibility Verdict
 
 ReviewLock cannot gather real moderation data from arbitrary subreddits.

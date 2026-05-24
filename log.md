@@ -1180,3 +1180,23 @@
 - Open risks:
   - Live report/edit trigger proof still requires controlled Reddit actions and
     sanitized log capture.
+
+## 2026-05-25 - Wave 33 controlled live corpus copy prep
+
+- Added exact controlled Reddit post and comment copy for S01-S10 in
+  `docs/LIVE_SCENARIO_CONTENT.md`.
+- Prepared S01 in Zen on the Reddit submit form for `r/reviewlock_dev` but did
+  not click `Post`.
+- Started `npm run dev -- reviewlock_dev`; playtest reached `v0.0.2.70`.
+- Stopped the playtest cleanly after reaching the user-confirmation boundary.
+- Commands run:
+  - `git status --short`
+  - `ps -axo pid,ppid,command | rg 'npm run dev|devvit playtest|webbit|reviewlock_dev'`
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser submit-form prefill for S01
+- Pass/fail status: PASS for preflight; BLOCKED for live post creation pending
+  explicit user confirmation.
+- Open risks:
+  - S01 has not been posted yet.
+  - No live report, edit, flair, NSFW, spoiler, comment, or trigger proof has
+    been performed in this pass.
