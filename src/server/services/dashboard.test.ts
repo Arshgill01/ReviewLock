@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import {
+  MAX_ACTIVE_LOCKS,
+  MAX_AUDIT_EVENTS,
+  MAX_DAILY_METRICS,
+  MAX_REOPEN_EVENTS,
+} from '../../shared/constants';
 import { InMemoryRedisStore } from '../adapters/redis';
-import type { ReopenEvent, ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
+import type {
+  AuditEvent,
+  ReopenEvent,
+  ReviewLockRecord,
+  ReviewLockTarget,
+} from '../../shared/schema';
+import { appendAuditEvent } from './audit';
 import { saveLock } from './locks';
 import { incrementSuppressedReportMetric } from './metrics';
 import { enqueueReopenEvent } from './reopenQueue';
@@ -18,7 +30,17 @@ const target = (id: string, reports = 0): ReviewLockTarget => ({
   reportCount: reports,
 });
 
-const lock = (id: string, targetId: string): ReviewLockRecord => ({
+const isoAt = (base: string, minutesToAdd: number): string =>
+  new Date(Date.parse(base) + minutesToAdd * 60_000).toISOString();
+
+const dateAt = (base: string, daysToAdd: number): string =>
+  new Date(Date.parse(base) + daysToAdd * 86_400_000).toISOString().slice(0, 10);
+
+const lock = (
+  id: string,
+  targetId: string,
+  overrides: Partial<ReviewLockRecord> = {},
+): ReviewLockRecord => ({
   id,
   subreddit: 'alpha',
   targetId,
@@ -38,9 +60,10 @@ const lock = (id: string, targetId: string): ReviewLockRecord => ({
   suppressedReportCount: 0,
   runtimeWarnings: [],
   demo: false,
+  ...overrides,
 });
 
-const reopenEvent = (): ReopenEvent => ({
+const reopenEvent = (overrides: Partial<ReopenEvent> = {}): ReopenEvent => ({
   id: 'event-1',
   lockId: 'lock-old',
   subreddit: 'alpha',
@@ -53,6 +76,22 @@ const reopenEvent = (): ReopenEvent => ({
   summary: 'Changed after review.',
   runtimeWarnings: [],
   demo: false,
+  ...overrides,
+});
+
+const auditEvent = (overrides: Partial<AuditEvent> = {}): AuditEvent => ({
+  id: 'audit-1',
+  kind: 'report_suppressed',
+  subreddit: 'alpha',
+  targetId: 't3_old',
+  targetKind: 'post',
+  lockId: 'lock-old',
+  actor: 'reviewlock',
+  createdAt: '2026-05-24T00:00:00.000Z',
+  message: 'Repeat report suppressed because reviewed content was unchanged.',
+  data: {},
+  demo: false,
+  ...overrides,
 });
 
 describe('dashboard aggregation', () => {
@@ -100,5 +139,87 @@ describe('dashboard aggregation', () => {
 
     expect(data.demo).toBe(true);
     expect(JSON.stringify(data)).not.toContain('reporter');
+  });
+
+  it('keeps high-volume dashboard data bounded and newest-first', async () => {
+    const redis = new InMemoryRedisStore();
+    const lockCount = MAX_ACTIVE_LOCKS + 20;
+    const reopenCount = MAX_REOPEN_EVENTS + 15;
+    const auditCount = MAX_AUDIT_EVENTS + 15;
+    const dailyCount = MAX_DAILY_METRICS + 5;
+
+    for (let index = 0; index < lockCount; index += 1) {
+      const padded = String(index).padStart(3, '0');
+      await saveLock(
+        redis,
+        lock(`lock-${padded}`, `t3_lock_${padded}`, {
+          lockedAt: isoAt('2026-05-24T00:00:00.000Z', index),
+          title: `Reviewed post ${padded}`,
+        }),
+      );
+    }
+
+    for (let index = 0; index < reopenCount; index += 1) {
+      const padded = String(index).padStart(3, '0');
+      await enqueueReopenEvent(
+        redis,
+        reopenEvent({
+          id: `event-${padded}`,
+          lockId: `lock-reopen-${padded}`,
+          targetId: `t3_reopen_${padded}`,
+          createdAt: isoAt('2026-05-24T01:00:00.000Z', index),
+        }),
+      );
+    }
+
+    for (let index = 0; index < auditCount; index += 1) {
+      const padded = String(index).padStart(3, '0');
+      await appendAuditEvent(
+        redis,
+        auditEvent({
+          id: `audit-${padded}`,
+          createdAt: isoAt('2026-05-24T02:00:00.000Z', index),
+        }),
+      );
+    }
+
+    for (let index = 0; index < dailyCount; index += 1) {
+      await incrementSuppressedReportMetric(
+        redis,
+        target(`t3_daily_${index}`),
+        `${dateAt('2026-04-01T00:00:00.000Z', index)}T00:00:00.000Z`,
+      );
+    }
+
+    for (let targetIndex = 1; targetIndex <= 15; targetIndex += 1) {
+      for (let reportIndex = 0; reportIndex < targetIndex; reportIndex += 1) {
+        await incrementSuppressedReportMetric(
+          redis,
+          target(`t3_churn_${targetIndex}`),
+          isoAt('2026-05-24T03:00:00.000Z', reportIndex),
+        );
+      }
+    }
+
+    const data = await getDashboardData(redis, {
+      subreddit: 'alpha',
+      now: '2026-05-24T04:00:00.000Z',
+    });
+
+    expect(data.activeLocks).toHaveLength(MAX_ACTIVE_LOCKS);
+    expect(data.reopenQueue).toHaveLength(MAX_REOPEN_EVENTS);
+    expect(data.auditEvents).toHaveLength(MAX_AUDIT_EVENTS);
+    expect(data.dailyMetrics).toHaveLength(MAX_DAILY_METRICS);
+    expect(data.overview.topChurnTargets).toHaveLength(10);
+    expect(data.activeLocks[0]?.id).toBe('lock-069');
+    expect(data.reopenQueue[0]?.id).toBe('event-064');
+    expect(data.auditEvents[0]?.id).toBe('audit-114');
+    expect(data.dailyMetrics[0]?.date).toBe('2026-05-24');
+    expect(data.overview.latestReopenEvent?.id).toBe('event-064');
+    expect(data.overview.topChurnTargets.map((entry) => entry.targetId).slice(0, 3)).toEqual([
+      't3_churn_15',
+      't3_churn_14',
+      't3_churn_13',
+    ]);
   });
 });

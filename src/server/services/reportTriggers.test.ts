@@ -198,6 +198,61 @@ describe('handleReportTrigger', () => {
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(2);
   });
 
+  it('handles a high-volume burst of distinct unchanged reports deterministically', async () => {
+    const dependencies = await deps();
+    const reportCount = 50;
+
+    for (let index = 0; index < reportCount; index += 1) {
+      await expect(
+        handleReportTrigger(dependencies, {
+          targetId: 't3_post',
+          eventId: `evt-burst-${index}`,
+          reportCount: index + 1,
+        }),
+      ).resolves.toMatchObject({ action: 'suppress_unchanged' });
+    }
+
+    expect(dependencies.reddit.calls).toHaveLength(reportCount);
+    expect(await getLock(dependencies.redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: reportCount,
+      lastReportCount: reportCount,
+    });
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: reportCount,
+      locksReopened: 0,
+    });
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      reportsSuppressed: reportCount,
+      locksReopened: 0,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(reportCount);
+  });
+
+  it('collapses a high-volume duplicate delivery storm to one suppression', async () => {
+    const dependencies = await deps();
+    const results = await Promise.all(
+      Array.from({ length: 50 }, () =>
+        handleReportTrigger(dependencies, {
+          targetId: 't3_post',
+          eventId: 'evt-duplicate-storm',
+          reportCount: 5,
+        }),
+      ),
+    );
+    const actions = results.map((result) => result.action);
+
+    expect(actions.filter((action) => action === 'suppress_unchanged')).toHaveLength(1);
+    expect(actions.filter((action) => action === 'duplicate')).toHaveLength(49);
+    expect(dependencies.reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getLock(dependencies.redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 1,
+    });
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
   it('suppresses unchanged comment reports with the comment moderation operation', async () => {
     const dependencies = await deps(commentTarget());
     const result = await handleReportTrigger(dependencies, {

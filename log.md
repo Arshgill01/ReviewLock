@@ -439,3 +439,20 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Live `unignoreReports()` behavior remains runtime-unverified until controlled playtest proof is captured.
+
+## 2026-05-24 - Wave 26
+
+- Added high-volume dashboard aggregation coverage for locks, reopen events, audit events, daily metrics, and churn target metrics above configured dashboard limits.
+- Added high-volume report-trigger coverage for 50 distinct unchanged reports and a 50-delivery duplicate storm.
+- Added `docs/PERFORMANCE_HARDENING.md` with the tested volumes, bounded dashboard behavior, trigger behavior, and remaining exact-count boundary.
+- Logged D023 to keep dashboard reads bounded instead of introducing unbounded count scans.
+- Commands run:
+  - `npx prettier --write src/server/services/dashboard.test.ts src/server/services/reportTriggers.test.ts`
+  - `npm run test -- --run src/server/services/dashboard.test.ts src/server/services/reportTriggers.test.ts`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - `overview.activeLockCount` remains a bounded slice count until exact counters or a verified Redis cardinality primitive are added.

@@ -286,3 +286,18 @@ Reason:
 
 - Mod teams need traceability for lock/unlock/reopen-dismiss actions.
 - ReviewLock's value is reducing repeat report churn, not measuring individual moderator performance.
+
+### D023 - Keep high-volume dashboard lists bounded
+
+Wave 26 verified dashboard aggregation with more records than the dashboard should render at once.
+
+Decision:
+
+- Keep active locks, reopen events, audit events, daily metrics, and churn targets capped at their configured dashboard limits.
+- Treat `overview.activeLockCount` as the currently loaded active-lock slice count until exact counters are added.
+- Do not replace bounded reads with unbounded sorted-set scans for exact counts.
+
+Reason:
+
+- A report-churn dashboard must stay fast and scan-friendly under load.
+- Exact large-total counts need explicit counters or a verified Redis cardinality primitive, not unbounded reads.
