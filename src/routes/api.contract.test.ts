@@ -90,6 +90,22 @@ describe('API/client route contract', () => {
     });
   });
 
+  it('rejects runtime smoke when neither runtime nor client provides a subreddit', async () => {
+    const app = createApp({
+      redis: new InMemoryRedisStore(),
+      reddit: new FakeRedditAdapter([], 'mod_test', ''),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+
+    const response = await app.request('/api/smoke/redis', { method: 'POST' });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Runtime smoke subreddit context is required.',
+    });
+  });
+
   it('returns structured non-200 JSON when API dependencies are missing', async () => {
     const response = await createApiRouter().request('/locks?subreddit=alpha&demo=false');
 

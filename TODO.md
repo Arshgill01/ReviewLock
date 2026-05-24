@@ -82,6 +82,7 @@
 - [x] Harden Reddit adapter mapping for installed Devvit `PostV2` and `CommentV2` field names.
 - [x] Harden trigger routes for installed Devvit `TriggerEvent` wrapper payloads.
 - [x] Re-run live WebView runtime and demo smoke after trigger-wrapper hardening.
+- [x] Remove the remaining controlled test subreddit fallback from runtime smoke routes.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

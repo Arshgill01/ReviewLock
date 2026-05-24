@@ -72,7 +72,22 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       };
     }
 
-    return { ok: true, subreddit: runtimeSubreddit ?? clientSubreddit ?? 'reviewlock_dev' };
+    const subreddit = runtimeSubreddit ?? clientSubreddit;
+
+    if (!subreddit) {
+      return {
+        ok: false,
+        response: new Response(
+          JSON.stringify({
+            ok: false,
+            error: 'Runtime smoke subreddit context is required.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+        ),
+      };
+    }
+
+    return { ok: true, subreddit };
   };
 
   router.get('/health', (context) =>

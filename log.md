@@ -1056,3 +1056,26 @@
 - Open risks:
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission or controlled edit actions.
+
+## 2026-05-25 - Wave 33 runtime smoke scope hardening
+
+- Cross-checked ReviewLock's Devvit config and runtime proof patterns against
+  the ModMirror workspace the user identified as a reference.
+- Found and removed the remaining direct runtime smoke fallback to the
+  controlled `reviewlock_dev` namespace.
+- Runtime smoke routes now require Devvit runtime subreddit context or an
+  explicit valid client scope, and return a structured 400 when both are absent.
+- Commands run:
+  - `sed -n '1,260p' /Users/arshdeepsingh/Developer/ModMirror/devvit.json`
+  - `sed -n '1,260p' /Users/arshdeepsingh/Developer/ModMirror/src/routes/triggers.ts`
+  - `sed -n '1,260p' /Users/arshdeepsingh/Developer/ModMirror/src/server/services/runtimeVerification.ts`
+  - `npm run test -- src/routes/api.contract.test.ts src/server/services/runtimeHardening.test.ts --reporter verbose`
+  - `npx prettier --write src/routes/api.ts src/routes/api.contract.test.ts TODO.md decisions.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+- Pass/fail status: PASS. Targeted validation passed with 2 test files and 9
+  tests, followed by type-check, lint, and whitespace checks.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission or controlled edit actions.

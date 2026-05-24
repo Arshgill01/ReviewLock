@@ -917,3 +917,23 @@ Reason:
 - Live trigger delivery is still unverified. Supporting both installed typed
   shapes keeps the edit-break and report-suppression paths from depending on a
   single assumed payload envelope.
+
+### D060 - Runtime smoke routes require explicit subreddit scope
+
+ReviewLock already removed the hidden `reviewlock_dev` fallback from dashboard
+launch and runtime subreddit normalization, but the direct runtime smoke helper
+still used that controlled test subreddit when neither Devvit runtime context
+nor the client request provided scope.
+
+Decision:
+
+- Runtime smoke routes now reject missing runtime and client subreddit scope
+  with a structured 400 error.
+- Requests with a valid explicit client scope still work in local harnesses, and
+  requests with Devvit runtime context continue to prefer the runtime subreddit.
+
+Reason:
+
+- Runtime proof should never invent a production write namespace. A missing
+  subreddit context is an operational problem that moderators and proof docs
+  should see directly.
