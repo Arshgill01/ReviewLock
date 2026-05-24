@@ -631,3 +631,211 @@ Decision:
 Reason:
 
 - Protective moderation-scope rejections should be understandable to moderators.
+
+### D045 - Enforce runtime subreddit scope on Devvit form submits
+
+Reviewer analysis found that lock and unlock form callbacks consumed valid form
+tokens from the submitted subreddit without comparing that subreddit to the
+current Devvit runtime subreddit.
+
+Decision:
+
+- Lock and unlock form submit routes now run the same Devvit runtime subreddit
+  scope check used by reopen-dismiss forms.
+- If runtime and submitted subreddit differ, ReviewLock returns a neutral toast
+  before consuming the form token or calling Reddit moderation methods.
+
+Reason:
+
+- A stale or replayed Devvit form must not approve, ignore, unignore, or unlock
+  content outside the subreddit where the moderator is currently acting.
+
+### D046 - Validate runtime proof records before dashboard use
+
+Reviewer analysis found that syntactically valid but malformed Redis runtime
+proof JSON could be returned to the client and crash the dashboard renderer.
+
+Decision:
+
+- Server runtime proof loading now validates `overall`, `generatedAt`,
+  `capabilities`, and `warnings`; malformed records fall back to the default
+  unverified proof matrix.
+- The client API contract also validates runtime proof shape before handing data
+  to render helpers.
+
+Reason:
+
+- Runtime proof is most important during failures, so corrupted proof state must
+  degrade to an honest unverified status rather than breaking the dashboard.
+
+### D047 - Remove active indexes if reopen status write fails after queueing
+
+Reviewer analysis found that Redis could accept a reopen event but fail the
+subsequent lock-status write, leaving the item both visible in the reopen queue
+and still suppressible through the active target index.
+
+Decision:
+
+- Report-trigger and update-trigger reopen paths still queue the reopen event
+  before the lock status update so moderator-visible reopen evidence is not lost.
+- If the lock status update throws after queueing, ReviewLock removes active
+  lock indexes as a compensating action before returning `runtime_uncertain`.
+
+Reason:
+
+- A queued reopen must never continue to behave like an active suppression lock.
+  In a partial Redis failure, preserving visibility and stopping further
+  suppression is safer than preserving the old active index.
+
+### D048 - Treat demo URL bootstrap as demo namespace state
+
+Reviewer analysis found that a reload of `?demo=true` could pair demo mode with
+the live subreddit namespace and trigger the server's demo isolation guard.
+
+Decision:
+
+- When the dashboard starts with `initialDemo: true`, the store immediately uses
+  `reviewlock_demo` for fetches while preserving the original live subreddit for
+  exit from demo mode.
+- Demo toggle URLs now write `subreddit=reviewlock_demo` when entering demo and
+  restore the live subreddit parameter when leaving demo.
+
+Reason:
+
+- Demo mode is mandatory and must survive reloads or shared URLs without
+  accidentally requesting live data under the demo flag.
+
+### D049 - Validate Redis dashboard ledger records at service boundaries
+
+Reviewer analysis found that valid JSON with missing or wrong fields could pass
+through lock, reopen, audit, and metric services and later crash dashboard
+render helpers.
+
+Decision:
+
+- Shared schema guards now validate `ReviewLockRecord`, `ReopenEvent`,
+  `AuditEvent`, `DailyMetrics`, and `TargetMetrics`.
+- Redis service readers return `undefined` for syntactically valid but
+  malformed records, matching the existing invalid-JSON fallback behavior.
+
+Reason:
+
+- Redis-backed moderation state is a runtime trust boundary. A partial write or
+  corrupt record should disappear from dashboard lists until repaired, not break
+  the entire moderator dashboard.
+
+### D050 - Make active lock creation idempotent per target
+
+Reviewer analysis found that repeated lock submissions could create stale
+active ledger rows for the same target and double-count lock metrics.
+
+Decision:
+
+- `lockReviewedContent()` checks for an existing active lock after resolving the
+  target and before fingerprinting or Reddit moderation calls.
+- If a lock is already active for the target, the flow returns that lock with a
+  neutral already-locked message and does not call `approve()` or
+  `ignoreReports()` again.
+
+Reason:
+
+- ReviewLock's ledger should represent one current review state per target, and
+  duplicate form submits or retries should not inflate metrics or strand older
+  active lock rows.
+
+### D051 - Reopen known locks on report-trigger target resolution uncertainty
+
+Reviewer analysis found that report triggers returned `runtime_uncertain` on
+target resolution failure while leaving a known active lock suppressible.
+
+Decision:
+
+- When a report trigger cannot load the current target but the payload supplies a
+  subreddit, ReviewLock now looks up the active target lock.
+- If an active lock exists, ReviewLock queues a `runtime_uncertain` reopen event,
+  marks the lock reopened, records a lock-reopened audit event, and returns
+  `runtime_uncertain` without clearing the dedupe marker.
+- If no subreddit or active lock is available, ReviewLock keeps the retryable
+  runtime-failure behavior and clears the dedupe marker.
+
+Reason:
+
+- Fingerprint uncertainty must fail open. A known active lock whose current
+  content cannot be loaded should return to moderator attention rather than
+  remain eligible for future suppression.
+
+### D052 - Fingerprint before duplicate-lock idempotency return
+
+Reviewer analysis found that returning an existing active lock before comparing
+the freshly refetched fingerprint could preserve a stale lock if update triggers
+were missed or delayed.
+
+Decision:
+
+- Lock submission now computes the current fingerprint before returning an
+  existing active lock as a duplicate.
+- If the existing lock fingerprint matches, ReviewLock returns the active lock
+  without another Reddit moderation call.
+- If the fingerprint differs, ReviewLock reopens the stale lock, records a
+  reopen event and metrics, then continues creating a new lock for the
+  moderator-reviewed current content.
+
+Reason:
+
+- The lock form is also a fresh content read. It must uphold "locked until
+  edited" even when automatic update delivery has not already broken the old
+  lock.
+
+### D053 - Keep seeded demo dashboard actions read-only
+
+Reviewer analysis found that demo rows rendered live unlock and reopen-dismiss
+controls even though those API calls did not carry demo scope.
+
+Decision:
+
+- Demo dashboard rendering now replaces unlock and dismiss controls with a
+  read-only demo status marker.
+- Live mode keeps the existing inline confirmation controls.
+
+Reason:
+
+- Seeded demo data should tell the four-beat product story without attempting
+  live Reddit moderation operations or failing the demo namespace guard.
+
+### D054 - Unignore stale locks before replacement relock attempts
+
+Reviewer analysis found that stale-lock relock reopened the old lock before
+proving the replacement `ignoreReports()` call succeeded.
+
+Decision:
+
+- When lock review detects that an active lock's fingerprint is stale, ReviewLock
+  calls `unignoreReports()` and records runtime proof before reopening the stale
+  lock and attempting the replacement lock.
+- If the replacement `ignoreReports()` fails, the old lock is already fail-open
+  and the replacement failed lock remains visible for retry/debugging.
+
+Reason:
+
+- Changed content must not remain report-suppressed without an active lock that
+  can be evaluated later. The relock path must preserve fail-open behavior even
+  when the replacement lock cannot be established.
+
+### D055 - Keep proof docs aligned to current claim boundary
+
+Reviewer analysis found older proof docs still said all live moderation methods
+were unverified even after controlled post-target proof passed.
+
+Decision:
+
+- Historical wave docs may keep their original local-harness scope, but stale
+  live-status statements now point to `docs/RUNTIME_PROOF.md`.
+- Current boundary wording is: controlled post-target `approve()`,
+  `ignoreReports()`, and `unignoreReports()` are verified; comment-target
+  moderation methods and live report/update trigger delivery remain unverified.
+
+Reason:
+
+- Submission copy and final audit need one consistent proof boundary. Inconsistent
+  docs invite either underclaiming verified post-target behavior or overclaiming
+  unverified trigger/comment behavior.

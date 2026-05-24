@@ -9,7 +9,7 @@ import type {
 } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { compareFingerprints, fingerprintTarget } from './fingerprint';
-import { getActiveLockByTarget, updateLockStatus } from './locks';
+import { getActiveLockByTarget, removeActiveLockIndexes, updateLockStatus } from './locks';
 import { incrementReopenedMetric } from './metrics';
 import { unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
@@ -74,6 +74,19 @@ const buildReopenEvent = (
   demo: lock.demo,
 });
 
+const markLockReopenedAfterQueue = async (
+  redis: RedisStore,
+  lock: ReviewLockRecord,
+  updates: Partial<ReviewLockRecord>,
+): Promise<void> => {
+  try {
+    await updateLockStatus(redis, lock.subreddit, lock.id, 'reopened', updates);
+  } catch (error) {
+    await removeActiveLockIndexes(redis, lock).catch(() => undefined);
+    throw error;
+  }
+};
+
 export const breakLockForChangedContent = async (
   deps: ReopenFlowDependencies,
   input: BreakLockInput,
@@ -126,7 +139,7 @@ export const breakLockForChangedContent = async (
       const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
 
       await enqueueReopenEvent(deps.redis, event);
-      await updateLockStatus(deps.redis, lock.subreddit, lock.id, 'reopened', {
+      await markLockReopenedAfterQueue(deps.redis, lock, {
         reopenedAt: now,
         reopenReason: reason,
         reopenEventId: event.id,

@@ -243,6 +243,11 @@ describe('client render helpers', () => {
     expect(html).toContain('Reports suppressed');
     expect(html).toContain('Reopened after edit');
     expect(html).toContain('Demo mode');
+    expect(html).toContain('Demo read-only');
+    expect(html).not.toContain('data-action="unlock"');
+    expect(html).not.toContain('data-action="confirm-unlock"');
+    expect(html).not.toContain('data-action="dismiss-reopen"');
+    expect(html).not.toContain('data-action="confirm-dismiss-reopen"');
     expectSafeCopy(html);
   });
 

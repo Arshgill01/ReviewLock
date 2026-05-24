@@ -26,7 +26,12 @@ const renderDismissAction = (
   event: ReopenEvent,
   confirmation: DashboardConfirmation | null,
   label: string,
+  readOnly = false,
 ): string => {
+  if (readOnly) {
+    return '<span class="status status-unverified">Demo read-only</span>';
+  }
+
   const isConfirming =
     confirmation?.action === 'dismiss-reopen' && confirmation.eventId === event.id;
 
@@ -54,6 +59,7 @@ const renderDismissAction = (
 export const renderLatestReopenEvent = (
   event: ReopenEvent | undefined,
   confirmation: DashboardConfirmation | null = null,
+  readOnly = false,
 ): string => {
   if (!event) {
     return `
@@ -88,7 +94,7 @@ export const renderLatestReopenEvent = (
       </div>
       <p>${text(event.summary)}</p>
       ${renderHashTransition(event)}
-      ${renderDismissAction(event, confirmation, 'Dismiss reopen')}
+      ${renderDismissAction(event, confirmation, 'Dismiss reopen', readOnly)}
     </section>
   `;
 };
@@ -96,6 +102,7 @@ export const renderLatestReopenEvent = (
 export const renderReopenQueue = (
   events: ReopenEvent[],
   confirmation: DashboardConfirmation | null = null,
+  readOnly = false,
 ): string => {
   const rows = events
     .map(
@@ -110,7 +117,7 @@ export const renderReopenQueue = (
             <p>${text(event.summary)}</p>
             ${renderHashTransition(event)}
           </div>
-          ${renderDismissAction(event, confirmation, 'Dismiss')}
+          ${renderDismissAction(event, confirmation, 'Dismiss', readOnly)}
         </li>
       `,
     )

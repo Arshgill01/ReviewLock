@@ -78,15 +78,24 @@ describe('lock persistence', () => {
   it('degrades safely when a lock record is malformed', async () => {
     const redis = new InMemoryRedisStore();
     await redis.set(keys.lock('alpha', 'lock-bad'), '{');
+    await redis.set(keys.lock('alpha', 'lock-wrong-shape'), JSON.stringify({ status: 'active' }));
     await redis.set(keys.targetLock('alpha', 't3_bad'), 'lock-bad');
+    await redis.set(keys.targetLock('alpha', 't3_wrong_shape'), 'lock-wrong-shape');
     await redis.zAdd(keys.activeLocks('alpha'), {
       member: 'lock-bad',
       score: Date.parse('2026-05-24T00:00:00.000Z'),
     });
+    await redis.zAdd(keys.activeLocks('alpha'), {
+      member: 'lock-wrong-shape',
+      score: Date.parse('2026-05-24T01:00:00.000Z'),
+    });
 
     expect(await getLock(redis, 'alpha', 'lock-bad')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-wrong-shape')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_bad')).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_wrong_shape')).toBeUndefined();
     expect(await listActiveLocks(redis, 'alpha')).toEqual([]);
     expect(await updateLockStatus(redis, 'alpha', 'lock-bad', 'reopened')).toBeUndefined();
+    expect(await updateLockStatus(redis, 'alpha', 'lock-wrong-shape', 'reopened')).toBeUndefined();
   });
 });

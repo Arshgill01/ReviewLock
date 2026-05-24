@@ -1,17 +1,22 @@
 import type { RedisStore } from '../adapters/redis';
-import type { ReopenEvent } from '../../shared/schema';
+import { isReopenEvent, type ReopenEvent } from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined => {
+const parseJson = (value: string | undefined): unknown => {
   if (value === undefined) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value) as T;
+    return JSON.parse(value) as unknown;
   } catch {
     return undefined;
   }
+};
+
+const parseReopenEvent = (value: string | undefined): ReopenEvent | undefined => {
+  const parsed = parseJson(value);
+  return isReopenEvent(parsed) ? parsed : undefined;
 };
 
 export const enqueueReopenEvent = async (
@@ -35,7 +40,7 @@ export const getReopenEvent = async (
   subreddit: string,
   eventId: string,
 ): Promise<ReopenEvent | undefined> =>
-  parseJson(await redis.get(keys.reopenEvent(subreddit, eventId)));
+  parseReopenEvent(await redis.get(keys.reopenEvent(subreddit, eventId)));
 
 export const listOpenReopenEvents = async (
   redis: RedisStore,

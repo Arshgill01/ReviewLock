@@ -136,6 +136,7 @@ describe('ReviewLockApiClient contract handling', () => {
 
   it('validates runtime status arrays and demo status shape', async () => {
     stubFetch(
+      jsonResponse({ ok: true, demo: false, runtime: {}, dailyMetrics: [], topChurnTargets: [] }),
       jsonResponse({ ok: true, demo: false, runtime: runtimeStatus, dailyMetrics: [] }),
       jsonResponse({
         ok: true,
@@ -145,6 +146,9 @@ describe('ReviewLockApiClient contract handling', () => {
     );
     const api = new ReviewLockApiClient();
 
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'runtime object is missing required runtime proof fields',
+    );
     await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
       'missing topChurnTargets array',
     );

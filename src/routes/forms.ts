@@ -123,7 +123,15 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       return context.json<UiResponse>(uiToast('ReviewLock lock reason is not valid.'));
     }
 
-    const binding = await consumeFormBinding(deps.redis, body.subreddit, body.formToken);
+    const subreddit = await scopedFormSubreddit(deps.reddit, body.subreddit);
+
+    if (!subreddit) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock form subreddit does not match the current Devvit context.'),
+      );
+    }
+
+    const binding = await consumeFormBinding(deps.redis, subreddit, body.formToken);
 
     if (!binding || binding.action !== 'lock') {
       return context.json<UiResponse>(
@@ -164,7 +172,15 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       return context.json<UiResponse>(uiToast('ReviewLock form token and lock are required.'));
     }
 
-    const binding = await consumeFormBinding(deps.redis, body.subreddit, body.formToken);
+    const subreddit = await scopedFormSubreddit(deps.reddit, body.subreddit);
+
+    if (!subreddit) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock form subreddit does not match the current Devvit context.'),
+      );
+    }
+
+    const binding = await consumeFormBinding(deps.redis, subreddit, body.formToken);
 
     if (!binding || binding.action !== 'unlock' || !binding.lockId) {
       return context.json<UiResponse>(

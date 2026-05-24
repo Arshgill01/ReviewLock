@@ -60,6 +60,42 @@ describe('runtime proof status', () => {
     });
   });
 
+  it('loads the unverified default matrix for valid JSON with malformed runtime proof shape', async () => {
+    const redis = new InMemoryRedisStore();
+
+    for (const malformed of [
+      {},
+      {
+        overall: 'verified',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: null,
+        warnings: [],
+      },
+      {
+        overall: 'verified',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: [{ name: 'redis', status: 'verified' }],
+        warnings: [],
+      },
+      {
+        overall: 'verified',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: [{ name: 'redis', status: 'surprising', notes: [] }],
+        warnings: [],
+      },
+    ]) {
+      await redis.set(keys.runtime('alpha'), JSON.stringify(malformed));
+
+      await expect(
+        loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T00:00:00.000Z'),
+      ).resolves.toMatchObject({
+        overall: 'unverified',
+        capabilities: expect.arrayContaining([expect.objectContaining({ name: 'triggers' })]),
+        warnings: ['Runtime capabilities have not been playtested yet.'],
+      });
+    }
+  });
+
   it('records moderation operation proof with target-level evidence', async () => {
     const redis = new InMemoryRedisStore();
 

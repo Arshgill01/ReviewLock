@@ -48,6 +48,28 @@ const errorText = (data: unknown): string | undefined =>
 const contractError = (endpoint: string, message: string): Error =>
   new Error(`API contract error at ${endpoint}: ${message}`);
 
+const isRuntimeProofStatus = (value: unknown): value is RuntimeProofStatus => {
+  if (!isObject(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.overall === 'string' &&
+    typeof value.generatedAt === 'string' &&
+    Array.isArray(value.capabilities) &&
+    value.capabilities.every(
+      (capability) =>
+        isObject(capability) &&
+        typeof capability.name === 'string' &&
+        typeof capability.status === 'string' &&
+        Array.isArray(capability.notes) &&
+        capability.notes.every((note) => typeof note === 'string'),
+    ) &&
+    Array.isArray(value.warnings) &&
+    value.warnings.every((warning) => typeof warning === 'string')
+  );
+};
+
 export class ReviewLockApiClient {
   private baseUrl: string;
 
@@ -100,7 +122,7 @@ export class ReviewLockApiClient {
       typeof overview.reportsSuppressed !== 'number' ||
       typeof overview.reopenedAfterEditCount !== 'number' ||
       !Array.isArray(overview.topChurnTargets) ||
-      !isObject(overview.runtimeStatus)
+      !isRuntimeProofStatus(overview.runtimeStatus)
     ) {
       throw contractError(endpoint, 'overview object is missing required dashboard fields');
     }
@@ -194,11 +216,11 @@ export class ReviewLockApiClient {
     const endpoint = `/api/runtime${this.getQueryString(subreddit, demo)}`;
     const data = await this.requestJson(endpoint);
     this.expectOk(data, endpoint);
-    if (!hasObject(data, 'runtime')) {
-      throw contractError(endpoint, 'missing runtime object');
+    if (!isRuntimeProofStatus(data.runtime)) {
+      throw contractError(endpoint, 'runtime object is missing required runtime proof fields');
     }
     return {
-      runtime: data.runtime as unknown as RuntimeProofStatus,
+      runtime: data.runtime,
       dailyMetrics: this.expectArray<DailyMetrics>(data, endpoint, 'dailyMetrics'),
       topChurnTargets: this.expectArray<TargetMetrics>(data, endpoint, 'topChurnTargets'),
     };

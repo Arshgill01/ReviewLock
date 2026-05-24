@@ -193,7 +193,26 @@ describe('ReviewLockStore', () => {
     expect(apiClient.enableDemoMode).toHaveBeenCalled();
     expect(store.demo).toBe(true);
     expect(store.subreddit).toBe('reviewlock_demo');
+    expect(store.getLiveSubreddit()).toBe('test_subreddit');
     expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_demo', true);
+  });
+
+  it('boots demo URLs into the deterministic demo namespace and preserves the live subreddit', async () => {
+    store = new ReviewLockStore(apiClient, 'reviewlock_dev', true);
+
+    await store.fetchState();
+
+    expect(store.demo).toBe(true);
+    expect(store.subreddit).toBe('reviewlock_demo');
+    expect(store.getLiveSubreddit()).toBe('reviewlock_dev');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_demo', true);
+
+    await store.setDemo(false);
+
+    expect(apiClient.disableDemoMode).toHaveBeenCalledWith('reviewlock_demo');
+    expect(store.demo).toBe(false);
+    expect(store.subreddit).toBe('reviewlock_dev');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_dev', false);
   });
 
   it('returns to the live subreddit when demo mode is disabled', async () => {

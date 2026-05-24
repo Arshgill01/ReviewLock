@@ -97,13 +97,13 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
 
       <section class="first-viewport" aria-label="Dashboard overview">
         ${renderMetricStrip(store.overview)}
-        ${renderLatestReopenEvent(store.overview?.latestReopenEvent, store.confirmation)}
+        ${renderLatestReopenEvent(store.overview?.latestReopenEvent, store.confirmation, store.demo)}
       </section>
 
       <div class="content-grid">
         <div class="main-column">
-          ${renderLockTable(store.locks, store.confirmation)}
-          ${renderReopenQueue(store.reopenQueue, store.confirmation)}
+          ${renderLockTable(store.locks, store.confirmation, store.demo)}
+          ${renderReopenQueue(store.reopenQueue, store.confirmation, store.demo)}
         </div>
         <div class="side-column">
           ${renderTopChurnTargets(store.topChurnTargets)}

@@ -1,17 +1,22 @@
 import type { RedisStore } from '../adapters/redis';
-import type { AuditEvent } from '../../shared/schema';
+import { isAuditEvent, type AuditEvent } from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined => {
+const parseJson = (value: string | undefined): unknown => {
   if (value === undefined) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value) as T;
+    return JSON.parse(value) as unknown;
   } catch {
     return undefined;
   }
+};
+
+const parseAuditEvent = (value: string | undefined): AuditEvent | undefined => {
+  const parsed = parseJson(value);
+  return isAuditEvent(parsed) ? parsed : undefined;
 };
 
 export const appendAuditEvent = async (
@@ -31,7 +36,7 @@ export const getAuditEvent = async (
   subreddit: string,
   eventId: string,
 ): Promise<AuditEvent | undefined> =>
-  parseJson(await redis.get(keys.auditEvent(subreddit, eventId)));
+  parseAuditEvent(await redis.get(keys.auditEvent(subreddit, eventId)));
 
 export const listAuditEvents = async (
   redis: RedisStore,

@@ -300,3 +300,186 @@
 - Area: Dashboard action message-only non-200 errors
 - Result: Resolved in the current worktree.
 - Evidence: `errorText()` now falls back from `data.error` to a string `data.message` (`src/client/state/api.ts:41-46`). `src/client/state/api.test.ts` now includes `uses action response message text for non-200 dashboard action responses`, covering the 403 unlock message path. `npm run test -- src/client/state/api.test.ts --reporter verbose` passes with 8 tests.
+
+## 2026-05-24 23:25 IST - Validation
+
+- Area: Current dirty implementation fixes
+- Result: Full local validation gates passed.
+- Evidence: `npm run type-check`, `npm run lint`, `npm run test`, and `npm run build` all passed in the current review pass.
+
+## 2026-05-24 23:26 IST - Finding
+
+- Severity: medium
+- Area: Lock/unlock Devvit form submissions do not enforce current subreddit scope
+- Evidence: `scopedFormSubreddit()` validates a submitted subreddit against `reddit.getCurrentSubredditName()` (`src/routes/forms.ts:83-103`), and the reopen-dismiss form uses it before touching Redis (`src/routes/forms.ts:232-238`). The lock and unlock form submit routes do not call that helper; they consume a Redis binding using `body.subreddit` directly (`src/routes/forms.ts:118-127`, `src/routes/forms.ts:163-168`) and then call `lockReviewedContent()` / `unlockReviewedContent()` (`src/routes/forms.ts:140-146`, `src/routes/forms.ts:181-186`). The form binding itself is keyed by the stored target subreddit (`src/server/services/formBindings.ts:17-18`, `src/server/services/formBindings.ts:48-49`), but nothing in the lock/unlock submit path rejects a still-valid binding whose subreddit differs from the current Devvit runtime subreddit. Existing form route tests cover token presence, changed target identity, unknown reason, and stale lock id, but they do not create a router with `FakeRedditAdapter(..., 'mod', 'beta')` and an `alpha` binding to prove lock/unlock submissions are rejected in a mismatched runtime context (`src/routes/forms.test.ts:65-249`).
+- Why it matters: Recent dashboard actions were hardened to make the Devvit runtime subreddit authoritative before moderation operations. Internal Devvit form callbacks are also moderation actions. If a stale or replayed form submission can carry a valid token for another subreddit namespace, ReviewLock can approve/ignore/unignore a target outside the current runtime context rather than forcing the moderator to reopen the menu in that subreddit.
+- Suggested fix: Apply the same scope check to `lock-review-submit` and `unlock-review-submit` before consuming the binding or before calling the flow. Normalize and compare the submitted/bound subreddit to `reddit.getCurrentSubredditName()`, reject mismatches with a neutral toast, and add regressions for lock and unlock forms where runtime subreddit is `beta` but the binding/body are `alpha`; assert no Reddit moderation call and the active lock remains unchanged.
+- Files reviewed: `src/routes/forms.ts`, `src/routes/forms.test.ts`, `src/server/services/formBindings.ts`, `src/server/services/keys.ts`, `src/server/adapters/reddit.ts`
+
+## 2026-05-24 23:28 IST - Recheck
+
+- Area: Lock/unlock Devvit form runtime subreddit scoping
+- Result: Resolved in the current worktree.
+- Evidence: `lock-review-submit` and `unlock-review-submit` now call `scopedFormSubreddit()` before consuming form bindings, returning `ReviewLock form subreddit does not match the current Devvit context.` on mismatch (`src/routes/forms.ts`). `src/routes/forms.test.ts` now covers both lock and unlock form mismatches with runtime subreddit `beta` and binding/body subreddit `alpha`, proving no Reddit moderation call, no token consumption, and no active-lock mutation. `npm run test -- src/routes/forms.test.ts --reporter verbose` passes with 10 tests.
+
+## 2026-05-24 23:27 IST - Finding
+
+- Severity: medium
+- Area: Malformed runtime proof records can crash dashboard rendering
+- Evidence: `loadRuntimeProofStatus()` only falls back for missing or syntactically invalid JSON; any JSON object is cast to `RuntimeProofStatus` without validating `overall`, `capabilities`, or `warnings` (`src/server/services/runtimeProof.ts:12-22`, `src/server/services/runtimeProof.ts:52-58`). The runtime API returns that value directly from Redis (`src/routes/api.dashboard.ts:302-307`), and the client only checks that `runtime` is an object before casting it (`src/client/state/api.ts:186-204`). `renderRuntimeBanner()` then assumes `status.capabilities` and `status.warnings` are arrays and that statuses are strings with `.replace()` (`src/client/components/RuntimeBanner.ts:3-12`, `src/client/components/RuntimeBanner.ts:33-44`, `src/client/components/RuntimeBanner.ts:51-63`). Current tests cover the string `{` case, but not valid JSON with the wrong shape such as `{}` or `{"capabilities":null}` (`src/server/services/runtimeProof.test.ts:53-61`).
+- Why it matters: Runtime proof is written to Redis and is intentionally surfaced during failure/debug flows. A corrupted or partially-written runtime proof record can make `/api/runtime` return a contract-passing object that crashes the dashboard render instead of degrading to the unverified runtime matrix. That turns a proof/status problem into a blank or broken mod dashboard.
+- Suggested fix: Validate parsed runtime proof shape at the server boundary and return `defaultRuntimeStatus()` for malformed objects; also make the client contract check require `overall` string, `capabilities` array, and `warnings` array before rendering. Add regressions for valid-but-malformed runtime JSON in `runtimeProof.test.ts` and/or `api.test.ts` plus a render regression proving `renderRuntimeBanner()` handles only validated status data.
+- Files reviewed: `src/server/services/runtimeProof.ts`, `src/server/services/runtimeProof.test.ts`, `src/routes/api.dashboard.ts`, `src/client/state/api.ts`, `src/client/components/RuntimeBanner.ts`
+
+## 2026-05-24 23:31 IST - Recheck
+
+- Area: Malformed runtime proof records
+- Result: Resolved in the current worktree.
+- Evidence: `loadRuntimeProofStatus()` now validates parsed Redis records before returning them and falls back to the default unverified matrix for malformed objects (`src/server/services/runtimeProof.ts`). The client API contract now requires runtime proof `overall`, `generatedAt`, `capabilities`, and `warnings` shape before render use (`src/client/state/api.ts`). `src/server/services/runtimeProof.test.ts` covers `{}`, `capabilities: null`, missing notes, and unknown status values; `src/client/state/api.test.ts` covers malformed `/api/runtime` output. `npm run test -- src/server/services/runtimeProof.test.ts src/client/state/api.test.ts src/routes/forms.test.ts --reporter verbose` passes with 23 tests.
+
+## 2026-05-24 23:28 IST - Recheck
+
+- Area: Lock/unlock Devvit form subreddit scoping
+- Result: Resolved in the current worktree.
+- Evidence: Lock and unlock form submit routes now call `scopedFormSubreddit()` before consuming the Redis form binding and return `ReviewLock form subreddit does not match the current Devvit context.` on mismatch (`src/routes/forms.ts:126-134`, `src/routes/forms.ts:175-183`). `src/routes/forms.test.ts` now includes lock and unlock regressions with runtime subreddit `beta` and binding/body subreddit `alpha`, asserting no Reddit moderation call and preserving the binding/active lock. `npm run test -- src/routes/forms.test.ts --reporter verbose` passes with 10 tests.
+
+## 2026-05-24 23:30 IST - Finding
+
+- Severity: medium
+- Area: Reopen transition can leave contradictory active-lock and reopen-queue state if the lock status write fails
+- Evidence: Both changed-content paths enqueue the reopen event before persisting the lock as `reopened`: report triggers call `enqueueReopenEvent()` and then `updateLockStatus()` (`src/server/services/reportTriggers.ts:235-246`), and update triggers do the same through `breakLockForChangedContent()` (`src/server/services/reopenFlow.ts:120-138`). `updateLockStatus()` first saves the new lock record and only then removes active indexes (`src/server/services/locks.ts:55-63`, `src/server/services/locks.ts:82-95`), while `getActiveLockByTarget()` continues to use the target-lock pointer and only filters on the stored lock status (`src/server/services/locks.ts:40-52`). Existing reopen tests cover failure while removing active indexes after the status save has succeeded (`src/server/services/reopenFlow.test.ts:126-151`), but they do not cover Redis `set()` failure for `reviewlock:{subreddit}:lock:{lockId}` after the reopen event has already been enqueued. The report-trigger Redis failure regression is currently for unchanged-content suppression rollback, not changed-content reopen rollback (`src/server/services/reportTriggers.test.ts:472-504`).
+- Why it matters: If Redis accepts the reopen event write but rejects the subsequent lock-record status write, the mod dashboard can show an item in the reopen queue while `getActiveLockByTarget()` still returns the old active lock. A later report on unchanged current content can then run the suppression path for content that ReviewLock has already surfaced as reopened, undercutting the "lock breaks automatically and returns to moderator attention" loop.
+- Suggested fix: Make the reopen transition atomic or explicitly compensating. Options include saving the lock status before enqueueing the visible reopen event, wrapping the lock/event/index writes in a Redis transaction where Devvit supports it, or deleting/marking the queued reopen event as runtime-uncertain if `updateLockStatus()` fails. Add regressions for report and update reopen paths where `redis.set(keys.lock(...))` fails after `enqueueReopenEvent()`: assert the final state does not contain both an open reopen event and an active lock capable of suppressing reports.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/locks.ts`, `src/server/services/reopenFlow.test.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenQueue.ts`
+
+## 2026-05-24 23:31 IST - Recheck
+
+- Area: Malformed runtime proof records
+- Result: Resolved in the current worktree.
+- Evidence: `loadRuntimeProofStatus()` now validates parsed Redis JSON before returning it and falls back to the default unverified runtime matrix for malformed shapes (`src/server/services/runtimeProof.ts:25-99`). The client API contract now validates `RuntimeProofStatus` before returning dashboard/runtime data (`src/client/state/api.ts:48-70`, `src/client/state/api.ts:216-224`). `src/server/services/runtimeProof.test.ts` includes malformed-but-valid JSON cases such as `{}`, `capabilities: null`, missing `notes`, and an invalid status string, and `src/client/state/api.test.ts` rejects `{ runtime: {} }`. `npm run test -- src/server/services/runtimeProof.test.ts src/client/state/api.test.ts --reporter verbose` passes with 13 tests.
+
+## 2026-05-24 23:33 IST - Finding
+
+- Severity: medium
+- Area: Demo-mode URL/reload path can request the live subreddit with `demo=true` and fail the isolated demo guard
+- Evidence: The dashboard click handler for `data-action="toggle-mode"` only writes the `demo` query parameter to the URL; it does not write the deterministic demo subreddit (`src/client/main.ts:80-85`). `setDemo(true)` correctly switches the in-memory store to the `reviewlock_demo` namespace after `/api/demo/enable` returns (`src/client/state/store.ts:215-220`), and API requests always include the current store subreddit plus demo flag (`src/client/state/api.ts:80-82`). On a reload or shared URL with `?demo=true`, however, the store constructor keeps the requested or embedded live subreddit as `this.subreddit` and only sets `this.demo = true`; it also seeds `liveSubreddit` as plain `reviewlock` instead of the original live subreddit (`src/client/main.ts:10-22`, `src/client/state/store.ts:44-52`). The server intentionally rejects demo dashboard reads when `demo=true` is paired with any client subreddit other than `reviewlock_demo` (`src/routes/api.dashboard.ts:110-121`). Current store tests cover entering demo through `setDemo(true)` and returning to live mode, but not initial construction/bootstrap with `initialDemo: true` or a reload after the URL was changed to `demo=true` (`src/client/state/store.test.ts:190-208`).
+- Why it matters: Demo mode is mandatory and must be visibly labeled. A moderator or judge who clicks Demo and then reloads the embedded dashboard can land on a retryable 403 instead of the seeded four-beat demo, because the URL says demo mode while the bootstrapped store asks for the live subreddit namespace. That makes the required demo story brittle at exactly the moment reviewers are likely to refresh or share the playtest URL.
+- Suggested fix: Make initial demo bootstrap use `reviewlock_demo` immediately and preserve the live subreddit separately. When toggling demo in `main.ts`, either also set `subreddit=reviewlock_demo` in the URL or make `ReviewLockStore` ignore any non-demo initial subreddit while `initialDemo` is true. Add a store or main bootstrap regression that simulates `initialSubreddit: 'reviewlock_dev', initialDemo: true` and asserts the first fetch uses `reviewlock_demo` with `demo=true`, then disabling demo returns to `reviewlock_dev`.
+- Files reviewed: `src/client/main.ts`, `src/client/state/store.ts`, `src/client/state/api.ts`, `src/client/state/store.test.ts`, `src/routes/api.dashboard.ts`, `src/routes/api.dashboard.test.ts`
+
+## 2026-05-24 23:36 IST - Recheck
+
+- Area: Reopen transition partial Redis failure
+- Result: Resolved in the current worktree.
+- Evidence: Report-trigger and update-trigger reopen paths now compensate for a post-queue status-write failure by removing active lock indexes before returning `runtime_uncertain`. `src/server/services/reopenFlow.test.ts` and `src/server/services/reportTriggers.test.ts` cover `redis.set(keys.lock(...))` failure after `enqueueReopenEvent()`, asserting the reopen event remains visible and `getActiveLockByTarget()` returns `undefined`. `npm run test -- src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts src/client/state/store.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:36 IST - Recheck
+
+- Area: Demo-mode URL/reload namespace handling
+- Result: Resolved in the current worktree.
+- Evidence: `ReviewLockStore` now boots `initialDemo: true` into `reviewlock_demo` while preserving the original live subreddit for exit, and `src/client/main.ts` writes `subreddit=reviewlock_demo` when entering demo mode. `src/client/state/store.test.ts` covers `initialSubreddit: 'reviewlock_dev', initialDemo: true`, first fetch to `reviewlock_demo` with demo mode enabled, and return to `reviewlock_dev` after disabling demo. Targeted validation passes.
+
+## 2026-05-24 23:36 IST - Finding
+
+- Severity: medium
+- Area: Valid-but-malformed Redis dashboard records can still crash rendering
+- Evidence: Runtime proof now validates valid JSON shape, but the other Redis-backed dashboard services still parse and cast any syntactically valid JSON. Locks use `parseJson<ReviewLockRecord>()` directly (`src/server/services/locks.ts:5-15`, `src/server/services/locks.ts:33-38`), reopen events do the same (`src/server/services/reopenQueue.ts:5-15`, `src/server/services/reopenQueue.ts:33-50`), audit events do the same (`src/server/services/audit.ts:5-15`, `src/server/services/audit.ts:29-46`), and metrics do the same (`src/server/services/metrics.ts:5-15`, `src/server/services/metrics.ts:65-112`). Current malformed-record tests only write invalid JSON like `{`, so they prove syntax failures are skipped but not valid wrong-shape JSON (`src/server/services/locks.test.ts:78-91`, `src/server/services/reopenQueue.test.ts:49-60`, `src/server/services/audit.test.ts:35-46`, `src/server/services/metrics.test.ts:76-93`). The dashboard render path then calls string/number methods on those fields: active locks call `lock.targetId.replace(...)` and `reason(lock.lockReason)` (`src/client/components/LockTable.ts:53-75`), reopen events call `reason(event.reason)`, `date(event.createdAt)`, and `event.oldContentHash.slice(...)` (`src/client/components/ReopenQueue.ts:10-22`, `src/client/components/ReopenQueue.ts:69-111`), audit events call `event.kind.replace(...)` (`src/client/components/AuditTimeline.ts:6-16`), and churn targets call `target.targetId.replace(...)` (`src/client/pages/DashboardPage.ts:13-29`).
+- Why it matters: Redis records are written across several multi-step flows that already handle partial runtime failures. A valid JSON object with missing fields, for example `{"status":"active"}` in a lock slot or `{}` in a reopen event slot, can pass the server list filters and API array contract, then throw in the dashboard renderer. That reintroduces the same class of blank-dashboard failure just fixed for runtime proof, but through the active locks, reopen queue, audit timeline, or report churn lists.
+- Suggested fix: Add schema guards at the service boundary for `ReviewLockRecord`, `ReopenEvent`, `AuditEvent`, `DailyMetrics`, and `TargetMetrics`, and skip or quarantine valid-but-malformed records the same way invalid JSON is skipped. Add regression cases using valid JSON with missing fields for each list service and an API/client regression proving malformed list items do not reach render helpers.
+- Files reviewed: `src/server/services/locks.ts`, `src/server/services/reopenQueue.ts`, `src/server/services/audit.ts`, `src/server/services/metrics.ts`, `src/server/services/locks.test.ts`, `src/server/services/reopenQueue.test.ts`, `src/server/services/audit.test.ts`, `src/server/services/metrics.test.ts`, `src/client/components/LockTable.ts`, `src/client/components/ReopenQueue.ts`, `src/client/components/AuditTimeline.ts`, `src/client/pages/DashboardPage.ts`
+
+## 2026-05-24 23:37 IST - Finding
+
+- Severity: medium
+- Area: Re-locking an already active target can create stale active locks in the dashboard ledger
+- Evidence: The lock menu always creates a new lock form binding after resolving the target; it does not check `getActiveLockByTarget()` before showing the lock form (`src/routes/menu.ts:187-218`). The lock flow also resolves, fingerprints, approves, ignores reports, and creates a new `ReviewLockRecord` without checking for an existing active lock on the target (`src/server/services/lockFlow.ts:80-178`). `saveLock()` writes the new lock record, adds it to `locks:active`, and overwrites `locks:activeByTarget` / `target:{thingId}:lock` with the new lock id, but it never marks or removes any previous active lock for the same target (`src/server/services/locks.ts:20-30`). `listActiveLocks()` returns every zset member whose stored lock still has `status === 'active'` (`src/server/services/locks.ts:98-107`), so the prior lock remains visible even though target lookups now point only to the newest lock. Existing lock-flow tests cover success and failure rollback but do not call `lockReviewedContent()` twice for the same target or assert one active lock per target (`src/server/services/lockFlow.test.ts:29-203`).
+- Why it matters: A moderator can open `Lock review` twice, double-submit a form, or retry after a slow response. That can leave multiple active ledger rows for one piece of content, inflate active-lock and lock-created metrics, and strand older active locks that cannot be reached by target-based unlock/report/update flows because `target:{thingId}:lock` points at the newest lock. ReviewLock’s core ledger should represent one current review state per target.
+- Suggested fix: Make lock creation idempotent per active target. Before calling Reddit moderation methods, load the current active lock by target and either return that lock with a neutral "already locked" response or update the existing lock in place. Add regressions for duplicate lock submissions proving only one active lock row remains, metrics are not double-counted, and the second call does not make unnecessary `approve()` / `ignoreReports()` calls.
+- Files reviewed: `src/routes/menu.ts`, `src/server/services/lockFlow.ts`, `src/server/services/locks.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/locks.test.ts`
+
+## 2026-05-24 23:40 IST - Recheck
+
+- Area: Valid-but-malformed Redis dashboard records
+- Result: Resolved in the current worktree.
+- Evidence: `src/shared/schema.ts` now exports guards for lock records, reopen events, audit events, daily metrics, and target metrics. The Redis-backed service readers in `locks.ts`, `reopenQueue.ts`, `audit.ts`, and `metrics.ts` use those guards before returning records. Tests now cover syntactically valid but wrong-shape JSON for every affected list/get path. `npm run test -- src/server/services/locks.test.ts src/server/services/reopenQueue.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts src/server/services/lockFlow.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:40 IST - Recheck
+
+- Area: Duplicate active lock creation
+- Result: Resolved in the current worktree.
+- Evidence: `lockReviewedContent()` now checks `getActiveLockByTarget()` after resolving the target and returns the existing active lock before fingerprinting or calling Reddit moderation methods. `src/server/services/lockFlow.test.ts` covers two lock attempts across different timestamps, proving one active lock row, one `locksCreated` metric increment, and no second `approve()` / `ignoreReports()` call. Targeted validation passes.
+
+## 2026-05-24 23:39 IST - Finding
+
+- Severity: medium
+- Area: Report-trigger target resolution failure leaves an active suppressible lock instead of reopening as runtime uncertain
+- Evidence: `handleReportTrigger()` resolves the current target before looking up the active lock. If `resolveTargetById()` fails, it writes a `runtime_failure` audit event, clears the dedupe marker, and returns `runtime_uncertain` without checking the provided subreddit for an existing active lock (`src/server/services/reportTriggers.ts:123-163`). The regression for this exact path asserts that the active lock remains active after the target cannot be loaded (`src/server/services/reportTriggers.test.ts:408-428`). By contrast, update-trigger handling uses the supplied subreddit to find the active lock even when target resolution fails, builds a `runtime_uncertain` reopen event, and marks the lock reopened with `target_resolution_failed` warnings (`src/server/services/reopenFlow.ts:120-176`).
+- Why it matters: The product rule is that fingerprint uncertainty must fail open: reopen or mark runtime uncertain rather than suppress. After this report-trigger path returns, `target:{thingId}:lock` still points at an active lock. A later retry that successfully refetches unchanged current content can suppress reports for a lock whose integrity was previously unknown, instead of keeping the item in moderator attention.
+- Suggested fix: When target resolution fails but `input.subreddit` is available, load `getActiveLockByTarget(redis, input.subreddit, input.targetId)` and transition that lock to a visible `runtime_uncertain` reopen queue entry before returning. Since there is no target object to call `unignoreReports()` on, include `target_resolution_failed` in `runtimeWarnings` and audit `unignoreReportsOk: false`. Keep the current plain runtime failure only when the handler truly cannot determine a subreddit/lock. Update `fails open when the target cannot be loaded` to assert `getActiveLockByTarget()` returns `undefined` and the reopen queue contains a `runtime_uncertain` event.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.ts`
+
+## 2026-05-24 23:42 IST - Recheck
+
+- Area: Report-trigger target resolution failure on known active locks
+- Result: Resolved in the current worktree.
+- Evidence: `handleReportTrigger()` now looks up the active lock when target resolution fails but `input.subreddit` is available. Known active locks are reopened with a `runtime_uncertain` reopen event, active indexes are removed through the same post-queue status transition path, and the audit log records a `lock_reopened` event with `unignoreReportsOk: false`. `src/server/services/reportTriggers.test.ts` now asserts target-resolution failure with a known lock leaves `getActiveLockByTarget()` undefined, persists a `runtime_uncertain` reopen event, and marks the lock reopened. The no-subreddit path remains retryable and clears the `unknown` dedupe marker. `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:41 IST - Finding
+
+- Severity: medium
+- Area: Existing-lock idempotency skips fingerprint comparison, so a changed target can remain actively locked
+- Evidence: `lockReviewedContent()` refetches the current target, then checks `getActiveLockByTarget()` and returns the existing active lock before computing the current fingerprint (`src/server/services/lockFlow.ts:84-110`). That means a still-active lock with an old `contentHash` is treated as "already locked" even if the newly fetched target body/title/flair/flags now fingerprint differently. The new duplicate-submit regression only calls `lockReviewedContent()` twice against the same unchanged `target()` and asserts no second moderation call (`src/server/services/lockFlow.test.ts:107-123`); there is no case where an active lock was created from the original content and the second lock submission refetches edited content.
+- Why it matters: ReviewLock's core promise is "locked until edited." Update/report triggers are the normal automatic break path, but the lock form is also a moderator-facing refetch of the current content. If an update trigger was missed or delayed, a moderator opening/submitting Lock review on the edited target should not be told the old review is still valid. The current early return can leave stale active-lock state in place until a later report or update event happens to correct it.
+- Suggested fix: Compute the current fingerprint before the idempotency return. If an existing active lock matches the current fingerprint, return the existing lock as the duplicate-submit path. If it differs or is uncertain, transition the old lock to a `content_changed` or `runtime_uncertain` reopen state before either returning a clear "content changed; review reopened" response or creating a new lock from the moderator's confirmed submission. Add a regression where the first lock stores `Reviewed body`, the second call refetches `Edited body`, and the old lock is no longer returned as active.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/fingerprint.ts`, `src/server/services/reopenFlow.ts`
+
+## 2026-05-24 23:44 IST - Recheck
+
+- Area: Existing-lock idempotency with changed current content
+- Result: Resolved in the current worktree.
+- Evidence: `lockReviewedContent()` now computes the current fingerprint before returning an existing active lock. Matching fingerprints still use the idempotent return path. Changed fingerprints reopen the stale lock, enqueue a `content_changed` reopen event, increment reopen metrics, and continue creating a new active lock for the current moderator-reviewed content. `src/server/services/lockFlow.test.ts` covers the edited-body second submission, proving the first lock is `reopened`, the second lock becomes the active target lock, the reopen queue contains the old lock event, and metrics show two locks created plus one reopen. `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:43 IST - Finding
+
+- Severity: medium
+- Area: Demo dashboard renders action buttons whose API calls do not carry demo scope
+- Evidence: The demo dashboard renders the same active-lock and reopen-queue action controls as live mode: `renderLockTable()` always emits `data-action="unlock"` / `confirm-unlock` buttons (`src/client/components/LockTable.ts:12-39`, `src/client/components/LockTable.ts:77-79`), and `renderReopenQueue()` / `renderLatestReopenEvent()` always emit dismiss buttons (`src/client/components/ReopenQueue.ts:25-51`, `src/client/components/ReopenQueue.ts:91-113`). `renderDashboardPage()` calls those renderers while `store.demo` is true and the demo render test asserts only that the demo banner is present, not that actions are safe or disabled (`src/client/render.test.ts:225-246`). The action API calls omit demo context: `unlockTarget()` posts to `/api/locks/unlock` with only `targetId`, `lockId`, and `actor`, and `dismissReopen()` posts to `/api/reopen-queue/dismiss` with a body subreddit but no `demo=true` query (`src/client/state/api.ts:258-290`). Server scope rejects `reviewlock_demo` when `demoFrom(context)` is false (`src/routes/api.dashboard.ts:124-138`), so demo dismiss calls against `reviewlock_demo` return 403. Demo unlock calls do not include the demo subreddit at all, so they resolve against the live runtime/default subreddit and then try to refetch a seeded demo target through Reddit (`src/routes/api.dashboard.ts:313-350`).
+- Why it matters: Demo mode is mandatory and must be visibly labeled. A judge/moderator can click visible demo buttons after the seeded four-beat story appears, but those controls either fail the demo namespace guard or attempt a live Reddit-backed unlock for seeded IDs. That makes the demo experience look broken and risks confusing seeded demo state with real moderation actions.
+- Suggested fix: Either make demo mode read-only by hiding/disabling unlock and dismiss controls with clear in-dashboard state, or plumb action scope through the client (`subreddit=reviewlock_demo&demo=true`) and handle demo mutations without Reddit moderation calls. Add store/API/router regressions for demo unlock/dismiss clicks proving they do not touch live Reddit and either succeed safely in the demo namespace or are not rendered as actionable controls.
+- Files reviewed: `src/client/components/LockTable.ts`, `src/client/components/ReopenQueue.ts`, `src/client/pages/DashboardPage.ts`, `src/client/state/api.ts`, `src/client/state/store.ts`, `src/routes/api.dashboard.ts`, `src/client/render.test.ts`
+
+## 2026-05-24 23:45 IST - Recheck
+
+- Area: Demo dashboard action safety
+- Result: Resolved in the current worktree.
+- Evidence: `renderDashboardPage()` now passes demo read-only state into lock and reopen renderers. In demo mode, active lock and reopen rows render `Demo read-only` instead of `unlock`, `confirm-unlock`, `dismiss-reopen`, or `confirm-dismiss-reopen` action controls. Live mode still renders the existing confirmation controls. `src/client/render.test.ts` asserts the demo dashboard contains the read-only marker and none of the live action data attributes. `npm run test -- src/client/render.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:45 IST - Finding
+
+- Severity: high
+- Area: Stale-lock relock can reopen the old lock before proving the replacement lock actually ignored reports
+- Evidence: When `lockReviewedContent()` finds an existing active lock whose fingerprint differs from the refetched target, it immediately enqueues a reopen event and marks the existing lock `reopened` (`src/server/services/lockFlow.ts:145-185`). Only after that does it call `approveForReviewLock()` and `ignoreReportsForReviewLock()` for the replacement lock (`src/server/services/lockFlow.ts:187-189`). If the replacement `ignoreReports()` fails, the function persists a separate `failed` lock and returns `Reports were not locked because ignoreReports failed.` without calling `unignoreReports()` or restoring the previous active lock (`src/server/services/lockFlow.ts:191-223`). The stale-relock regression covers only the successful replacement path (`src/server/services/lockFlow.test.ts:127-180`); the existing ignore failure test is for a first-time lock with no prior active lock (`src/server/services/lockFlow.test.ts:70-90`).
+- Why it matters: The previous active lock likely corresponds to Reddit reports already being ignored. If content changed and the replacement lock cannot call `ignoreReports()`, ReviewLock can end with no active lock, a reopened old lock, and Reddit reports still ignored from the old lock state. That violates the fail-open rule: changed or uncertain reviewed content should return to moderator attention, not remain suppressed without an active lock that can reopen later.
+- Suggested fix: Treat stale-lock relock as a two-phase transition. Either call `unignoreReports()` when reopening the stale lock before attempting the replacement, or defer marking the old lock reopened until the replacement lock has successfully ignored reports and persisted. On replacement failure, leave a visible retryable state that guarantees reports are not ignored without an active lock. Add a regression where the second lock attempt sees edited content and `ignoreReports()` fails; assert `unignoreReports()` is called or the previous active lock remains retryable, and `getActiveLockByTarget()` is not silently empty while reports may still be ignored.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/locks.ts`, `src/server/adapters/reddit.ts`
+
+## 2026-05-24 23:47 IST - Recheck
+
+- Area: Stale-lock relock fail-open ordering
+- Result: Resolved in the current worktree.
+- Evidence: Stale-lock relock now calls `unignoreReportsForReviewLock()` and records runtime proof before reopening the stale lock and attempting the replacement `approve()` / `ignoreReports()` calls. `src/server/services/lockFlow.test.ts` covers edited-content relock with replacement `ignoreReports()` failure, proving `unignoreReports:t3_post` is called, the old lock is `reopened`, the replacement lock is `failed`, and no active target lock remains. `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose` passes.
+
+## 2026-05-24 23:46 IST - Finding
+
+- Severity: medium
+- Area: Current proof-boundary docs still contradict controlled moderation method proof
+- Evidence: `docs/RUNTIME_PROOF.md` and `docs/MODERATION_METHOD_PROOF.md` now mark controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` verified, while keeping comment-target and trigger proof unverified (`docs/RUNTIME_PROOF.md:70-72`, `docs/MODERATION_METHOD_PROOF.md:16-20`). Several current proof docs still state the older broader boundary: `docs/FULL_SCENARIO_WALKTHROUGH.md:25` says real `approve()`, `ignoreReports()`, and `unignoreReports()` behavior remains unverified and still requires controlled playtest; `docs/PRODUCTION_TRUST_AUDIT.md:9` and `docs/PRODUCTION_TRUST_AUDIT.md:38` say live `approve()`, `ignoreReports()`, and `unignoreReports()` remain unverified and list them as next actions; `docs/REDIS_RACE_PROOF.md:82` says live Reddit moderation method behavior still requires controlled playtest proof. Earlier review notes claimed the proof docs were reconciled after Wave 32, but these files remain stale.
+- Why it matters: ReviewLock's final submission and README are supposed to use the proof docs as the claim boundary. Leaving some docs saying "all moderation methods unverified" while the runtime proof says "post-target methods verified" makes the final audit ambiguous and can cause either underclaiming in submission copy or accidental cherry-picking from inconsistent evidence.
+- Suggested fix: Reconcile these docs to the current boundary: controlled post-target `approve()` / `ignoreReports()` / `unignoreReports()` verified; comment-target moderation methods, report trigger delivery, update trigger delivery, and trigger-driven `unignoreReports()` unverified. If any file is intentionally historical for its wave, label the statement as historical and add a pointer to `docs/RUNTIME_PROOF.md` for current status.
+- Files reviewed: `docs/RUNTIME_PROOF.md`, `docs/MODERATION_METHOD_PROOF.md`, `docs/FULL_SCENARIO_WALKTHROUGH.md`, `docs/PRODUCTION_TRUST_AUDIT.md`, `docs/REDIS_RACE_PROOF.md`, `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-24 23:48 IST - Recheck
+
+- Area: Proof-boundary documentation consistency
+- Result: Resolved in the current worktree.
+- Evidence: `docs/FULL_SCENARIO_WALKTHROUGH.md`, `docs/PRODUCTION_TRUST_AUDIT.md`, and `docs/REDIS_RACE_PROOF.md` now distinguish historical/local wave status from the current claim boundary and point to `docs/RUNTIME_PROOF.md`. The boundary is consistent: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are verified; comment-target moderation methods and live report/update trigger delivery remain unverified.

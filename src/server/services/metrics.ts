@@ -1,17 +1,33 @@
 import type { RedisStore } from '../adapters/redis';
-import type { DailyMetrics, ReviewLockTarget, TargetMetrics } from '../../shared/schema';
+import {
+  isDailyMetrics,
+  isTargetMetrics,
+  type DailyMetrics,
+  type ReviewLockTarget,
+  type TargetMetrics,
+} from '../../shared/schema';
 import { keys } from './keys';
 
-const parseJson = <T>(value: string | undefined): T | undefined => {
+const parseJson = (value: string | undefined): unknown => {
   if (value === undefined) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value) as T;
+    return JSON.parse(value) as unknown;
   } catch {
     return undefined;
   }
+};
+
+const parseDailyMetrics = (value: string | undefined): DailyMetrics | undefined => {
+  const parsed = parseJson(value);
+  return isDailyMetrics(parsed) ? parsed : undefined;
+};
+
+const parseTargetMetrics = (value: string | undefined): TargetMetrics | undefined => {
+  const parsed = parseJson(value);
+  return isTargetMetrics(parsed) ? parsed : undefined;
 };
 
 const emptyDailyMetrics = (subreddit: string, date: string, demo = false): DailyMetrics => ({
@@ -67,7 +83,7 @@ export const getDailyMetrics = async (
   subreddit: string,
   date: string,
 ): Promise<DailyMetrics | undefined> =>
-  parseJson(await redis.get(keys.metricsDaily(subreddit, date)));
+  parseDailyMetrics(await redis.get(keys.metricsDaily(subreddit, date)));
 
 export const listDailyMetrics = async (
   redis: RedisStore,
@@ -92,7 +108,7 @@ export const getTargetMetrics = async (
   subreddit: string,
   targetId: string,
 ): Promise<TargetMetrics | undefined> =>
-  parseJson(await redis.get(keys.metricsTarget(subreddit, targetId)));
+  parseTargetMetrics(await redis.get(keys.metricsTarget(subreddit, targetId)));
 
 export const listTopTargetMetrics = async (
   redis: RedisStore,

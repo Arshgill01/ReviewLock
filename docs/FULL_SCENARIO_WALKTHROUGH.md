@@ -22,7 +22,7 @@ Test Files  2 passed (2)
 Tests  10 passed (10)
 ```
 
-Live status: unverified for real Reddit report delivery and real `approve()`, `ignoreReports()`, and `unignoreReports()` behavior. Those still require controlled playtest against `reviewlock_dev`.
+Current live status: this Wave 19 scenario remains a local integration harness, not live trigger proof. Later controlled playtest verified post-target `approve()`, `ignoreReports()`, and `unignoreReports()` on `t3_1tm8nak`; comment-target moderation methods and real Reddit report/update trigger delivery remain unverified. See `docs/RUNTIME_PROOF.md` for the current claim boundary.
 
 ## Route Payloads
 

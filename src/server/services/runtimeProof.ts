@@ -4,6 +4,7 @@ import type {
   RuntimeProofCapability,
   RuntimeProofStatus,
 } from '../../shared/schema';
+import { RUNTIME_CAPABILITY_STATUSES } from '../../shared/constants';
 import type { ModerationOperationResult } from './moderation';
 import { keys } from './keys';
 
@@ -19,6 +20,44 @@ const parseJson = <T>(value: string | undefined): T | undefined => {
   } catch {
     return undefined;
   }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isRuntimeCapabilityStatus = (value: unknown): value is RuntimeCapabilityStatus =>
+  typeof value === 'string' &&
+  RUNTIME_CAPABILITY_STATUSES.includes(value as RuntimeCapabilityStatus);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+const isRuntimeProofCapability = (value: unknown): value is RuntimeProofCapability => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.name === 'string' &&
+    isRuntimeCapabilityStatus(value.status) &&
+    isStringArray(value.notes) &&
+    (value.checkedAt === undefined || typeof value.checkedAt === 'string') &&
+    (value.evidence === undefined || typeof value.evidence === 'string')
+  );
+};
+
+const isRuntimeProofStatus = (value: unknown): value is RuntimeProofStatus => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isRuntimeCapabilityStatus(value.overall) &&
+    typeof value.generatedAt === 'string' &&
+    Array.isArray(value.capabilities) &&
+    value.capabilities.every(isRuntimeProofCapability) &&
+    isStringArray(value.warnings)
+  );
 };
 
 const defaultRuntimeStatus = (now: string): RuntimeProofStatus => ({
@@ -53,9 +92,11 @@ export const loadRuntimeProofStatus = async (
   redis: RedisStore,
   subreddit: string,
   now = new Date().toISOString(),
-): Promise<RuntimeProofStatus> =>
-  parseJson<RuntimeProofStatus>(await redis.get(keys.runtime(subreddit))) ??
-  defaultRuntimeStatus(now);
+): Promise<RuntimeProofStatus> => {
+  const parsed = parseJson<unknown>(await redis.get(keys.runtime(subreddit)));
+
+  return isRuntimeProofStatus(parsed) ? parsed : defaultRuntimeStatus(now);
+};
 
 export const saveRuntimeProofStatus = async (
   redis: RedisStore,

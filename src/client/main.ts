@@ -81,6 +81,13 @@ app?.addEventListener('click', (event) => {
     const demo = target.dataset.mode === 'demo';
     const url = new URL(window.location.href);
     url.searchParams.set('demo', demo ? 'true' : 'false');
+    if (demo) {
+      url.searchParams.set('subreddit', 'reviewlock_demo');
+    } else if (store.getLiveSubreddit()) {
+      url.searchParams.set('subreddit', store.getLiveSubreddit());
+    } else {
+      url.searchParams.delete('subreddit');
+    }
     window.history.replaceState({}, '', url.toString());
     void store.setDemo(demo);
   }

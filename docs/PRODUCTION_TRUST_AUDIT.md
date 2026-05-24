@@ -6,7 +6,7 @@ Wave 30 reviewed the hardening record from Waves 15 through 29 and made one fina
 
 The weakest area is not local correctness. The lock, reopen, dashboard, demo, namespace, race, and browser-mocked paths have substantial local coverage. The weakest area is production trust around runtime proof and release safety:
 
-- Live `approve()`, `ignoreReports()`, and `unignoreReports()` remain unverified on controlled Reddit content.
+- Historical Wave 30 note: at the time of this audit, live moderation method proof was still unverified. Current status is narrower: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are now verified; comment-target methods and live report/update trigger delivery remain unverified. See `docs/RUNTIME_PROOF.md`.
 - Live report and edit trigger delivery remains unverified.
 - The app can upload, install, and reach playtest, but a public publish must not happen until the claim boundary is resolved.
 - `package.json` still exposed an `npm run launch` script that executed `npm run deploy && devvit publish`.
@@ -49,7 +49,7 @@ No, not yet.
 The app is locally strong and safe to keep hardening in the controlled test subreddit, but production trust requires live proof of the moderation loop:
 
 1. A moderator locks controlled post and comment targets.
-2. `approve()` and `ignoreReports()` are separately observed to succeed or fail honestly.
+2. `approve()` and `ignoreReports()` are separately observed to succeed or fail honestly. Post-target proof has passed; comment-target proof remains open.
 3. Repeat report events are generated and shown to hit `PostReport` and `CommentReport`.
 4. Unchanged locked content increments suppressed metrics and audit records.
 5. Edited content breaks the lock, calls `unignoreReports()` when supported, and appears in the reopen queue.

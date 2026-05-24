@@ -140,6 +140,50 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - Runtime proof text was previously rendered without escaping in the dashboard.
   - Hardened by escaping Redis-backed runtime proof names, warnings, and
     verification messages.
+- Lock/unlock Devvit form callbacks previously did not enforce the current
+  Devvit runtime subreddit before consuming form tokens.
+  - Hardened by rejecting mismatched runtime/submitted subreddit values before
+    token consumption or moderation operations.
+- Malformed but syntactically valid runtime proof JSON could previously flow to
+  the dashboard and crash runtime status rendering.
+  - Hardened by validating server-loaded runtime proof shape and client API
+    runtime proof contracts, with fallback to an unverified matrix.
+- Reopen transitions could previously enqueue a reopen event and then fail the
+  lock status write, leaving the target suppressible through active indexes.
+  - Hardened by removing active indexes as compensation when the post-queue
+    status write fails.
+- Reloading a dashboard URL with `demo=true` could previously request a live
+  subreddit namespace under the demo flag.
+  - Hardened by bootstrapping demo URLs directly into `reviewlock_demo` while
+    preserving the live subreddit for exit from demo mode.
+- Valid-but-malformed Redis records in lock, reopen, audit, or metric stores
+  could previously pass through service lists and crash dashboard rendering.
+  - Hardened by adding shared schema guards and skipping malformed ledger
+    records at service boundaries.
+- Repeated lock submissions for an already active target could previously create
+  stale active ledger rows and double-count lock metrics.
+  - Hardened by returning the existing active lock before fingerprinting or
+    calling Reddit moderation methods.
+- Report-trigger target resolution failure could previously leave a known
+  active lock suppressible while returning `runtime_uncertain`.
+  - Hardened by reopening known active locks as `runtime_uncertain` when the
+    target cannot be loaded during report-trigger processing.
+- Duplicate-lock idempotency could previously return an old active lock before
+  checking whether the current target fingerprint had changed.
+  - Hardened by fingerprinting first; changed current content reopens the stale
+    lock before creating the new reviewed lock.
+- Seeded demo dashboard rows previously rendered live unlock and dismiss
+  controls whose API calls did not carry demo scope.
+  - Hardened by rendering demo rows as read-only while keeping live mode actions
+    unchanged.
+- Stale-lock relock previously reopened the old lock before proving the
+  replacement `ignoreReports()` call worked.
+  - Hardened by calling `unignoreReports()` before reopening the stale lock and
+    attempting the replacement lock.
+- Older proof docs previously contradicted the controlled post-target
+  moderation proof boundary.
+  - Hardened by reconciling historical docs to point at this file for current
+    claim status.
 
 ## Current Claim Boundary
 

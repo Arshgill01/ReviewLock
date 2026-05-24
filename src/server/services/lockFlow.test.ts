@@ -3,8 +3,10 @@ import { fixedClock } from '../adapters/clock';
 import { InMemoryRedisStore } from '../adapters/redis';
 import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockTarget } from '../../shared/schema';
-import { getActiveLockByTarget, getLock } from './locks';
+import { getActiveLockByTarget, getLock, listActiveLocks } from './locks';
 import { lockReviewedContent } from './lockFlow';
+import { getDailyMetrics, getTargetMetrics } from './metrics';
+import { listOpenReopenEvents } from './reopenQueue';
 import { loadRuntimeProofStatus } from './runtimeProof';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
@@ -87,6 +89,139 @@ describe('lockReviewedContent', () => {
         expect.objectContaining({ name: 'ignoreReports', status: 'failed' }),
       ]),
     });
+  });
+
+  it('returns the existing active lock on duplicate lock attempts without double-counting', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({
+      ok: true,
+      lock: { id: first.lock?.id },
+      message: 'Reviewed content is already locked until it changes.',
+    });
+    expect(reddit.calls).toEqual(['approve:t3_post', 'ignoreReports:t3_post']);
+    expect(await listActiveLocks(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 1,
+    });
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      locksCreated: 1,
+    });
+  });
+
+  it('reopens a stale active lock before relocking changed content from the lock form', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    reddit.setTarget(target({ body: 'Edited body', edited: true, reportCount: 6 }));
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({
+      ok: true,
+      message: 'Reviewed content locked until it changes.',
+    });
+    expect(second.lock?.id).not.toBe(first.lock?.id);
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+    ]);
+    expect(await getLock(dependencies.redis, 'alpha', first.lock?.id ?? '')).toMatchObject({
+      status: 'reopened',
+      reopenReason: 'content_changed',
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      id: second.lock?.id,
+      status: 'active',
+      lastKnownEdited: true,
+    });
+    expect(await listActiveLocks(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: second.lock?.id }),
+    ]);
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({ lockId: first.lock?.id, reason: 'content_changed' }),
+    ]);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 2,
+      locksReopened: 1,
+    });
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      locksCreated: 2,
+      locksReopened: 1,
+    });
+  });
+
+  it('unignores reports before stale relock replacement failure can leave reports suppressed', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    reddit.setTarget(target({ body: 'Edited body', edited: true, reportCount: 6 }));
+    reddit.failOperation('ignoreReports', 'replacement ignore denied');
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(second).toMatchObject({
+      ok: false,
+      lock: { status: 'failed' },
+      message: 'Reports were not locked because ignoreReports failed.',
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+    ]);
+    expect(await getLock(dependencies.redis, 'alpha', first.lock?.id ?? '')).toMatchObject({
+      status: 'reopened',
+      reopenReason: 'content_changed',
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getLock(dependencies.redis, 'alpha', second.lock?.id ?? '')).toMatchObject({
+      status: 'failed',
+    });
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({ lockId: first.lock?.id, reason: 'content_changed' }),
+    ]);
   });
 
   it('rolls back ignore reports if Redis persistence fails', async () => {

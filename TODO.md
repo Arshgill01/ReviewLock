@@ -65,6 +65,17 @@
 - [x] Align Devvit Redis `zRange` adapter options with installed runtime typings.
 - [x] Escape Redis-backed runtime proof text before dashboard rendering.
 - [x] Surface message-only non-200 dashboard action errors in the client.
+- [x] Enforce current Devvit runtime subreddit on lock/unlock form submit callbacks.
+- [x] Validate runtime proof Redis shape before returning it to the dashboard.
+- [x] Compensate reopen status-write failures so queued reopen events cannot keep suppressing reports.
+- [x] Bootstrap `demo=true` dashboard URLs into the deterministic demo namespace.
+- [x] Validate Redis-backed dashboard ledger records before exposing them to renderers.
+- [x] Make lock creation idempotent for already-active targets.
+- [x] Reopen known active locks when report-trigger target resolution is uncertain.
+- [x] Compare current fingerprints before treating active lock submissions as duplicates.
+- [x] Keep seeded demo dashboard actions read-only.
+- [x] Unignore stale locks before attempting replacement relock writes.
+- [x] Reconcile proof-boundary docs after controlled post-target moderation proof.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

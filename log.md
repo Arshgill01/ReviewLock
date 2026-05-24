@@ -701,3 +701,192 @@
   - Controlled live report and edit trigger delivery still need proof in `r/reviewlock_dev`.
   - Comment-target moderation method proof remains unverified.
   - The active reviewer may append more findings before the next commit; check `docs/REVIEW_AGENT_FINDINGS.md` again before staging.
+
+## 2026-05-24 - Wave 33 form scope hardening
+
+- Reviewed the active second Codex reviewer finding that Devvit lock/unlock form
+  submit callbacks did not enforce current runtime subreddit scope before
+  consuming form bindings.
+- Hardened `lock-review-submit` and `unlock-review-submit` so they reject
+  submitted subreddit values that do not match `reddit.getCurrentSubredditName()`.
+- Added regressions proving mismatched lock/unlock form submissions:
+  - return a neutral scope mismatch toast;
+  - make no Reddit moderation calls;
+  - do not consume the form token;
+  - leave the active lock unchanged on unlock.
+- Commands run:
+  - `npm run test -- src/routes/forms.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/client/state/api.test.ts src/routes/forms.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `git diff --check`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 222 tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 reviewer hardening continued
+
+- Reviewed new active reviewer findings before staging:
+  - reopen transitions could leave an open reopen event plus an active lock if
+    the lock status write failed after queueing;
+  - `?demo=true` dashboard reloads could request the live subreddit namespace
+    and trip the isolated demo guard.
+- Hardened report-trigger and update-trigger reopen paths so status-write
+  failures after a queued reopen event remove active lock indexes before
+  returning `runtime_uncertain`.
+- Hardened demo bootstrap so `initialDemo: true` fetches from
+  `reviewlock_demo` immediately and preserves the original live subreddit for
+  exiting demo mode.
+- Hardened demo toggle URL state so entering demo writes
+  `subreddit=reviewlock_demo` and leaving demo restores the live subreddit.
+- Commands run:
+  - `npx prettier --write src/server/services/reopenFlow.ts src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.ts src/server/services/reportTriggers.test.ts src/client/state/store.ts src/client/state/store.test.ts src/client/main.ts`
+  - `npm run test -- src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts src/client/state/store.test.ts --reporter verbose`
+  - `npx prettier --write TODO.md decisions.md docs/RUNTIME_PROOF.md docs/REVIEW_AGENT_FINDINGS.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `git diff --check`
+  - `npm run build`
+- Pass/fail status: PASS. Targeted validation passed with 3 test files and 40 tests.
+- Open risks:
+  - A fresh reviewer check after full validation appended more findings, so this
+    work is not committed yet.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 dashboard ledger hardening
+
+- Reviewed new active reviewer findings before staging:
+  - valid-but-malformed Redis dashboard records could still crash render helpers;
+  - duplicate lock attempts could create stale active lock rows and double-count
+    lock metrics.
+- Added shared schema guards for lock records, reopen events, audit events,
+  daily metrics, and target metrics.
+- Hardened Redis-backed service readers so valid-but-wrong-shape records are
+  skipped like syntactically invalid JSON.
+- Made `lockReviewedContent()` idempotent for already active targets before
+  fingerprinting or calling Reddit moderation methods.
+- Commands run:
+  - `npx prettier --write src/shared/schema.ts src/server/services/locks.ts src/server/services/locks.test.ts src/server/services/reopenQueue.ts src/server/services/reopenQueue.test.ts src/server/services/audit.ts src/server/services/audit.test.ts src/server/services/metrics.ts src/server/services/metrics.test.ts src/server/services/lockFlow.ts src/server/services/lockFlow.test.ts`
+  - `npm run test -- src/server/services/locks.test.ts src/server/services/reopenQueue.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts src/server/services/lockFlow.test.ts --reporter verbose`
+- Pass/fail status: PASS. Targeted validation passed with 5 test files and 20 tests.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 report uncertainty hardening
+
+- Reviewed a new active reviewer finding that report-trigger target resolution
+  failures left known active locks suppressible.
+- Hardened report-trigger target-resolution failure handling:
+  - if the report payload supplies a subreddit and an active lock exists,
+    ReviewLock now queues a `runtime_uncertain` reopen event and removes the
+    active lock path;
+  - if there is not enough scope to find a lock, ReviewLock preserves the
+    previous retryable runtime-failure behavior and clears the dedupe marker.
+- Commands run:
+  - `npx prettier --write src/server/services/reportTriggers.ts src/server/services/reportTriggers.test.ts`
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+- Pass/fail status: PASS. Targeted validation passed with 1 test file and 19 tests.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 lock-form fingerprint hardening
+
+- Reviewed a new active reviewer finding that active-lock idempotency returned
+  before comparing the freshly refetched target fingerprint.
+- Moved duplicate-lock handling after fingerprint computation.
+- If the current fingerprint matches the active lock, duplicate submissions
+  still return the existing lock without another Reddit moderation call.
+- If the fingerprint changed, ReviewLock now reopens the stale lock, records the
+  reopen event and metrics, then creates a new lock for the moderator-reviewed
+  current content.
+- Commands run:
+  - `npx prettier --write src/server/services/lockFlow.ts src/server/services/lockFlow.test.ts`
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+- Pass/fail status: PASS. Targeted validation passed with 1 test file and 8 tests.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 demo action hardening
+
+- Reviewed a new active reviewer finding that demo rows exposed live unlock and
+  reopen-dismiss controls.
+- Made demo dashboard rows read-only by replacing unlock and dismiss controls
+  with a demo status marker.
+- Kept live mode inline confirmation controls unchanged.
+- Commands run:
+  - `npx prettier --write src/client/components/LockTable.ts src/client/components/ReopenQueue.ts src/client/pages/DashboardPage.ts src/client/render.test.ts`
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+- Pass/fail status: PASS. Targeted validation passed with 1 test file and 12 tests.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 stale-relock fail-open hardening
+
+- Reviewed a high-severity active reviewer finding that stale-lock relock could
+  reopen the old lock before proving the replacement lock had ignored reports.
+- Hardened stale relock so ReviewLock calls `unignoreReports()` and records
+  runtime proof before reopening the stale lock and attempting the replacement
+  lock.
+- Added a replacement `ignoreReports()` failure regression proving the old lock
+  is reopened, `unignoreReports()` was called, no active lock remains, and the
+  failed replacement lock stays visible.
+- Commands run:
+  - `npx prettier --write src/server/services/lockFlow.ts src/server/services/lockFlow.test.ts`
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+- Pass/fail status: PASS. Targeted validation passed with 1 test file and 9 tests.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 proof-boundary doc hardening
+
+- Reviewed a new active reviewer finding that older proof docs contradicted
+  controlled post-target moderation proof.
+- Reconciled historical status language in:
+  - `docs/FULL_SCENARIO_WALKTHROUGH.md`
+  - `docs/PRODUCTION_TRUST_AUDIT.md`
+  - `docs/REDIS_RACE_PROOF.md`
+- Current boundary is now consistent: controlled post-target `approve()`,
+  `ignoreReports()`, and `unignoreReports()` are verified; comment-target
+  methods and live report/update trigger delivery remain unverified.
+- Commands run:
+  - Documentation edit only; full validation must be rerun before commit.
+- Pass/fail status: PARTIAL.
+- Open risks:
+  - Full validation still needs to be rerun before commit.
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+
+## 2026-05-24 - Wave 33 reviewer hardening validation
+
+- Rechecked `docs/REVIEW_AGENT_FINDINGS.md` after the final full validation run;
+  no newer actionable finding was present after the proof-boundary recheck.
+- Confirmed no `TODO` comments remain under `src/`.
+- Commands run:
+  - `npx prettier --write docs/FULL_SCENARIO_WALKTHROUGH.md docs/PRODUCTION_TRUST_AUDIT.md docs/REDIS_RACE_PROOF.md TODO.md decisions.md docs/RUNTIME_PROOF.md docs/REVIEW_AGENT_FINDINGS.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `git diff --check`
+  - `npm run build`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled" src docs README.md || true`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 228 tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.
+  - Comment-target moderation method proof remains unverified.

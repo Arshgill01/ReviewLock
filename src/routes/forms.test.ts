@@ -158,6 +158,34 @@ describe('form routes', () => {
     });
   });
 
+  it('rejects lock form submissions outside the current runtime subreddit before moderation', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([target()], 'mod_test', 'beta');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form subreddit does not match the current Devvit context.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
+  });
+
   it('creates a dashboard post and navigates to it', async () => {
     const router = createFormsRouter({
       reddit: new FakeRedditAdapter([target()]),
@@ -246,6 +274,43 @@ describe('form routes', () => {
     });
     expect(reddit.calls).toEqual([]);
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({ id: 'lock-1' });
+  });
+
+  it('rejects unlock form submissions outside the current runtime subreddit before moderation', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+    const reddit = new FakeRedditAdapter([target()], 'mod_test', 'beta');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockId: 'lock-1',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form subreddit does not match the current Devvit context.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({ id: 'lock-1' });
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
   });
 
   it('dismisses a reopened item and records audit output', async () => {

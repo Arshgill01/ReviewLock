@@ -1,16 +1,24 @@
 import type { Clock } from '../adapters/clock';
 import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
-import type { LockReasonPreset, ReviewLockRecord } from '../../shared/schema';
+import type { LockReasonPreset, ReopenEvent, ReviewLockRecord } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
-import { removeLock, saveLock, updateLock } from './locks';
-import { recordLockCreatedMetric } from './metrics';
+import {
+  getActiveLockByTarget,
+  removeActiveLockIndexes,
+  removeLock,
+  saveLock,
+  updateLock,
+  updateLockStatus,
+} from './locks';
+import { incrementReopenedMetric, recordLockCreatedMetric } from './metrics';
 import {
   approveForReviewLock,
   ignoreReportsForReviewLock,
   unignoreReportsForReviewLock,
 } from './moderation';
+import { enqueueReopenEvent } from './reopenQueue';
 import { recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 
@@ -77,6 +85,38 @@ export const createLockRecord = (
   demo: false,
 });
 
+const buildReopenEventForStaleLock = (
+  lock: ReviewLockRecord,
+  newContentHash: string,
+  now: string,
+): ReopenEvent => ({
+  id: `reopen-${lock.id}-lock-review-${Date.parse(now)}`,
+  lockId: lock.id,
+  subreddit: lock.subreddit,
+  targetId: lock.targetId,
+  targetKind: lock.targetKind,
+  oldContentHash: lock.contentHash,
+  newContentHash,
+  reason: 'content_changed',
+  createdAt: now,
+  summary: 'Lock review found that the previously reviewed content changed.',
+  runtimeWarnings: [],
+  demo: lock.demo,
+});
+
+const markLockReopenedAfterQueue = async (
+  redis: RedisStore,
+  lock: ReviewLockRecord,
+  updates: Partial<ReviewLockRecord>,
+): Promise<void> => {
+  try {
+    await updateLockStatus(redis, lock.subreddit, lock.id, 'reopened', updates);
+  } catch (error) {
+    await removeActiveLockIndexes(redis, lock).catch(() => undefined);
+    throw error;
+  }
+};
+
 export const lockReviewedContent = async (
   deps: LockFlowDependencies,
   input: LockReviewInput,
@@ -100,6 +140,59 @@ export const lockReviewedContent = async (
       message: 'ReviewLock could not fingerprint the current content, so reports were not locked.',
       warnings: ['fingerprint_uncertain'],
     };
+  }
+
+  const existingLock = await getActiveLockByTarget(
+    deps.redis,
+    resolution.target.subreddit,
+    resolution.target.id,
+  );
+
+  if (existingLock) {
+    if (
+      existingLock.contentHash === fingerprint.hash &&
+      existingLock.fingerprintVersion === fingerprint.version
+    ) {
+      return {
+        ok: true,
+        lock: existingLock,
+        message: 'Reviewed content is already locked until it changes.',
+        warnings: existingLock.runtimeWarnings,
+      };
+    }
+
+    const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+    await recordRuntimeProof(deps, existingLock.subreddit, staleUnignoreResult, now);
+
+    const reopenEvent = {
+      ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
+      runtimeWarnings: staleUnignoreResult.warnings,
+    };
+    await enqueueReopenEvent(deps.redis, reopenEvent);
+    await markLockReopenedAfterQueue(deps.redis, existingLock, {
+      reopenedAt: now,
+      reopenReason: 'content_changed',
+      reopenEventId: reopenEvent.id,
+      runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
+    });
+    await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
+    await appendAuditEvent(deps.redis, {
+      id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
+      kind: 'lock_reopened',
+      subreddit: existingLock.subreddit,
+      targetId: existingLock.targetId,
+      targetKind: existingLock.targetKind,
+      lockId: existingLock.id,
+      actor: input.actor,
+      createdAt: now,
+      message: 'Lock review reopened a stale lock because reviewed content changed.',
+      data: {
+        reason: 'content_changed',
+        source: 'lock_review',
+        unignoreReportsOk: staleUnignoreResult.ok,
+      },
+      demo: existingLock.demo,
+    });
   }
 
   const approveResult = await approveForReviewLock(deps.reddit, resolution.target);

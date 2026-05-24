@@ -76,19 +76,37 @@ describe('metrics persistence', () => {
   it('skips malformed daily and target metric records', async () => {
     const redis = new InMemoryRedisStore();
     await redis.set(keys.metricsDaily('alpha', '2026-05-24'), '{');
+    await redis.set(
+      keys.metricsDaily('alpha', '2026-05-25'),
+      JSON.stringify({ date: '2026-05-25' }),
+    );
     await redis.zAdd(keys.metricsDailyIndex('alpha'), {
       member: '2026-05-24',
       score: Date.parse('2026-05-24T00:00:00.000Z'),
     });
+    await redis.zAdd(keys.metricsDailyIndex('alpha'), {
+      member: '2026-05-25',
+      score: Date.parse('2026-05-25T00:00:00.000Z'),
+    });
     await redis.set(keys.metricsTarget('alpha', 't3_bad'), '{');
+    await redis.set(
+      keys.metricsTarget('alpha', 't3_wrong_shape'),
+      JSON.stringify({ targetId: 't3_wrong_shape' }),
+    );
     await redis.zAdd(keys.metricsTargetIndex('alpha'), {
       member: 't3_bad',
       score: 10,
     });
+    await redis.zAdd(keys.metricsTargetIndex('alpha'), {
+      member: 't3_wrong_shape',
+      score: 20,
+    });
 
     expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-25')).toBeUndefined();
     expect(await listDailyMetrics(redis, 'alpha')).toEqual([]);
     expect(await getTargetMetrics(redis, 'alpha', 't3_bad')).toBeUndefined();
+    expect(await getTargetMetrics(redis, 'alpha', 't3_wrong_shape')).toBeUndefined();
     expect(await listTopTargetMetrics(redis, 'alpha')).toEqual([]);
   });
 });

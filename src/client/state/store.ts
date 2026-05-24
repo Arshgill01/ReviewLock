@@ -47,8 +47,8 @@ export class ReviewLockStore {
     initialDemo: boolean = false,
   ) {
     this.api = api;
-    this.subreddit = initialSubreddit;
-    this.liveSubreddit = initialDemo ? 'reviewlock' : initialSubreddit;
+    this.subreddit = initialDemo ? 'reviewlock_demo' : initialSubreddit;
+    this.liveSubreddit = initialSubreddit === 'reviewlock_demo' ? 'reviewlock' : initialSubreddit;
     this.demo = initialDemo;
   }
 
@@ -61,6 +61,10 @@ export class ReviewLockStore {
     for (const listener of this.listeners) {
       listener();
     }
+  }
+
+  getLiveSubreddit(): string {
+    return this.liveSubreddit;
   }
 
   requestConfirmation(confirmation: DashboardConfirmation) {

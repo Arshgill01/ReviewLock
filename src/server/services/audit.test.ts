@@ -36,12 +36,21 @@ describe('audit log', () => {
     const redis = new InMemoryRedisStore();
     await appendAuditEvent(redis, event({ id: 'good' }));
     await redis.set(keys.auditEvent('alpha', 'bad'), '{');
+    await redis.set(
+      keys.auditEvent('alpha', 'wrong-shape'),
+      JSON.stringify({ kind: 'lock_created' }),
+    );
     await redis.zAdd(keys.audit('alpha'), {
       member: 'bad',
       score: Date.parse('2026-05-24T01:00:00.000Z'),
     });
+    await redis.zAdd(keys.audit('alpha'), {
+      member: 'wrong-shape',
+      score: Date.parse('2026-05-24T02:00:00.000Z'),
+    });
 
     expect(await getAuditEvent(redis, 'alpha', 'bad')).toBeUndefined();
+    expect(await getAuditEvent(redis, 'alpha', 'wrong-shape')).toBeUndefined();
     expect((await listAuditEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
   });
 });

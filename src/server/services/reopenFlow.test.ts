@@ -9,6 +9,7 @@ import { getDailyMetrics, getTargetMetrics } from './metrics';
 import { handleReportTrigger } from './reportTriggers';
 import { breakLockForChangedContent } from './reopenFlow';
 import { listOpenReopenEvents } from './reopenQueue';
+import { keys } from './keys';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't3_post',
@@ -148,6 +149,43 @@ describe('breakLockForChangedContent', () => {
     expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({ reason: 'content_changed' }),
     ]);
+  });
+
+  it('removes active indexes if status write fails after queueing reopen event', async () => {
+    class ReopenStatusWriteFailingRedisStore extends InMemoryRedisStore {
+      failLockStatusWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failLockStatusWrites && key === keys.lock('alpha', 'lock-1')) {
+          throw new Error('lock status down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenStatusWriteFailingRedisStore();
+    await saveLock(redis, lock());
+    redis.failLockStatusWrites = true;
+
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
   it('keeps report and update races idempotent for the same edited target', async () => {

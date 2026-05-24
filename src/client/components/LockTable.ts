@@ -12,7 +12,12 @@ const reason = (value: string): string => value.replace(/_/g, ' ');
 const renderUnlockAction = (
   lock: ReviewLockRecord,
   confirmation: DashboardConfirmation | null,
+  readOnly = false,
 ): string => {
+  if (readOnly) {
+    return '<span class="status status-unverified">Demo read-only</span>';
+  }
+
   const isConfirming =
     confirmation?.action === 'unlock' &&
     confirmation.lockId === lock.id &&
@@ -42,6 +47,7 @@ const renderUnlockAction = (
 export const renderLockTable = (
   locks: ReviewLockRecord[],
   confirmation: DashboardConfirmation | null = null,
+  readOnly = false,
 ): string => {
   const activeLocks = locks.filter((lock) => lock.status === 'active');
 
@@ -75,7 +81,7 @@ export const renderLockTable = (
             ${new Date(lock.lockedAt).toLocaleDateString()}
           </td>
           <td>
-            ${renderUnlockAction(lock, confirmation)}
+            ${renderUnlockAction(lock, confirmation, readOnly)}
           </td>
         </tr>
       `,

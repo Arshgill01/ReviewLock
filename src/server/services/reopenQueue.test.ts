@@ -50,12 +50,18 @@ describe('reopen queue', () => {
     const redis = new InMemoryRedisStore();
     await enqueueReopenEvent(redis, event({ id: 'good' }));
     await redis.set(keys.reopenEvent('alpha', 'bad'), '{');
+    await redis.set(keys.reopenEvent('alpha', 'wrong-shape'), JSON.stringify({ status: 'open' }));
     await redis.zAdd(keys.reopenQueue('alpha'), {
       member: 'bad',
       score: Date.parse('2026-05-24T01:00:00.000Z'),
     });
+    await redis.zAdd(keys.reopenQueue('alpha'), {
+      member: 'wrong-shape',
+      score: Date.parse('2026-05-24T02:00:00.000Z'),
+    });
 
     expect(await getReopenEvent(redis, 'alpha', 'bad')).toBeUndefined();
+    expect(await getReopenEvent(redis, 'alpha', 'wrong-shape')).toBeUndefined();
     expect((await listOpenReopenEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
   });
 });

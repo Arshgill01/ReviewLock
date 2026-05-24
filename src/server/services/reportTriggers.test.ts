@@ -10,6 +10,7 @@ import { listOpenReopenEvents } from './reopenQueue';
 import { fingerprintTarget } from './fingerprint';
 import { handleReportTrigger } from './reportTriggers';
 import { handleUpdateTrigger } from './updateTriggers';
+import { keys } from './keys';
 
 const target = (body = 'Reviewed body'): ReviewLockTarget => ({
   id: 't3_post',
@@ -339,6 +340,43 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('removes active indexes when changed-report status write fails after queueing reopen event', async () => {
+    class ReopenStatusWriteFailingRedisStore extends InMemoryRedisStore {
+      failLockStatusWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failLockStatusWrites && key === keys.lock('alpha', 'lock-t3_post')) {
+          throw new Error('lock status down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenStatusWriteFailingRedisStore();
+    await saveLock(redis, lock());
+    redis.failLockStatusWrites = true;
+
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target('Edited body')]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-reopen-status-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('reopens changed comment reports with the comment moderation operation', async () => {
     const dependencies = await deps(commentTarget('Edited comment'));
     const result = await handleReportTrigger(dependencies, {
@@ -367,7 +405,7 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
-  it('fails open when the target cannot be loaded', async () => {
+  it('reopens as runtime uncertain when a report target cannot be loaded but the active lock is known', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter();
     await saveLock(redis, lock());
@@ -382,15 +420,22 @@ describe('handleReportTrigger', () => {
 
     expect(result).toMatchObject({ ok: false, action: 'runtime_uncertain' });
     expect(reddit.calls).toEqual([]);
-    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
-      status: 'active',
+    expect(result.reopenEvent).toMatchObject({ reason: 'runtime_uncertain' });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      status: 'reopened',
+      reopenReason: 'runtime_uncertain',
+      runtimeWarnings: ['target_resolution_failed'],
     });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'runtime_uncertain' }),
+    ]);
     expect(await listAuditEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ kind: 'runtime_failure' }),
+      expect.objectContaining({ kind: 'lock_reopened' }),
     ]);
   });
 
-  it('does not keep a dedupe marker after target resolution fails so trigger retry can succeed', async () => {
+  it('does not keep a dedupe marker after target resolution fails without enough scope to find a lock', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter();
     await saveLock(redis, lock());
@@ -401,10 +446,10 @@ describe('handleReportTrigger', () => {
         reddit,
         clock: fixedClock('2026-05-24T01:00:00.000Z'),
       },
-      { targetId: 't3_post', eventId: 'evt-resolution-retry', subreddit: 'alpha' },
+      { targetId: 't3_post', eventId: 'evt-resolution-retry' },
     );
     expect(first).toMatchObject({ ok: false, action: 'runtime_uncertain' });
-    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-resolution-retry')).toBe(false);
+    expect(await redis.exists('reviewlock:unknown:report:dedupe:evt-resolution-retry')).toBe(false);
 
     reddit.setTarget(target());
     const retry = await handleReportTrigger(
