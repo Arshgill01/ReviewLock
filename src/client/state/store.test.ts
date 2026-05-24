@@ -50,6 +50,7 @@ describe('ReviewLockStore', () => {
       dailyMetrics: [],
       topChurnTargets: [],
     });
+    apiClient.runRuntimeSmoke = vi.fn().mockResolvedValue(undefined);
 
     apiClient.unlockTarget = vi.fn().mockResolvedValue({ ok: true });
     apiClient.dismissReopen = vi.fn().mockResolvedValue({ ok: true });
@@ -105,5 +106,24 @@ describe('ReviewLockStore', () => {
 
     expect(apiClient.dismissReopen).toHaveBeenCalledWith('reopen-1', 'moderator');
     expect(apiClient.fetchOverview).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs runtime verification in live mode and refreshes proof status', async () => {
+    await store.verifyRuntime();
+
+    expect(apiClient.runRuntimeSmoke).toHaveBeenCalledWith('test_subreddit');
+    expect(apiClient.fetchRuntimeStatus).toHaveBeenCalledWith('test_subreddit', false);
+    expect(store.runtimeVerificationMessage).toBe('Runtime proof refreshed.');
+    expect(store.isVerifyingRuntime).toBe(false);
+  });
+
+  it('does not run runtime verification in demo mode', async () => {
+    await store.setDemo(true);
+    vi.mocked(apiClient.runRuntimeSmoke).mockClear();
+
+    await store.verifyRuntime();
+
+    expect(apiClient.runRuntimeSmoke).not.toHaveBeenCalled();
+    expect(store.error).toBe('Runtime verification runs in live mode only.');
   });
 });

@@ -20,13 +20,11 @@ const target = (): ReviewLockTarget => ({
 describe('menu routes', () => {
   it('builds lock review form fields with target context', () => {
     expect(buildLockReviewForm(target())).toMatchObject({
-      form: 'lockReview',
-      fields: {
-        targetId: 't3_post',
-        edited: true,
-        reportCount: 4,
-        reasonPreset: 'reviewed_policy_compliant',
-      },
+      title: 'Lock review',
+      fields: expect.arrayContaining([
+        expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+        expect.objectContaining({ name: 'lockReason' }),
+      ]),
     });
   });
 
@@ -37,7 +35,12 @@ describe('menu routes', () => {
       body: JSON.stringify({ targetId: 't3_post' }),
     });
 
-    expect(await response.json()).toMatchObject({ ok: true, form: { form: 'lockReview' } });
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        name: 'lockReview',
+        form: { title: 'Lock review' },
+      },
+    });
   });
 
   it('returns neutral unlock response when no lock exists', async () => {
@@ -51,8 +54,9 @@ describe('menu routes', () => {
     });
 
     expect(await response.json()).toMatchObject({
-      ok: true,
-      message: 'No active ReviewLock lock was found for this content.',
+      showToast: {
+        text: 'No active ReviewLock lock was found for this content.',
+      },
     });
   });
 
@@ -85,6 +89,15 @@ describe('menu routes', () => {
       body: JSON.stringify({ targetId: 't3_post' }),
     });
 
-    expect(await response.json()).toMatchObject({ ok: true, form: { form: 'unlockReview' } });
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        name: 'unlockReview',
+        form: {
+          fields: expect.arrayContaining([
+            expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+          ]),
+        },
+      },
+    });
   });
 });

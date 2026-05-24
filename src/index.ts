@@ -1,33 +1,19 @@
-import { Hono } from 'hono';
-import type { Clock } from './server/adapters/clock';
-import { systemClock } from './server/adapters/clock';
-import { InMemoryRedisStore, type RedisStore } from './server/adapters/redis';
-import type { RedditAdapter } from './server/adapters/reddit';
-import { createApiRouter } from './routes/api';
-import { createFormsRouter } from './routes/forms';
-import { createMenuRouter } from './routes/menu';
-import { createTriggersRouter } from './routes/triggers';
+import { serve } from '@hono/node-server';
+import { context, createServer, getServerPort, reddit, redis } from '@devvit/web/server';
+import { createApp } from './app';
+import { createDevvitRedisStore } from './server/adapters/redis';
+import { createRedditAdapterFromContext } from './server/adapters/reddit';
 
-export interface ReviewLockAppDeps {
-  reddit?: RedditAdapter;
-  redis?: RedisStore;
-  clock?: Clock;
-}
+export { createApp } from './app';
 
-export const createApp = (deps: ReviewLockAppDeps = {}): Hono => {
-  const app = new Hono();
-  const resolvedDeps = {
-    redis: deps.redis ?? new InMemoryRedisStore(),
-    clock: deps.clock ?? systemClock,
-    reddit: deps.reddit,
-  };
+const app = createApp({
+  redis: createDevvitRedisStore(redis),
+  reddit: createRedditAdapterFromContext({ reddit }),
+  getCurrentSubredditName: () => context.subredditName,
+});
 
-  app.route('/api', createApiRouter(resolvedDeps));
-  app.route('/internal/menu', createMenuRouter(resolvedDeps));
-  app.route('/internal/form', createFormsRouter(resolvedDeps));
-  app.route('/internal/triggers', createTriggersRouter(resolvedDeps));
-
-  return app;
-};
-
-export default createApp();
+serve({
+  fetch: app.fetch,
+  createServer,
+  port: getServerPort(),
+});

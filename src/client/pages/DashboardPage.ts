@@ -93,7 +93,7 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
         </div>
         <div class="side-column">
           ${renderTopChurnTargets(store.topChurnTargets)}
-          ${renderRuntimeBanner(store.runtimeStatus)}
+          ${renderRuntimeBanner(store.runtimeStatus, store.runtimeVerificationMessage, store.isVerifyingRuntime)}
           ${renderAuditTimeline(store.auditEvents)}
         </div>
       </div>

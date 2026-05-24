@@ -29,6 +29,14 @@ export class ReviewLockApiClient {
     return `?subreddit=${encodeURIComponent(subreddit)}&demo=${demo ? 'true' : 'false'}`;
   }
 
+  async fetchRuntimeContext(): Promise<{ subreddit?: string }> {
+    const res = await fetch(`${this.baseUrl}/api/context`);
+    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Failed to fetch runtime context');
+    return { subreddit: data.subreddit ?? undefined };
+  }
+
   async fetchOverview(subreddit: string, demo: boolean): Promise<DashboardOverview & { demo: boolean }> {
     const res = await fetch(`${this.baseUrl}/api/overview${this.getQueryString(subreddit, demo)}`);
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
@@ -77,6 +85,20 @@ export class ReviewLockApiClient {
     };
   }
 
+  async runRuntimeSmoke(subreddit: string): Promise<void> {
+    const query = `?subreddit=${encodeURIComponent(subreddit)}`;
+    const checks = await Promise.all([
+      fetch(`${this.baseUrl}/api/smoke/redis${query}`, { method: 'POST' }),
+      fetch(`${this.baseUrl}/api/smoke/reddit${query}`, { method: 'POST' }),
+    ]);
+
+    for (const res of checks) {
+      if (!res.ok) throw new Error(`API error: ${res.statusText}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Runtime verification failed');
+    }
+  }
+
   async unlockTarget(targetId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
     const res = await fetch(`${this.baseUrl}/internal/form/unlock-review-submit`, {
       method: 'POST',
@@ -84,7 +106,8 @@ export class ReviewLockApiClient {
       body: JSON.stringify({ targetId, actor }),
     });
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    return res.json();
+    const data = await res.json();
+    return { ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo), message: data.message ?? data.showToast?.text };
   }
 
   async dismissReopen(eventId: string, actor: string): Promise<{ ok: boolean; message?: string }> {
@@ -94,6 +117,7 @@ export class ReviewLockApiClient {
       body: JSON.stringify({ eventId, action: 'dismiss', actor }),
     });
     if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    return res.json();
+    const data = await res.json();
+    return { ok: Boolean(data.ok ?? data.showToast ?? data.navigateTo), message: data.message ?? data.showToast?.text };
   }
 }

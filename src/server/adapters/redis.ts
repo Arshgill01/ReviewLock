@@ -106,18 +106,18 @@ interface DevvitRedisClient {
   set(key: string, value: string): Promise<unknown>;
   del(key: string): Promise<unknown>;
   exists(key: string): Promise<number | boolean>;
-  hgetall(key: string): Promise<Record<string, string>>;
-  hset(key: string, values: Record<string, string>): Promise<unknown>;
-  hdel(key: string, field: string): Promise<unknown>;
-  hincrby(key: string, field: string, value: number): Promise<number>;
-  zAdd(key: string, entry: SortedSetEntry): Promise<unknown>;
+  hGetAll(key: string): Promise<Record<string, string>>;
+  hSet(key: string, values: Record<string, string>): Promise<unknown>;
+  hDel(key: string, fields: string[]): Promise<unknown>;
+  hIncrBy(key: string, field: string, value: number): Promise<number>;
+  zAdd(key: string, ...entries: SortedSetEntry[]): Promise<unknown>;
   zRange(
     key: string,
-    start: number,
-    stop: number,
+    start: number | string,
+    stop: number | string,
     options?: { reverse?: boolean },
   ): Promise<SortedSetEntry[]>;
-  zRem(key: string, member: string): Promise<unknown>;
+  zRem(key: string, members: string[]): Promise<unknown>;
   zIncrBy(key: string, member: string, increment: number): Promise<number>;
 }
 
@@ -136,16 +136,16 @@ export const createDevvitRedisStore = (client: DevvitRedisClient): RedisStore =>
     return typeof result === 'boolean' ? result : result > 0;
   },
   async hgetall(key) {
-    return client.hgetall(key);
+    return client.hGetAll(key);
   },
   async hset(key, values) {
-    await client.hset(key, values);
+    await client.hSet(key, values);
   },
   async hdel(key, field) {
-    await client.hdel(key, field);
+    await client.hDel(key, [field]);
   },
   async hincrby(key, field, value) {
-    return client.hincrby(key, field, value);
+    return client.hIncrBy(key, field, value);
   },
   async zAdd(key, entry) {
     await client.zAdd(key, entry);
@@ -154,7 +154,7 @@ export const createDevvitRedisStore = (client: DevvitRedisClient): RedisStore =>
     return client.zRange(key, start, stop, reverse ? { reverse } : undefined);
   },
   async zRem(key, member) {
-    await client.zRem(key, member);
+    await client.zRem(key, [member]);
   },
   async zIncrBy(key, increment, member) {
     return client.zIncrBy(key, member, increment);

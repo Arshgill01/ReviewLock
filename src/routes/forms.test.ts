@@ -33,7 +33,12 @@ describe('form routes', () => {
       }),
     });
 
-    expect(await response.json()).toMatchObject({ ok: true });
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock locked this reviewed content until it changes.',
+        appearance: 'success',
+      },
+    });
   });
 
   it('validates required lock fields', async () => {
@@ -47,6 +52,26 @@ describe('form routes', () => {
       body: JSON.stringify({ targetId: 't3_post' }),
     });
 
-    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'Target and reason are required.',
+      },
+    });
+  });
+
+  it('creates a dashboard post and navigates to it', async () => {
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+      showToast: {
+        text: 'Opening ReviewLock dashboard',
+      },
+    });
   });
 });

@@ -1,7 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
   "name": "reviewlock",
-  "version": "0.1.0",
   "server": {
     "dir": "dist/server",
     "entry": "index.cjs"
@@ -72,7 +71,10 @@
     "redis": true
   },
   "scripts": {
-    "build": "npm run build",
-    "dev": "npm run dev"
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "dev": {
+    "subreddit": "reviewlock_dev"
   }
 }

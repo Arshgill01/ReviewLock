@@ -4,7 +4,7 @@ import { fixedClock } from './server/adapters/clock';
 import { InMemoryRedisStore } from './server/adapters/redis';
 import { FakeRedditAdapter } from './server/adapters/reddit';
 import type { ReviewLockTarget } from './shared/schema';
-import { createApp } from './index';
+import { createApp } from './app';
 
 interface DevvitMenuItem {
   endpoint: string;
@@ -95,6 +95,29 @@ describe('integrated ReviewLock app', () => {
     });
   });
 
+  it('returns current subreddit context for embedded dashboard startup', async () => {
+    const response = await makeApp().request('/api/context');
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      subreddit: 'alpha',
+    });
+  });
+
+  it('prefers Devvit server context for embedded dashboard subreddit', async () => {
+    const response = await createApp({
+      redis: new InMemoryRedisStore(),
+      reddit: new FakeRedditAdapter([target(), commentTarget()]),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      getCurrentSubredditName: () => 'reviewlock_dev',
+    }).request('/api/context');
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      subreddit: 'reviewlock_dev',
+    });
+  });
+
   it('demo enable then overview returns demo data', async () => {
     const app = makeApp();
     await app.request('/api/demo/enable', { method: 'POST' });
@@ -108,6 +131,44 @@ describe('integrated ReviewLock app', () => {
         reopenedAfterEditCount: 3,
       },
     });
+  });
+
+  it('runs Redis smoke proof and records runtime status', async () => {
+    const app = makeApp();
+    const response = await app.request('/api/smoke/redis?subreddit=alpha', { method: 'POST' });
+    const runtime = await app.request('/api/runtime?subreddit=alpha');
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      capability: 'redis',
+      status: 'verified',
+    });
+    expect(await runtime.json()).toMatchObject({
+      ok: true,
+      runtime: {
+        capabilities: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'redis',
+            status: 'verified',
+          }),
+        ]),
+      },
+    });
+  });
+
+  it('runs Reddit context smoke proof without returning the username', async () => {
+    const response = await makeApp().request('/api/smoke/reddit?subreddit=alpha', {
+      method: 'POST',
+    });
+    const body = await response.json();
+
+    expect(body).toMatchObject({
+      ok: true,
+      capability: 'redditContext',
+      status: 'verified',
+      usernamePresent: true,
+    });
+    expect(body).not.toHaveProperty('username');
   });
 
   it('trigger endpoint accepts representative payload without throwing', async () => {

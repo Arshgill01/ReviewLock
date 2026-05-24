@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import type { UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
@@ -16,7 +17,7 @@ interface RouteDeps {
 interface LockSubmitBody {
   targetId?: string;
   actor?: string;
-  lockReason?: LockReasonPreset;
+  lockReason?: LockReasonPreset | LockReasonPreset[];
   customNote?: string;
   expiresAt?: string;
 }
@@ -34,57 +35,102 @@ const readJson = async <T>(context: Context): Promise<T> => {
   }
 };
 
+const uiToast = (text: string, appearance: 'neutral' | 'success' = 'neutral'): UiResponse => ({
+  showToast: { text, appearance },
+});
+
+const actorFromReddit = async (reddit: RedditAdapter, fallback?: string): Promise<string> =>
+  fallback?.trim() || (await reddit.getCurrentUsername()) || 'unknown_moderator';
+
+const selectedLockReason = (value: LockSubmitBody['lockReason']): LockReasonPreset | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
 export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
 
   router.post('/lock-review-submit', async (context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {
-      return context.json({ ok: false, error: 'ReviewLock dependencies are not configured.' }, 503);
+      return context.json<UiResponse>(uiToast('ReviewLock dependencies are not configured.'));
     }
     const flowDeps = { reddit: deps.reddit, redis: deps.redis, clock: deps.clock };
 
     const body = await readJson<LockSubmitBody>(context);
 
-    if (!body.targetId || !body.actor || !body.lockReason) {
-      return context.json({ ok: false, message: 'Target, actor, and reason are required.' }, 400);
+    const lockReason = selectedLockReason(body.lockReason);
+
+    if (!body.targetId || !lockReason) {
+      return context.json<UiResponse>(uiToast('Target and reason are required.'));
     }
 
     const result = await lockReviewedContent(flowDeps, {
       targetId: body.targetId,
-      actor: body.actor,
-      lockReason: body.lockReason,
+      actor: await actorFromReddit(deps.reddit, body.actor),
+      lockReason,
       customNote: body.customNote,
       expiresAt: body.expiresAt,
     });
 
-    return context.json(result, result.ok ? 200 : 400);
+    return context.json<UiResponse>(
+      result.ok
+        ? uiToast('ReviewLock locked this reviewed content until it changes.', 'success')
+        : uiToast(result.message),
+    );
   });
 
   router.post('/unlock-review-submit', async (context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {
-      return context.json({ ok: false, error: 'ReviewLock dependencies are not configured.' }, 503);
+      return context.json<UiResponse>(uiToast('ReviewLock dependencies are not configured.'));
     }
     const flowDeps = { reddit: deps.reddit, redis: deps.redis, clock: deps.clock };
 
     const body = await readJson<UnlockSubmitBody>(context);
 
-    if (!body.targetId || !body.actor) {
-      return context.json({ ok: false, message: 'Target and actor are required.' }, 400);
+    if (!body.targetId) {
+      return context.json<UiResponse>(uiToast('Target is required.'));
     }
 
-    return context.json(await unlockReviewedContent(flowDeps, { targetId: body.targetId, actor: body.actor }));
+    const result = await unlockReviewedContent(flowDeps, {
+      targetId: body.targetId,
+      actor: await actorFromReddit(deps.reddit, body.actor),
+    });
+
+    return context.json<UiResponse>(
+      result.ok
+        ? uiToast('ReviewLock unlocked this reviewed content.', 'success')
+        : uiToast(result.message),
+    );
   });
 
-  router.post('/dashboard-launch-submit', (context) =>
-    context.json({
-      ok: true,
-      message: 'ReviewLock dashboard can be opened from the subreddit app surface.',
-    }),
-  );
+  router.post('/dashboard-launch-submit', async (context) => {
+    await readJson(context);
+
+    if (!deps.reddit?.submitDashboardPost) {
+      return context.json<UiResponse>(uiToast('ReviewLock dashboard launch is not available in this runtime.'));
+    }
+
+    const subredditName = (await deps.reddit.getCurrentSubredditName()) ?? 'reviewlock_dev';
+    const post = await deps.reddit.submitDashboardPost({
+      subredditName,
+      title: 'ReviewLock dashboard',
+    });
+    const permalink = post.permalink.startsWith('http')
+      ? post.permalink
+      : `https://www.reddit.com${post.permalink}`;
+
+    return context.json<UiResponse>({
+      navigateTo: permalink,
+      showToast: {
+        text: 'Opening ReviewLock dashboard',
+        appearance: 'success',
+      },
+    });
+  });
   router.post('/reopen-action-submit', (context) =>
-    context.json({
-      ok: true,
-      message: 'Reopen actions are wired by the reopen flow wave.',
+    context.json<UiResponse>({
+      showToast: {
+        text: 'ReviewLock reopen action received.',
+        appearance: 'neutral',
+      },
     }),
   );
 

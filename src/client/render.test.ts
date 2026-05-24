@@ -115,6 +115,8 @@ describe('client render helpers', () => {
     expect(renderDemoBanner(true)).toContain('Demo mode');
     expect(renderRuntimeBanner(runtime())).toContain('Runtime proof/status');
     expect(renderRuntimeBanner(runtime())).toContain('ignoreReports');
+    expect(renderRuntimeBanner(runtime(), 'Runtime proof refreshed.')).toContain('Verify runtime');
+    expect(renderRuntimeBanner(runtime(), 'Runtime proof refreshed.')).toContain('Runtime proof refreshed.');
   });
 
   it('renders audit timeline', () => {

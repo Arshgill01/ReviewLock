@@ -215,3 +215,25 @@ Typing source already verified in Wave 01:
 Implementation note:
 
 - Update trigger behavior is locally tested through refetch-and-fingerprint services. Live payload shape and delivery behavior remain unverified until Wave 13.
+
+## 2026-05-24 - Wave 13 runtime hardening evidence
+
+Commands:
+
+- `rg -n "context\\.subredditName|submitCustomPost|getCurrentSubreddit|@devvit/web/server" /Users/arshdeepsingh/Developer/ModMirror/src /Users/arshdeepsingh/Developer/ModMirror -g '*.ts' -g '*.tsx'`
+- `sed -n '1,130p' /Users/arshdeepsingh/Developer/ModMirror/src/routes/forms.ts`
+- `sed -n '280,365p' /Users/arshdeepsingh/Developer/ModMirror/src/routes/api.ts`
+- `sed -n '133,148p' node_modules/@devvit/build-pack/esbuild/templatizer/blocks.template.js`
+
+Observed local evidence:
+
+- `ModMirror/src/routes/forms.ts:2` imports `context` and `reddit` from `@devvit/web/server`.
+- `ModMirror/src/routes/forms.ts:75` through `:77` uses `context.subredditName ?? (await reddit.getCurrentSubreddit()).name` before `reddit.submitCustomPost(...)`.
+- `ModMirror/src/routes/api.ts:300` returns `context.subredditName` in health output.
+- `node_modules/@devvit/build-pack/esbuild/templatizer/blocks.template.js:133` through `:147` validates `UiResponse` objects and permits only `navigateTo`, `showToast`, and `showForm` keys.
+
+Implementation conclusions:
+
+- ReviewLock should read the embedded subreddit from Devvit server `context.subredditName` and only fall back to Reddit API or client URL inference when context is unavailable.
+- Internal menu/form endpoints must not return `{ ok: true }` because Devvit treats unknown `UiResponse` keys as runtime failures.
+- Runtime smoke endpoints should be executed from the embedded WebView, not direct unauthenticated terminal requests.

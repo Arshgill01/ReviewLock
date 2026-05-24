@@ -25,6 +25,8 @@ export class ReviewLockStore {
   public dailyMetrics: DailyMetrics[] = [];
   public topChurnTargets: TargetMetrics[] = [];
   public runtimeStatus: RuntimeProofStatus | null = null;
+  public isVerifyingRuntime: boolean = false;
+  public runtimeVerificationMessage: string | null = null;
 
   constructor(api: ReviewLockApiClient, initialSubreddit: string = 'reviewlock', initialDemo: boolean = false) {
     this.api = api;
@@ -118,6 +120,34 @@ export class ReviewLockStore {
     } catch (err) {
       this.error = err instanceof Error ? err.message : 'An error occurred while dismissing';
       this.isLoading = false;
+      this.notify();
+    }
+  }
+
+  async verifyRuntime() {
+    if (this.demo) {
+      this.runtimeVerificationMessage = null;
+      this.error = 'Runtime verification runs in live mode only.';
+      this.notify();
+      return;
+    }
+
+    this.isVerifyingRuntime = true;
+    this.runtimeVerificationMessage = null;
+    this.error = null;
+    this.notify();
+
+    try {
+      await this.api.runRuntimeSmoke(this.subreddit);
+      const runtimeData = await this.api.fetchRuntimeStatus(this.subreddit, false);
+      this.runtimeStatus = runtimeData.runtime;
+      this.dailyMetrics = runtimeData.dailyMetrics;
+      this.topChurnTargets = runtimeData.topChurnTargets;
+      this.runtimeVerificationMessage = 'Runtime proof refreshed.';
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : 'Runtime verification failed';
+    } finally {
+      this.isVerifyingRuntime = false;
       this.notify();
     }
   }

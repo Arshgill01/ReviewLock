@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
+import type { FormField, MenuItemRequest, UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
@@ -12,24 +13,23 @@ interface RouteDeps {
   clock?: Clock;
 }
 
-interface MenuRequestBody {
-  targetId?: string;
+type ReviewLockMenuRequest = Partial<MenuItemRequest> & {
   postId?: string;
   commentId?: string;
-}
+};
 
-const readMenuBody = async (context: Context): Promise<MenuRequestBody> => {
+const readMenuBody = async (context: Context): Promise<ReviewLockMenuRequest> => {
   try {
-    return (await context.req.json()) as MenuRequestBody;
+    return (await context.req.json()) as ReviewLockMenuRequest;
   } catch {
     return {};
   }
 };
 
-const targetIdFromBody = (body: MenuRequestBody): string | undefined =>
+const targetIdFromBody = (body: ReviewLockMenuRequest): string | undefined =>
   body.targetId ?? body.postId ?? body.commentId;
 
-export const buildLockReviewForm = (target: {
+const targetSummary = (target: {
   id: string;
   kind: string;
   authorName: string;
@@ -38,30 +38,87 @@ export const buildLockReviewForm = (target: {
   permalink: string;
   body?: string;
   title?: string;
-}) => ({
-  form: 'lockReview',
+}): string =>
+  [
+    `${target.kind} ${target.id}`,
+    `Author: ${target.authorName}`,
+    `Reports now: ${target.reportCount}`,
+    `Edited: ${target.edited ? 'yes' : 'no'}`,
+    `Permalink: ${target.permalink}`,
+    `Preview: ${(target.body ?? target.title ?? '').slice(0, 240)}`,
+  ].join('\n');
+
+export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0]) => ({
   title: 'Lock review',
-  fields: {
-    targetId: target.id,
-    targetKind: target.kind,
-    author: target.authorName,
-    reportCount: target.reportCount,
-    edited: target.edited,
-    permalink: target.permalink,
-    contentPreview: (target.body ?? target.title ?? '').slice(0, 240),
-    reasonPreset: 'reviewed_policy_compliant',
-    customNote: '',
-    expiryDays: 30,
-  },
+  description: 'Lock reviewed content until it changes.',
+  fields: [
+    {
+      name: 'targetId',
+      label: 'Target ID',
+      type: 'string',
+      required: true,
+      defaultValue: target.id,
+    },
+    {
+      name: 'targetSummary',
+      label: 'Reviewed content',
+      type: 'paragraph',
+      defaultValue: targetSummary(target),
+      disabled: true,
+    },
+    {
+      name: 'lockReason',
+      label: 'Reason',
+      type: 'select',
+      required: true,
+      defaultValue: ['reviewed_policy_compliant'],
+      options: [
+        { label: 'Reviewed and policy-compliant', value: 'reviewed_policy_compliant' },
+        { label: 'Repeat false reports', value: 'repeat_false_reports' },
+        { label: 'Context verified', value: 'context_verified' },
+        { label: 'Moderator consensus', value: 'moderator_consensus' },
+      ],
+    },
+    {
+      name: 'customNote',
+      label: 'Moderator note',
+      type: 'paragraph',
+      defaultValue: '',
+      helpText: 'Optional. Stored only for moderation workflow context.',
+    },
+  ] satisfies FormField[],
+  acceptLabel: 'Lock review',
+  cancelLabel: 'Cancel',
 });
 
-export const buildUnlockReviewForm = (lockId: string) => ({
-  form: 'unlockReview',
+export const buildUnlockReviewForm = (targetId: string, lockId: string) => ({
   title: 'Unlock review',
-  fields: {
-    lockId,
-    confirmation: 'Unlock review',
-  },
+  description: 'Unlock this reviewed item and allow reports to surface again.',
+  fields: [
+    {
+      name: 'targetId',
+      label: 'Target ID',
+      type: 'string',
+      required: true,
+      defaultValue: targetId,
+    },
+    {
+      name: 'lockId',
+      label: 'Current lock ID',
+      type: 'string',
+      required: true,
+      defaultValue: lockId,
+    },
+    {
+      name: 'confirmation',
+      label: 'Confirmation',
+      type: 'paragraph',
+      defaultValue: 'Unlock review',
+      disabled: true,
+    },
+  ] satisfies FormField[],
+  acceptLabel: 'Unlock review',
+  cancelLabel: 'Cancel',
 });
 
 export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
@@ -69,38 +126,52 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
 
   const lockHandler = async (context: Context) => {
     if (!deps.reddit) {
-      return context.json({ ok: false, error: 'Reddit adapter is not configured.' }, 503);
+      return context.json<UiResponse>({
+        showToast: { text: 'ReviewLock could not resolve Reddit context.', appearance: 'neutral' },
+      });
     }
 
     const body = await readMenuBody(context);
     const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body));
 
     if (!resolution.ok || !resolution.target) {
-      return context.json({ ok: false, message: resolution.error ?? 'Target not found.' }, 404);
+      return context.json<UiResponse>({
+        showToast: { text: resolution.error ?? 'ReviewLock could not resolve this target.', appearance: 'neutral' },
+      });
     }
 
-    return context.json({ ok: true, form: buildLockReviewForm(resolution.target) });
+    return context.json<UiResponse>({
+      showForm: { name: 'lockReview', form: buildLockReviewForm(resolution.target) },
+    });
   };
 
   const unlockHandler = async (context: Context) => {
     if (!deps.reddit || !deps.redis) {
-      return context.json({ ok: false, error: 'ReviewLock dependencies are not configured.' }, 503);
+      return context.json<UiResponse>({
+        showToast: { text: 'ReviewLock dependencies are not configured.', appearance: 'neutral' },
+      });
     }
 
     const body = await readMenuBody(context);
     const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body));
 
     if (!resolution.ok || !resolution.target) {
-      return context.json({ ok: false, message: resolution.error ?? 'Target not found.' }, 404);
+      return context.json<UiResponse>({
+        showToast: { text: resolution.error ?? 'ReviewLock could not resolve this target.', appearance: 'neutral' },
+      });
     }
 
     const lock = await getActiveLockByTarget(deps.redis, resolution.target.subreddit, resolution.target.id);
 
     if (!lock) {
-      return context.json({ ok: true, message: 'No active ReviewLock lock was found for this content.' });
+      return context.json<UiResponse>({
+        showToast: { text: 'No active ReviewLock lock was found for this content.', appearance: 'neutral' },
+      });
     }
 
-    return context.json({ ok: true, form: buildUnlockReviewForm(lock.id) });
+    return context.json<UiResponse>({
+      showForm: { name: 'unlockReview', form: buildUnlockReviewForm(resolution.target.id, lock.id) },
+    });
   };
 
   router.post('/lock-post', lockHandler);
@@ -108,12 +179,24 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
   router.post('/unlock-post', unlockHandler);
   router.post('/unlock-comment', unlockHandler);
   router.post('/open-dashboard', (context) =>
-    context.json({
-      ok: true,
-      form: {
-        form: 'dashboardLaunch',
-        title: 'Open ReviewLock dashboard',
-        fields: { copy: 'Lock reviewed content until it changes.' },
+    context.json<UiResponse>({
+      showForm: {
+        name: 'dashboardLaunch',
+        form: {
+          title: 'Open ReviewLock dashboard',
+          fields: [
+            {
+              name: 'copy',
+              label: 'ReviewLock',
+              type: 'paragraph',
+              defaultValue:
+                'This creates a visible ReviewLock dashboard custom post in this subreddit. Lock reviewed content until it changes.',
+              disabled: true,
+            },
+          ],
+          acceptLabel: 'Create dashboard post',
+          cancelLabel: 'Cancel',
+        },
       },
     }),
   );

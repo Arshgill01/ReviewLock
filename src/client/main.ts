@@ -1,13 +1,16 @@
 import './styles.css';
 import { renderDashboardPage } from './pages/DashboardPage';
 import { ReviewLockApiClient } from './state/api';
+import { inferEmbeddedSubreddit } from './state/runtimeContext';
 import { ReviewLockStore } from './state/store';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 const params = new URLSearchParams(window.location.search);
+const api = new ReviewLockApiClient();
+const requestedSubreddit = params.get('subreddit');
 const store = new ReviewLockStore(
-  new ReviewLockApiClient(),
-  params.get('subreddit') ?? 'reviewlock',
+  api,
+  requestedSubreddit ?? 'reviewlock',
   params.get('demo') === 'true',
 );
 
@@ -56,7 +59,29 @@ app?.addEventListener('click', (event) => {
   if (action === 'retry-fetch') {
     void store.fetchState();
   }
+
+  if (action === 'verify-runtime') {
+    void store.verifyRuntime();
+  }
 });
 
 render();
-void store.fetchState();
+void (async () => {
+  if (!requestedSubreddit) {
+    const embeddedSubreddit = inferEmbeddedSubreddit(window.location.href, document.referrer);
+    if (embeddedSubreddit) {
+      store.subreddit = embeddedSubreddit;
+    }
+
+    try {
+      const runtimeContext = await api.fetchRuntimeContext();
+      if (runtimeContext.subreddit) {
+        store.subreddit = runtimeContext.subreddit;
+      }
+    } catch {
+      // Dashboard data loading below will surface runtime connectivity failures.
+    }
+  }
+
+  await store.fetchState();
+})();

@@ -217,6 +217,19 @@ a:hover {
   background: var(--surface-muted);
 }
 
+.button:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
+.panel-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .count-badge,
 .number-pill,
 .status {
@@ -308,6 +321,11 @@ td strong {
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+.runtime-note {
+  margin: 0 0 10px;
+  color: var(--muted);
 }
 
 .queue-row,

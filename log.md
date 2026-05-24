@@ -173,3 +173,30 @@
 - Open risks:
   - `npm run build` emits a Vite warning about mixed named/default exports in `src/index.ts`; build passes and the default export remains available for Devvit.
   - Default app wiring uses in-memory fallback dependencies for local integration tests; runtime Devvit adapter wiring must be proven or documented in Wave 13.
+
+## 2026-05-24 - Wave 13
+
+- Hardened the runtime entrypoint to use Devvit Web server primitives, real Redis and Reddit adapters, and a testable `createApp()` factory.
+- Fixed Devvit manifest playtest blockers: unsupported top-level `version` and recursive `scripts.dev`.
+- Fixed invalid Devvit `UiResponse` payloads from internal menu/form routes.
+- Added dashboard custom post launch and runtime smoke checks for Redis and Reddit context.
+- Added `/api/context` and client context resolution so the embedded dashboard can use the actual Devvit subreddit instead of a hardcoded fallback.
+- Added runtime proof docs, playtest checklist, known limitations, and runtime hardening tests.
+- Commands run so far:
+  - `npx devvit whoami`
+  - `npx devvit view --json`
+  - `npm run dev -- reviewlock_dev`
+  - `npm run type-check`
+  - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
+  - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
+  - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps`
+  - `npx devvit logs reviewlock_dev reviewlock --connect --since 10m --show-timestamps`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+  - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps`
+- Pass/fail status: PASS for Wave 13 local verification and Devvit logs connectivity; live moderation methods/triggers remain unverified and are carried to Wave 15.
+- Open risks:
+  - `devvit logs` attempts were blocked by `listen EADDRINUSE: address already in use :::5678` while playtest was active, then streamed successfully after stopping playtest.
+  - The dashboard runtime smoke must be rerun from an isolated ReviewLock browser window after the subreddit context fix.
+  - Live `approve()`, `ignoreReports()`, `unignoreReports()`, report triggers, and update triggers remain unverified.

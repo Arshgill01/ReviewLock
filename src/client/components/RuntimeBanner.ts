@@ -3,12 +3,19 @@ import type { RuntimeCapabilityStatus, RuntimeProofStatus } from '../../shared/s
 const statusLabel = (status: RuntimeCapabilityStatus): string =>
   status.replace(/_/g, ' ');
 
-export const renderRuntimeBanner = (status: RuntimeProofStatus | null): string => {
+export const renderRuntimeBanner = (
+  status: RuntimeProofStatus | null,
+  verificationMessage: string | null = null,
+  isVerifying: boolean = false,
+): string => {
+  const verifyLabel = isVerifying ? 'Verifying' : 'Verify runtime';
+
   if (!status) {
     return `
       <section class="panel panel-tight">
         <div class="panel-heading">
           <h2>Runtime proof/status</h2>
+          <button class="button button-secondary" data-action="verify-runtime" ${isVerifying ? 'disabled' : ''}>${verifyLabel}</button>
         </div>
         <p class="empty-text">Runtime status has not loaded.</p>
       </section>
@@ -34,8 +41,12 @@ export const renderRuntimeBanner = (status: RuntimeProofStatus | null): string =
     <section class="panel panel-tight">
       <div class="panel-heading">
         <h2>Runtime proof/status</h2>
-        <span class="status status-${status.overall}">${statusLabel(status.overall)}</span>
+        <div class="panel-actions">
+          <span class="status status-${status.overall}">${statusLabel(status.overall)}</span>
+          <button class="button button-secondary" data-action="verify-runtime" ${isVerifying ? 'disabled' : ''}>${verifyLabel}</button>
+        </div>
       </div>
+      ${verificationMessage ? `<p class="runtime-note">${verificationMessage}</p>` : ''}
       <ul class="capability-list">${capabilities}</ul>
       ${
         status.warnings.length

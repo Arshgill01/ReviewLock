@@ -14,7 +14,7 @@
 - [x] Wave 10 - Dashboard Client
 - [x] Wave 11 - Demo Mode
 - [x] Wave 12 - Integration Wiring
-- [ ] Wave 13 - Runtime Proof and Hardening
+- [x] Wave 13 - Runtime Proof and Hardening
 - [ ] Wave 15 - End-to-End Trigger Proof
 - [ ] Wave 16 - Edit-Fingerprint Stress
 - [ ] Wave 17 - Redis Failure and Race Conditions
@@ -38,6 +38,7 @@
 - [x] Verify Devvit package version after scaffold.
 - [x] Confirm trigger payload shapes in generated app typings.
 - [ ] Confirm `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support.
+- [ ] Rerun dashboard `Verify runtime` in an isolated ReviewLock browser window and confirm proof writes under `reviewlock_dev`.
 - [ ] Capture screenshots only after demo loop is integrated.
 - [ ] Keep `decisions.md` updated for every scope or platform call.
 - [ ] Do not treat Wave 14 as final until Waves 15-30 have run and committed.
