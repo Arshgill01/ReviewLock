@@ -88,6 +88,7 @@
 - [x] Expand seeded demo data to 18 records with richer churn and reopen reasons.
 - [x] Re-run live WebView demo smoke after seeded demo data expansion.
 - [x] Add controlled live scenario matrix separating demo quality from runtime proof.
+- [x] Add live trigger proof runbook for S01/S02 controlled execution.
 - [ ] Generate controlled live report trigger events in `r/reviewlock_dev`.
 - [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [ ] Capture sanitized `devvit logs` payload evidence for live report/update triggers.

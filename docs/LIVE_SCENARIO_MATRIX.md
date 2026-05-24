@@ -7,6 +7,8 @@ confusing seeded demo data with live evidence.
 
 Exact controlled post and comment copy lives in
 `docs/LIVE_SCENARIO_CONTENT.md`.
+The live trigger execution runbook lives in
+`docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`.
 
 ## Feasibility Verdict
 

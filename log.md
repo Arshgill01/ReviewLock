@@ -1200,3 +1200,20 @@
   - S01 has not been posted yet.
   - No live report, edit, flair, NSFW, spoiler, comment, or trigger proof has
     been performed in this pass.
+
+## 2026-05-25 - Wave 33 live trigger proof runbook
+
+- Added `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md` with the exact S01 unchanged-report
+  suppression sequence and S02 body-edit reopen sequence.
+- Included terminal setup, log capture commands, expected evidence, dashboard
+  assertions, and claim boundaries.
+- Kept live Reddit side effects behind action-time confirmation.
+- Commands run:
+  - `git status --short`
+  - `tail -n 220 docs/REVIEW_AGENT_FINDINGS.md 2>/dev/null || true`
+  - `rg -n "unverified|blocked|pending|TODO|not yet|needs|blocked" docs TODO.md log.md | head -n 200`
+  - `find . -name AGENTS.md -print`
+- Pass/fail status: PASS for non-risky runbook documentation.
+- Open risks:
+  - Live trigger proof remains blocked until the controlled S01 post is created
+    and reported in `r/reviewlock_dev`.
