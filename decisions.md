@@ -1030,3 +1030,26 @@ Reason:
   failed to persist the suppression ledger. Moderators need that failure visible
   in proof surfaces, and trigger retries must not be blocked by a stale dedupe
   marker.
+
+### D065 - Normalize bare Devvit target ids at route boundaries
+
+Installed Devvit types expose trigger/menu target ids as strings, and Devvit
+model mapping already normalizes bare `PostV2.id` and `CommentV2.id` values
+after a successful refetch.
+
+Decision:
+
+- Keep `resolveTargetById()` strict for shared service calls that do not know a
+  target kind.
+- Normalize ids at endpoint boundaries where the kind is known:
+  - post menu/report/update routes normalize bare ids to `t3_*`;
+  - comment menu/report/update routes normalize bare ids to `t1_*`;
+  - already-prefixed thing ids are preserved.
+- Add regressions for bare Devvit post/comment ids before live trigger proof.
+
+Reason:
+
+- If a live Devvit payload supplies `post.id` or `comment.id` without a thing
+  prefix, rejecting it before refetch would make report/update trigger proof fail
+  for a shape the adapter is otherwise prepared to handle. The route is the
+  safest place to apply kind-specific normalization.

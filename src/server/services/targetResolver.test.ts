@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockTarget } from '../../shared/schema';
-import { inferTargetKind, resolveTargetById } from './targetResolver';
+import { inferTargetKind, normalizeTargetId, resolveTargetById } from './targetResolver';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't1_comment',
@@ -20,6 +20,13 @@ describe('target resolver', () => {
     expect(inferTargetKind('t3_post')).toBe('post');
     expect(inferTargetKind('t1_comment')).toBe('comment');
     expect(inferTargetKind('abc')).toBeUndefined();
+  });
+
+  it('normalizes bare Reddit ids when the route target kind is known', () => {
+    expect(normalizeTargetId('post', 'abc123')).toBe('t3_abc123');
+    expect(normalizeTargetId('comment', 'def456')).toBe('t1_def456');
+    expect(normalizeTargetId('post', 't3_post')).toBe('t3_post');
+    expect(normalizeTargetId('comment', undefined)).toBeUndefined();
   });
 
   it('refetches comments through the adapter', async () => {

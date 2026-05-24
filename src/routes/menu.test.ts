@@ -49,6 +49,28 @@ describe('menu routes', () => {
     });
   });
 
+  it('normalizes bare post ids from Devvit menu payloads', async () => {
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ postId: 'post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        form: {
+          fields: expect.arrayContaining([
+            expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+          ]),
+        },
+      },
+    });
+  });
+
   it('returns neutral unlock response when no lock exists', async () => {
     const router = createMenuRouter({
       reddit: new FakeRedditAdapter([target()]),

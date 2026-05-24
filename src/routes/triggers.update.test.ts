@@ -90,6 +90,22 @@ describe('update trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
   });
 
+  it('normalizes bare Devvit post update ids before resolving targets', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([target('Edited body')]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({ post: { id: 'post' }, subreddit: { name: 'alpha' } }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+  });
+
   it('accepts Devvit TriggerEvent-wrapped post update payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
@@ -203,6 +219,24 @@ describe('update trigger routes', () => {
     const response = await router.request('/on-comment-update', {
       method: 'POST',
       body: JSON.stringify({ comment: { id: 't1_comment', subredditName: 'alpha' } }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+  });
+
+  it('normalizes bare Devvit comment update ids before resolving targets', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({ comment: { id: 'comment' }, subreddit: { name: 'alpha' } }),
     });
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });

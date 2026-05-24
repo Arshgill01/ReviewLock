@@ -94,6 +94,26 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
   });
 
+  it('normalizes bare Devvit post report ids before resolving targets', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-bare-post',
+        post: { id: 'post', numberOfReports: 6 },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+  });
+
   it('accepts Devvit TriggerEvent-wrapped post report payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
@@ -206,6 +226,28 @@ describe('report trigger routes', () => {
       body: JSON.stringify({
         id: 'evt-nested-comment',
         comment: { id: 't1_comment', subredditName: 'alpha', numReports: 3 },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
+  it('normalizes bare Devvit comment report ids before resolving targets', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-bare-comment',
+        comment: { id: 'comment', numReports: 3 },
+        subreddit: { name: 'alpha' },
       }),
     });
 

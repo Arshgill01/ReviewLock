@@ -4,6 +4,8 @@ import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
 import { handleReportTrigger } from '../server/services/reportTriggers';
+import { normalizeTargetId } from '../server/services/targetResolver';
+import type { TargetKind } from '../shared/schema';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
@@ -54,8 +56,10 @@ const payloads = (body: TriggerBody): TriggerBody[] => [
 const first = <T>(values: (T | undefined)[]): T | undefined =>
   values.find((value): value is T => value !== undefined);
 
-const targetId = (body: TriggerBody): string | undefined =>
-  first(
+const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
+  normalizeTargetId(
+    kind,
+    first(
     payloads(body).flatMap((payload) => [
       payload.targetId,
       payload.postId,
@@ -63,6 +67,7 @@ const targetId = (body: TriggerBody): string | undefined =>
       payload.post?.id,
       payload.comment?.id,
     ]),
+    ),
   );
 
 const eventId = (body: TriggerBody): string | undefined => body.eventId ?? body.id;
@@ -92,13 +97,13 @@ const reportedAt = (body: TriggerBody): string | undefined => body.reportedAt ??
 export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
 
-  const handler = async (context: Context) => {
+  const handler = (kind: TargetKind) => async (context: Context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {
       return context.json({ ok: false, error: 'ReviewLock dependencies are not configured.' }, 503);
     }
 
     const body = await readBody(context);
-    const id = targetId(body);
+    const id = targetId(body, kind);
 
     if (!id) {
       return context.json({ ok: false, error: 'Report trigger target id is required.' }, 400);
@@ -118,8 +123,8 @@ export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
     );
   };
 
-  router.post('/on-post-report', handler);
-  router.post('/on-comment-report', handler);
+  router.post('/on-post-report', handler('post'));
+  router.post('/on-comment-report', handler('comment'));
 
   return router;
 };

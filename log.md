@@ -1240,3 +1240,24 @@
 - Open risks:
   - The live S01 lock form is open but not submitted; live lock/report actions
     remain paused pending action-time confirmation.
+
+## 2026-05-25 - Wave 33 Devvit bare target id hardening
+
+- Added endpoint-kind-aware target id normalization for Devvit menu, report
+  trigger, and update trigger routes.
+- Bare post ids are normalized to `t3_*`; bare comment ids are normalized to
+  `t1_*` before target resolution and Reddit refetch.
+- Added route regressions for bare Devvit post/comment ids across lock menu,
+  report triggers, and update triggers.
+- Commands run:
+  - `npm run test -- src/server/services/targetResolver.test.ts src/routes/menu.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+- Pass/fail status: PASS for targeted route/service tests, type-check, lint,
+  full tests, build, and diff whitespace check.
+- Open risks:
+  - Live trigger payload shape still needs `devvit logs` evidence from
+    controlled S01/S02 actions.

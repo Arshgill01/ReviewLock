@@ -24,6 +24,18 @@ export const inferTargetKind = (id: string | undefined): TargetKind | undefined 
   return undefined;
 };
 
+export const normalizeTargetId = (kind: TargetKind, id: string | undefined): string | undefined => {
+  if (!id) {
+    return undefined;
+  }
+
+  if (id.startsWith('t1_') || id.startsWith('t3_')) {
+    return id;
+  }
+
+  return kind === 'post' ? `t3_${id}` : `t1_${id}`;
+};
+
 export const resolveTargetById = async (
   reddit: RedditAdapter,
   targetId: string | undefined,

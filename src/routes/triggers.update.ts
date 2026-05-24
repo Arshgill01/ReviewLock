@@ -4,6 +4,8 @@ import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
 import { handleUpdateTrigger, type UpdateTriggerKind } from '../server/services/updateTriggers';
+import { normalizeTargetId } from '../server/services/targetResolver';
+import type { TargetKind } from '../shared/schema';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
@@ -51,8 +53,10 @@ const payloads = (body: TriggerBody): TriggerBody[] => [
 const first = <T>(values: (T | undefined)[]): T | undefined =>
   values.find((value): value is T => value !== undefined);
 
-const targetId = (body: TriggerBody): string | undefined =>
-  first(
+const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
+  normalizeTargetId(
+    kind,
+    first(
     payloads(body).flatMap((payload) => [
       payload.targetId,
       payload.postId,
@@ -60,6 +64,7 @@ const targetId = (body: TriggerBody): string | undefined =>
       payload.post?.id,
       payload.comment?.id,
     ]),
+    ),
   );
 
 const subreddit = (body: TriggerBody): string | undefined =>
@@ -74,6 +79,7 @@ const subreddit = (body: TriggerBody): string | undefined =>
 const registerUpdate = (
   router: Hono,
   path: string,
+  targetKind: TargetKind,
   triggerKind: UpdateTriggerKind,
   deps: RouteDeps,
 ) => {
@@ -83,7 +89,7 @@ const registerUpdate = (
     }
 
     const body = await readBody(context);
-    const id = targetId(body);
+    const id = targetId(body, targetKind);
 
     if (!id) {
       return context.json({ ok: false, error: 'Update trigger target id is required.' }, 400);
@@ -101,11 +107,11 @@ const registerUpdate = (
 export const createUpdateTriggersRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
 
-  registerUpdate(router, '/on-post-update', 'post_update', deps);
-  registerUpdate(router, '/on-comment-update', 'comment_update', deps);
-  registerUpdate(router, '/on-post-nsfw-update', 'post_nsfw_update', deps);
-  registerUpdate(router, '/on-post-spoiler-update', 'post_spoiler_update', deps);
-  registerUpdate(router, '/on-post-flair-update', 'post_flair_update', deps);
+  registerUpdate(router, '/on-post-update', 'post', 'post_update', deps);
+  registerUpdate(router, '/on-comment-update', 'comment', 'comment_update', deps);
+  registerUpdate(router, '/on-post-nsfw-update', 'post', 'post_nsfw_update', deps);
+  registerUpdate(router, '/on-post-spoiler-update', 'post', 'post_spoiler_update', deps);
+  registerUpdate(router, '/on-post-flair-update', 'post', 'post_flair_update', deps);
 
   return router;
 };

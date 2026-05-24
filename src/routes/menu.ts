@@ -6,7 +6,8 @@ import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
 import { createFormBinding } from '../server/services/formBindings';
 import { getActiveLockByTarget } from '../server/services/locks';
-import { resolveTargetById } from '../server/services/targetResolver';
+import { normalizeTargetId, resolveTargetById } from '../server/services/targetResolver';
+import type { TargetKind } from '../shared/schema';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
@@ -27,8 +28,10 @@ const readMenuBody = async (context: Context): Promise<ReviewLockMenuRequest> =>
   }
 };
 
-const targetIdFromBody = (body: ReviewLockMenuRequest): string | undefined =>
-  body.targetId ?? body.postId ?? body.commentId;
+const targetIdFromBody = (
+  body: ReviewLockMenuRequest,
+  kind: TargetKind,
+): string | undefined => normalizeTargetId(kind, body.targetId ?? body.postId ?? body.commentId);
 
 const targetSummary = (target: {
   id: string;
@@ -184,7 +187,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     },
   });
 
-  const lockHandler = async (context: Context) => {
+  const lockHandler = (kind: TargetKind) => async (context: Context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {
       return context.json<UiResponse>({
         showToast: { text: 'ReviewLock dependencies are not configured.', appearance: 'neutral' },
@@ -192,7 +195,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     const body = await readMenuBody(context);
-    const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body));
+    const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body, kind));
 
     if (!resolution.ok || !resolution.target) {
       return context.json<UiResponse>({
@@ -218,7 +221,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     });
   };
 
-  const unlockHandler = async (context: Context) => {
+  const unlockHandler = (kind: TargetKind) => async (context: Context) => {
     if (!deps.reddit || !deps.redis) {
       return context.json<UiResponse>({
         showToast: { text: 'ReviewLock dependencies are not configured.', appearance: 'neutral' },
@@ -226,7 +229,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     const body = await readMenuBody(context);
-    const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body));
+    const resolution = await resolveTargetById(deps.reddit, targetIdFromBody(body, kind));
 
     if (!resolution.ok || !resolution.target) {
       return context.json<UiResponse>({
@@ -273,10 +276,10 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     });
   };
 
-  router.post('/lock-post', lockHandler);
-  router.post('/lock-comment', lockHandler);
-  router.post('/unlock-post', unlockHandler);
-  router.post('/unlock-comment', unlockHandler);
+  router.post('/lock-post', lockHandler('post'));
+  router.post('/lock-comment', lockHandler('comment'));
+  router.post('/unlock-post', unlockHandler('post'));
+  router.post('/unlock-comment', unlockHandler('comment'));
   router.post('/open-post', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
   router.post('/open-comment', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
   router.post('/open-dashboard', (context) => context.json<UiResponse>(dashboardLaunchResponse()));
