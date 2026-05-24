@@ -4,7 +4,10 @@ import { InMemoryRedisStore } from '../adapters/redis';
 import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
 import { fingerprintTarget } from './fingerprint';
-import { saveLock } from './locks';
+import { listAuditEvents } from './audit';
+import { getActiveLockByTarget, getLock, saveLock } from './locks';
+import { getDailyMetrics, getTargetMetrics } from './metrics';
+import { listOpenReopenEvents } from './reopenQueue';
 import { handleUpdateTrigger, reasonForUpdateTrigger } from './updateTriggers';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
@@ -23,18 +26,18 @@ const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => 
   ...overrides,
 });
 
-const lock = (): ReviewLockRecord => {
-  const fingerprint = fingerprintTarget(target(), '2026-05-24T00:00:00.000Z');
+const lock = (reviewedTarget: ReviewLockTarget = target()): ReviewLockRecord => {
+  const fingerprint = fingerprintTarget(reviewedTarget, '2026-05-24T00:00:00.000Z');
 
   return {
-    id: 'lock-1',
-    subreddit: 'alpha',
-    targetId: 't3_post',
-    targetKind: 'post',
-    targetAuthor: 'u_author',
-    permalink: '/r/alpha/comments/post',
-    title: 'Reviewed post',
-    contentPreview: 'Reviewed body',
+    id: `lock-${reviewedTarget.id}`,
+    subreddit: reviewedTarget.subreddit,
+    targetId: reviewedTarget.id,
+    targetKind: reviewedTarget.kind,
+    targetAuthor: reviewedTarget.authorName,
+    permalink: reviewedTarget.permalink,
+    title: reviewedTarget.title,
+    contentPreview: reviewedTarget.body ?? reviewedTarget.title ?? '',
     contentHash: fingerprint?.hash ?? '',
     fingerprintVersion: fingerprint?.version ?? 'content-v1',
     lockedBy: 'mod',
@@ -65,17 +68,97 @@ describe('update triggers', () => {
     ] as const) {
       const redis = new InMemoryRedisStore();
       await saveLock(redis, lock());
+      const reddit = new FakeRedditAdapter([currentTarget]);
       const result = await handleUpdateTrigger(
         {
           redis,
-          reddit: new FakeRedditAdapter([currentTarget]),
+          reddit,
           clock: fixedClock('2026-05-24T01:00:00.000Z'),
         },
         { targetId: 't3_post', triggerKind },
       );
 
       expect(result.event).toMatchObject({ reason });
+      expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+      expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+      expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+        status: 'reopened',
+        reopenReason: reason,
+      });
+      expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+        expect.objectContaining({ reason }),
+      ]);
+      expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+        locksReopened: 1,
+      });
+      expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+        locksReopened: 1,
+      });
+      expect(await listAuditEvents(redis, 'alpha')).toEqual([
+        expect.objectContaining({ kind: 'lock_reopened' }),
+      ]);
     }
+  });
+
+  it('keeps unchanged post updates active without moderation or audit writes', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleUpdateTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', triggerKind: 'post_update' },
+    );
+
+    expect(result.action).toBe('unchanged');
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([]);
+  });
+
+  it('reopens post body updates and records Redis-visible proof', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]);
+    const result = await handleUpdateTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', triggerKind: 'post_update' },
+    );
+
+    expect(result.action).toBe('reopened');
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      status: 'reopened',
+      reopenReason: 'content_changed',
+      reopenEventId: result.event?.id,
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed', targetKind: 'post' }),
+    ]);
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'lock_reopened',
+        message: 'Lock reopened after reviewed content changed or became uncertain.',
+      }),
+    ]);
   });
 
   it('reopens comment edits', async () => {
@@ -89,26 +172,37 @@ describe('update triggers', () => {
       edited: false,
       reportCount: 1,
     };
-    const fingerprint = fingerprintTarget(comment, '2026-05-24T00:00:00.000Z');
     const redis = new InMemoryRedisStore();
-    await saveLock(redis, {
-      ...lock(),
-      id: 'lock-comment',
-      targetId: 't1_comment',
-      targetKind: 'comment',
-      contentHash: fingerprint?.hash ?? '',
-      fingerprintVersion: fingerprint?.version ?? 'content-v1',
-    });
+    await saveLock(redis, lock(comment));
+    const reddit = new FakeRedditAdapter([{ ...comment, body: 'Edited comment', edited: true }]);
 
     const result = await handleUpdateTrigger(
       {
         redis,
-        reddit: new FakeRedditAdapter([{ ...comment, body: 'Edited comment', edited: true }]),
+        reddit,
         clock: fixedClock('2026-05-24T01:00:00.000Z'),
       },
       { targetId: 't1_comment', triggerKind: 'comment_update' },
     );
 
     expect(result.event).toMatchObject({ reason: 'content_changed' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't1_comment')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-t1_comment')).toMatchObject({
+      status: 'reopened',
+      reopenReason: 'content_changed',
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed', targetKind: 'comment' }),
+    ]);
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't1_comment')).toMatchObject({
+      locksReopened: 1,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ kind: 'lock_reopened', targetKind: 'comment' }),
+    ]);
   });
 });

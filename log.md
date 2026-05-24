@@ -200,3 +200,19 @@
   - `devvit logs` attempts were blocked by `listen EADDRINUSE: address already in use :::5678` while playtest was active, then streamed successfully after stopping playtest.
   - The dashboard runtime smoke must be rerun from an isolated ReviewLock browser window after the subreddit context fix.
   - Live `approve()`, `ignoreReports()`, `unignoreReports()`, report triggers, and update triggers remain unverified.
+
+## 2026-05-24 - Wave 15
+
+- Expanded report trigger tests to prove unchanged post/comment suppression, changed post/comment reopening, duplicate report idempotency, runtime-uncertain target resolution, and ignoreReports failure behavior.
+- Expanded update trigger tests to prove unchanged updates stay active, post/comment content edits reopen, and NSFW/spoiler/flair material changes reopen with the correct reason.
+- Expanded route tests to cover post/comment report routes, post/comment update routes, and flair update reason mapping.
+- Added `docs/TRIGGER_PROOF.md` with a path-by-path trace from trigger payload to moderation call, Redis lock state, metrics, audit, and reopen queue.
+- Commands run so far:
+  - `npm run type-check`
+  - `npm run test -- --run src/server/services/reportTriggers.test.ts src/server/services/updateTriggers.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live Devvit trigger payloads have not been captured yet; local route payloads remain representative fixtures.
+  - Live `ignoreReports()` and `unignoreReports()` trigger behavior still requires controlled Reddit events.
