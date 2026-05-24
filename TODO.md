@@ -25,7 +25,7 @@
 - [x] Wave 22 - API Contract and Client Integration Hardening
 - [x] Wave 23 - Trigger Idempotency Hardening
 - [x] Wave 24 - Data Namespace and Migration Hardening
-- [ ] Wave 25 - Safety and Privacy Hardening
+- [x] Wave 25 - Safety and Privacy Hardening
 - [ ] Wave 26 - Performance and High-Volume Hardening
 - [ ] Wave 27 - Claim and Copy Hardening
 - [ ] Wave 28 - Browser Regression Hardening

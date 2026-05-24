@@ -271,3 +271,18 @@ Reason:
 
 - A single corrupt Redis value should not blank ReviewLock or stop moderators from seeing remaining trustworthy state.
 - Failing closed keeps suppression and reopen claims honest while preserving recoverability.
+
+### D022 - Keep actor names for audit traceability only
+
+Wave 25 reviewed whether `lockedBy`, `actor`, and `dismissedBy` create moderator surveillance risk.
+
+Decision:
+
+- Keep moderator actor names on state-changing audit records.
+- Do not aggregate metrics by moderator, rank moderators, or calculate moderator productivity.
+- Keep ReviewLock metrics scoped to content targets, daily totals, suppressed reports, and reopen events.
+
+Reason:
+
+- Mod teams need traceability for lock/unlock/reopen-dismiss actions.
+- ReviewLock's value is reducing repeat report churn, not measuring individual moderator performance.

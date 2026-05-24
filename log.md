@@ -414,3 +414,28 @@
 - Pass/fail status: PASS.
 - Open risks:
   - Existing records remain unversioned except lock fingerprint versions; the migration note defines the next-step requirement before incompatible schema changes.
+
+## 2026-05-24 - Wave 25
+
+- Added `docs/SAFETY_PRIVACY_AUDIT.md` with concrete evidence for reporter privacy, moderator safety, no AI/external-service drift, non-destructive reopen behavior, and product-copy guardrails.
+- Reviewed schema, Reddit adapter mapping, report/reopen/update services, metrics, dashboard aggregation, forms, client copy, package dependencies, Devvit permissions, README, and docs.
+- Confirmed reporter usernames are not stored; report handling persists counts and moderation workflow metadata only.
+- Confirmed moderator actors are audit traceability fields only; no per-moderator productivity metrics or surveillance features exist.
+- Confirmed reopen remains non-destructive in implementation: unignore reports, update lock state, enqueue reopen, audit, and metrics; no remove/ban/delete calls are used.
+- Logged D022 to preserve actor traceability while prohibiting moderator productivity analytics.
+- Commands run:
+  - `rg -n "reporter|reporters|userReportReasons|modReportReasons|authorName|lockedBy|actor|moderator|productivity|surveillance|AI decides|AI|automatic removal|remove automatically|external service|webhook|fetch\\(|axios|openai|llm|not reportable|disable reports|blocked reports|unreportable" src docs README.md package.json devvit.json || true`
+  - `rg -n "remove|approve|ignoreReports|unignoreReports|delete|ban|report" src/server src/routes src/client | head -n 240`
+  - `rg -n "reporter|AI decides|automatic removal|productivity|surveillance|external service" src docs README.md || true`
+  - `rg -n "not reportable|disable reports|blocked reports|unreportable|report disabling|ignore reports wrapper|remove automatically|automated removal|AI judgment|LLM|OpenAI|external" src docs README.md package.json || true`
+  - `find . -maxdepth 3 -type f \\( -name '*.env*' -o -name '*secret*' -o -name '*token*' \\) -print`
+  - `rg -n "process\\.env|SECRET|TOKEN|API_KEY|fetch\\(|https?://|webhook|discord|slack|openai|anthropic|gemini|llm|ai" src docs README.md package.json devvit.json || true`
+  - `rg -n "remove|delete|ban|spam|distinguish|unignoreReports|approve\\(" src/server src/routes src/shared src/client | head -n 260`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+  - `rg -n "reporter|AI decides|automatic removal|productivity|surveillance|external service" src docs README.md || true`
+- Pass/fail status: PASS.
+- Open risks:
+  - Live `unignoreReports()` behavior remains runtime-unverified until controlled playtest proof is captured.
