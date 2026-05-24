@@ -41,6 +41,18 @@ const dedupeKey = (input: ReportTriggerInput, now: string): string => {
   return key(input.subreddit ?? 'unknown', `report:dedupe:${id}`);
 };
 
+const safeIdPart = (value: string): string => value.replace(/[^a-zA-Z0-9_]+/g, '-');
+
+const auditIdPart = (input: ReportTriggerInput, now: string): string =>
+  safeIdPart(input.eventId ?? `${input.targetId}-${Date.parse(now)}`);
+
+const reportAuditId = (
+  prefix: string,
+  input: ReportTriggerInput,
+  now: string,
+  subjectId: string,
+): string => `${prefix}-${Date.parse(now)}-${safeIdPart(subjectId)}-${auditIdPart(input, now)}`;
+
 export const buildReopenFromReportDecision = (
   lock: ReviewLockRecord,
   target: ReviewLockTarget,
@@ -93,7 +105,7 @@ export const handleReportTrigger = async (
 
       if (!resolution.ok || !resolution.target) {
         await appendAuditEvent(deps.redis, {
-          id: `audit-report-runtime-${Date.parse(now)}-${input.targetId}`,
+          id: reportAuditId('audit-report-runtime', input, now, input.targetId),
           kind: 'runtime_failure',
           subreddit,
           targetId: input.targetId,
@@ -134,7 +146,7 @@ export const handleReportTrigger = async (
 
         if (!ignoreResult.ok) {
           await appendAuditEvent(deps.redis, {
-            id: `audit-report-ignore-failed-${Date.parse(now)}-${lock.id}`,
+            id: reportAuditId('audit-report-ignore-failed', input, now, lock.id),
             kind: 'runtime_failure',
             subreddit: lock.subreddit,
             targetId: lock.targetId,
@@ -164,7 +176,7 @@ export const handleReportTrigger = async (
           );
           await incrementSuppressedReportMetric(deps.redis, resolution.target, now, lock.demo);
           await appendAuditEvent(deps.redis, {
-            id: `audit-report-suppressed-${Date.parse(now)}-${lock.id}`,
+            id: reportAuditId('audit-report-suppressed', input, now, lock.id),
             kind: 'report_suppressed',
             subreddit: lock.subreddit,
             targetId: lock.targetId,
@@ -211,7 +223,7 @@ export const handleReportTrigger = async (
         await enqueueReopenEvent(deps.redis, reopenEvent);
         await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
         await appendAuditEvent(deps.redis, {
-          id: `audit-report-reopened-${Date.parse(now)}-${lock.id}`,
+          id: reportAuditId('audit-report-reopened', input, now, lock.id),
           kind: 'lock_reopened',
           subreddit: lock.subreddit,
           targetId: lock.targetId,
@@ -234,7 +246,7 @@ export const handleReportTrigger = async (
       }
 
       await appendAuditEvent(deps.redis, {
-        id: `audit-report-uncertain-${Date.parse(now)}-${lock.id}`,
+        id: reportAuditId('audit-report-uncertain', input, now, lock.id),
         kind: 'runtime_failure',
         subreddit: lock.subreddit,
         targetId: lock.targetId,

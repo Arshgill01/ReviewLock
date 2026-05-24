@@ -273,3 +273,22 @@
 - Open risks:
   - Browser evidence used mocked dashboard API responses against the built client bundle; live Devvit WebView rendering and live moderation operations still require controlled playtest proof.
   - Plain Vite dev serving is blocked by the Devvit Vite plugin, so the browser audit used the built client served statically.
+
+## 2026-05-24 - Wave 19
+
+- Added `src/fullScenario.test.ts`, a route-level integration harness for the full post and comment story: lock review, suppress repeat reports, edit content, reopen, dashboard metrics, reopen queue, audit output, and Reddit operation log.
+- Added `docs/FULL_SCENARIO_WALKTHROUGH.md` with route payloads, observed outputs, Redis-visible state, dashboard output, and live/unverified labels.
+- Fixed report-trigger audit ids so distinct same-timestamp report events do not collapse into one `report_suppressed` audit entry.
+- Logged D015 for event-aware report audit ids.
+- Commands run:
+  - `npm run test -- --run src/fullScenario.test.ts`
+  - `npm run test -- --run src/fullScenario.test.ts src/server/services/reportTriggers.test.ts`
+  - `npx prettier --write docs/FULL_SCENARIO_WALKTHROUGH.md decisions.md src/fullScenario.test.ts src/server/services/reportTriggers.ts`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS.
+- Open risks:
+  - Scenario proof is an integration harness, not live Devvit report delivery.
+  - Real Reddit moderation calls and live report/update trigger payloads still require controlled playtest proof before live behavior can be claimed verified.

@@ -19,7 +19,7 @@
 - [x] Wave 16 - Edit-Fingerprint Stress
 - [x] Wave 17 - Redis Failure and Race Conditions
 - [x] Wave 18 - UI and Dashboard Audit
-- [ ] Wave 19 - Full Scenario Walkthrough
+- [x] Wave 19 - Full Scenario Walkthrough
 - [ ] Wave 20 - Hardening Pass 1
 - [ ] Wave 21 - Devvit Config and Registration Hardening
 - [ ] Wave 22 - API Contract and Client Integration Hardening

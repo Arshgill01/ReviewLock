@@ -172,3 +172,17 @@ Reason:
 
 - Reopen is non-destructive, but duplicate reopen events erode moderator trust.
 - The safe fallback is to avoid suppression and surface uncertainty rather than create contradictory active/reopened state.
+
+### D015 - Include report event identity in audit ids
+
+Wave 19 found that two distinct report trigger events on the same target and timestamp could collapse into one `report_suppressed` audit event.
+
+Decision:
+
+- Include the report trigger event id in report-trigger audit ids when it is available.
+- Keep a timestamp and target fallback for payloads that do not include an event id.
+
+Reason:
+
+- Suppressed-report metrics and audit output must agree.
+- Moderators need a trustworthy ledger of repeated report churn, especially when multiple reports arrive in the same minute or millisecond.
