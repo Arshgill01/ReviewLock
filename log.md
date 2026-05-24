@@ -534,3 +534,26 @@
   - Live `approve()`, `ignoreReports()`, and `unignoreReports()` behavior remains unverified on controlled Reddit content.
   - Live report and edit trigger delivery remains unverified because no controlled Reddit report/edit events were generated during this wave.
   - `npx devvit view --json` still reports `isWebviewEnabled: false`; playtest booted and uploaded WebView assets, but live WebView rendering still needs isolated browser verification.
+
+## 2026-05-24 - Wave 30
+
+- Added `docs/PRODUCTION_TRUST_AUDIT.md` with the weakest-area assessment, evidence reviewed, production-trust answer, and Wave 31-34 follow-up queue.
+- Hardened release safety by changing `npm run launch` from `npm run deploy && devvit publish` to an explicit refusal that requires final user approval before public publish.
+- Logged D025 to preserve private upload rehearsal while preventing accidental public publish before live proof.
+- Marked Wave 30 complete and added Wave 31-34 follow-up items because the production-trust answer is not yet yes.
+- Commands run:
+  - `rg -n "Open risks|open risks|unverified|not verified|isWebviewEnabled|WebView|webview|Next action|live" docs log.md TODO.md README.md`
+  - `sed -n '1,260p' devvit.json`
+  - `cat package.json`
+  - `find /Users/arshdeepsingh/Developer -maxdepth 3 -iname '*mod*mirror*' -o -iname 'mod_mirror'`
+  - `rg -n '"launch"|devvit publish|isWebviewEnabled|entrypoints|webview|post' /Users/arshdeepsingh/Developer/ModMirror /Users/arshdeepsingh/Developer/modmirror-worktrees -g 'devvit.json' -g 'package.json' -g '*.md' -g '*.ts'`
+  - `rg -n 'isWebviewEnabled|webview|entrypoints|config-file.v1|devvit publish|devvit upload' node_modules/devvit node_modules/@devvit -g '*.json' -g '*.ts' -g '*.d.ts' -g '*.md'`
+  - `npx prettier --write package.json docs/PRODUCTION_TRUST_AUDIT.md TODO.md decisions.md log.md`
+  - `npm run launch`
+  - `npm run type-check`
+  - `npm run test`
+  - `npm run lint`
+  - `npm run build`
+- Pass/fail status: PASS. `npm run launch` intentionally exits 1 after refusing public publish; the four required verification commands passed.
+- Open risks:
+  - Live WebView smoke, moderation methods, report triggers, and edit triggers still require controlled runtime proof before ReviewLock can be trusted for production use.

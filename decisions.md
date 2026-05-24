@@ -316,3 +316,18 @@ Reason:
 
 - ReviewLock's submission strength depends on trust in the edit-aware loop.
 - Inflated runtime claims would be worse than clearly labeled implemented behavior.
+
+### D025 - Disable one-command public publish until final approval
+
+Wave 30 found that `package.json` still exposed `npm run launch` as `npm run deploy && devvit publish`.
+
+Decision:
+
+- Keep `npm run deploy` as the private upload rehearsal path.
+- Change `npm run launch` to fail with an explicit message requiring user approval before public publish.
+- Require final manual `devvit publish` only after the live proof and claim-boundary waves pass.
+
+Reason:
+
+- ReviewLock still has live moderation and trigger proof gaps.
+- A one-command public publish path is too risky while the app is intentionally carrying unverified runtime claims.

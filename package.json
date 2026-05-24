@@ -13,7 +13,7 @@
     "prettier": "prettier --write .",
     "login": "devvit login",
     "deploy": "npm run type-check && npm run lint && npm run test && devvit upload",
-    "launch": "npm run deploy && devvit publish"
+    "launch": "node -e \"console.error('Public publish requires explicit user instruction; run devvit publish manually after final approval.'); process.exit(1)\""
   },
   "engines": {
     "node": ">=22.2.0"

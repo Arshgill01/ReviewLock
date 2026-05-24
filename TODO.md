@@ -30,7 +30,11 @@
 - [x] Wave 27 - Claim and Copy Hardening
 - [x] Wave 28 - Browser Regression Hardening
 - [x] Wave 29 - Install/Deploy Rehearsal Hardening
-- [ ] Wave 30 - Production Trust Audit
+- [x] Wave 30 - Production Trust Audit
+- [ ] Wave 31 - Isolated Live WebView Runtime Smoke Proof
+- [ ] Wave 32 - Controlled Moderation Method Proof
+- [ ] Wave 33 - Controlled Report and Edit Trigger Proof
+- [ ] Wave 34 - Claim Boundary Cleanup After Live Proof
 - [ ] Wave 14 - Submission Package and Final Audit
 
 ## Cross-wave reminders
