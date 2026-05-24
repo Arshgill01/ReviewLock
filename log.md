@@ -890,3 +890,30 @@
   - Controlled live report/edit trigger proof remains blocked pending explicit
     confirmation for live Reddit report submission.
   - Comment-target moderation method proof remains unverified.
+
+## 2026-05-24 - Wave 33 runtime context fallback hardening
+
+- Compared ReviewLock's Devvit wiring against the sibling ModMirror workspace
+  and installed Devvit trigger typings.
+- Found no evidence that trigger response bodies needed a route rewrite:
+  `@devvit/web/shared` exposes trigger responses as an empty JSON object type,
+  and ModMirror also returns an arbitrary success object from its trigger route.
+- Removed the hidden `reviewlock_dev` fallback from runtime subreddit
+  normalization.
+- Hardened dashboard launch so ReviewLock refuses to submit a custom dashboard
+  post if Devvit cannot provide the current subreddit context.
+- Commands run:
+  - `npm run test -- src/routes/forms.test.ts src/server/services/runtimeHardening.test.ts --reporter verbose`
+  - `npx prettier --write src/routes/forms.ts src/routes/forms.test.ts src/server/services/runtimeHardening.ts src/server/services/runtimeHardening.test.ts TODO.md decisions.md log.md`
+  - `npm run type-check`
+  - `npm run lint`
+  - `git diff --check`
+  - `npm run test`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled" src docs README.md || true`
+  - `npm run build`
+- Pass/fail status: PASS. Full validation passed with 40 test files and 229
+  tests.
+- Open risks:
+  - Controlled live report/edit trigger proof remains blocked pending explicit
+    confirmation for live Reddit report submission.

@@ -839,3 +839,22 @@ Reason:
 - Submission copy and final audit need one consistent proof boundary. Inconsistent
   docs invite either underclaiming verified post-target behavior or overclaiming
   unverified trigger/comment behavior.
+
+### D056 - Do not default production writes to the controlled playtest subreddit
+
+The dashboard-launch form previously used `reviewlock_dev` when Devvit did not
+provide a current subreddit.
+
+Decision:
+
+- Runtime subreddit normalization now requires a concrete subreddit value.
+- Dashboard custom-post launch refuses to submit if the current Devvit subreddit
+  cannot be determined.
+- Local test and playtest callers that need `reviewlock_dev` must pass it
+  explicitly through runtime context or the CLI target.
+
+Reason:
+
+- `reviewlock_dev` is the controlled proof subreddit, not a production fallback.
+  A missing runtime context should be visible and non-destructive instead of
+  creating a dashboard post in the wrong community.

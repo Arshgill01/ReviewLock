@@ -11,7 +11,11 @@ export interface RuntimeSmokeResult {
 }
 
 export const normalizeRuntimeSubreddit = (value: string | null | undefined): string => {
-  const subreddit = value?.trim() || 'reviewlock_dev';
+  const subreddit = value?.trim();
+
+  if (!subreddit) {
+    throw new Error('Subreddit context is required.');
+  }
 
   if (!subredditPattern.test(subreddit)) {
     throw new Error('Subreddit must be 3-21 characters using letters, numbers, or underscores.');

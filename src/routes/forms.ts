@@ -217,7 +217,20 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const subredditName = (await deps.reddit.getCurrentSubredditName()) ?? 'reviewlock_dev';
+    let subredditName: string | undefined;
+
+    try {
+      subredditName = await deps.reddit.getCurrentSubredditName();
+    } catch {
+      subredditName = undefined;
+    }
+
+    if (!subredditName) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not determine the current subreddit for dashboard launch.'),
+      );
+    }
+
     const post = await deps.reddit.submitDashboardPost({
       subredditName,
       title: 'ReviewLock dashboard',

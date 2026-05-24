@@ -202,6 +202,29 @@ describe('form routes', () => {
     });
   });
 
+  it('does not create a dashboard post when runtime subreddit context is missing', async () => {
+    class MissingSubredditRedditAdapter extends FakeRedditAdapter {
+      async getCurrentSubredditName(): Promise<string | undefined> {
+        return undefined;
+      }
+    }
+
+    const reddit = new MissingSubredditRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not determine the current subreddit for dashboard launch.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
   it('submits an unlock form only for the confirmed lock id', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
