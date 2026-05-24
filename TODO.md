@@ -21,7 +21,7 @@
 - [x] Wave 18 - UI and Dashboard Audit
 - [x] Wave 19 - Full Scenario Walkthrough
 - [x] Wave 20 - Hardening Pass 1
-- [ ] Wave 21 - Devvit Config and Registration Hardening
+- [x] Wave 21 - Devvit Config and Registration Hardening
 - [ ] Wave 22 - API Contract and Client Integration Hardening
 - [ ] Wave 23 - Trigger Idempotency Hardening
 - [ ] Wave 24 - Data Namespace and Migration Hardening

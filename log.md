@@ -315,3 +315,38 @@
 - Open risks:
   - Live Reddit report generation and real moderation method proof remain unverified.
   - Remaining scan hits are documented in `docs/HARDENING_PASS_01.md` and are not unfinished implementation code.
+
+## 2026-05-24 - Wave 21
+
+- Compared ReviewLock's `devvit.json`, package scripts, dependencies, and build output against the known-good ModMirror workspace.
+- Confirmed `npx devvit whoami` is logged in as `u/BrightyBrainiac`.
+- Confirmed `npx devvit view --json` resolves the registered `reviewlock` app owned by `BrightyBrainiac`; final observed version count was `31`.
+- Added Devvit menu descriptions, a `login` script, a Node engine floor, and audited overrides for Devvit transitive `protobufjs`, `tmp`, and `ws`.
+- Added `docs/DEVVIT_REGISTRATION_PROOF.md` with exact account, registration, playtest, logs, and dependency-hardening evidence.
+- Ran `npm run dev -- reviewlock_dev` four times; each run reached `Playtest ready` with no recursive build loop. Observed versions: `v0.0.1.24`, `v0.0.1.26`, `v0.0.1.28`, and `v0.0.1.30`.
+- Commands run:
+  - `npx devvit whoami`
+  - `npx devvit init --help`
+  - `npx devvit upload --help`
+  - `npx devvit playtest --help`
+  - `npx devvit logs --help`
+  - `npx devvit view --json`
+  - `npm run build`
+  - `npm install --package-lock-only`
+  - `npm audit --omit=dev --audit-level=critical`
+  - `npm view protobufjs version`
+  - `npm view protobufjs@8.4.2 engines peerDependencies dependencies --json`
+  - `npm view protobufjs@8.4.2 type main exports --json`
+  - `npm install`
+  - `node -p "require('./node_modules/protobufjs/package.json').version"`
+  - `npm run type-check`
+  - `npm run dev -- reviewlock_dev`
+  - `npx devvit logs reviewlock_dev reviewlock --since 1m --show-timestamps`
+  - `npx prettier --write docs/DEVVIT_REGISTRATION_PROOF.md decisions.md package.json package-lock.json devvit.json`
+  - `npm run test`
+  - `npm run lint`
+- Pass/fail status: PASS.
+- Open risks:
+  - `npx devvit view --json` reports `isWebviewEnabled: false` even though playtest serves and connects the ReviewLock WebView; this remains registration metadata to inspect before public submission.
+  - Live `approve()`, `ignoreReports()`, `unignoreReports()`, report triggers, and edit/update triggers remain unverified on controlled Reddit content.
+  - Playtest observed an existing ReviewLock dashboard WebView connection, but Wave 21 did not drive browser UI to avoid disrupting the user's active Aerospace windows.

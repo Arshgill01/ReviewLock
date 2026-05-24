@@ -19,30 +19,35 @@
     "items": [
       {
         "label": "Lock review",
+        "description": "Lock this reviewed post until it changes.",
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/lock-post"
       },
       {
         "label": "Lock review",
+        "description": "Lock this reviewed comment until it changes.",
         "location": "comment",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/lock-comment"
       },
       {
         "label": "Unlock review",
+        "description": "Remove the ReviewLock lock from this reviewed post.",
         "location": "post",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/unlock-post"
       },
       {
         "label": "Unlock review",
+        "description": "Remove the ReviewLock lock from this reviewed comment.",
         "location": "comment",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/unlock-comment"
       },
       {
         "label": "Open ReviewLock dashboard",
+        "description": "Create and open the ReviewLock dashboard for this subreddit.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/open-dashboard"

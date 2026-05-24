@@ -186,3 +186,31 @@ Reason:
 
 - Suppressed-report metrics and audit output must agree.
 - Moderators need a trustworthy ledger of repeated report churn, especially when multiple reports arrive in the same minute or millisecond.
+
+### D016 - Preserve the existing registered Devvit app identity
+
+Wave 21 confirmed `npx devvit whoami` is logged in as `u/BrightyBrainiac` and `npx devvit view --json` resolves the registered `reviewlock` app owned by that account.
+
+Decision:
+
+- Do not run `devvit init --force` for ReviewLock.
+- Harden the existing `reviewlock` registration and playtest path instead of creating a new app id.
+
+Reason:
+
+- Forced init would make the proof harder to review by replacing the app identity.
+- The current app already uploads and playtests on `r/reviewlock_dev`.
+
+### D017 - Carry audited dependency overrides for Devvit transitive packages
+
+Wave 21 found `npm audit --omit=dev --audit-level=critical` reported Devvit transitive vulnerabilities through `protobufjs`, `tmp`, and `ws`.
+
+Decision:
+
+- Keep package overrides for `protobufjs@8.4.2`, `tmp@0.2.5`, and `ws@8.20.1`.
+- Treat the overrides as part of the Devvit registration hardening path because build, type-check, and playtest all pass with them installed.
+
+Reason:
+
+- The same `tmp` and `ws` override pattern is already present in the known-good ModMirror workspace.
+- `protobufjs@8.4.2` removes the remaining critical audit finding and survived Devvit build/playtest verification.
