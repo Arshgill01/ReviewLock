@@ -4,6 +4,7 @@ import type { RedditAdapter } from '../adapters/reddit';
 import type { LockReasonPreset, ReopenEvent, ReviewLockRecord } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
+import { keys } from './keys';
 import {
   getActiveLockByTarget,
   removeActiveLockIndexes,
@@ -42,6 +43,8 @@ export interface LockFlowResult {
   message: string;
   warnings: string[];
 }
+
+const LOCK_CREATION_GUARD_SECONDS = 30;
 
 const safeIdPart = (value: string): string => value.replace(/[^a-zA-Z0-9_]+/g, '-');
 
@@ -142,100 +145,172 @@ export const lockReviewedContent = async (
     };
   }
 
-  const existingLock = await getActiveLockByTarget(
-    deps.redis,
-    resolution.target.subreddit,
-    resolution.target.id,
+  const guardKey = keys.targetLockCreation(resolution.target.subreddit, resolution.target.id);
+  const guardToken = `${now}:${resolution.target.id}:${Date.now()}:${Math.random()}`;
+  const guardAcquired = await deps.redis.setIfNotExists(
+    guardKey,
+    guardToken,
   );
 
-  if (existingLock) {
+  if (!guardAcquired) {
+    const inFlightLock = await getActiveLockByTarget(
+      deps.redis,
+      resolution.target.subreddit,
+      resolution.target.id,
+    );
+
     if (
-      existingLock.contentHash === fingerprint.hash &&
-      existingLock.fingerprintVersion === fingerprint.version
+      inFlightLock &&
+      inFlightLock.contentHash === fingerprint.hash &&
+      inFlightLock.fingerprintVersion === fingerprint.version
     ) {
       return {
         ok: true,
-        lock: existingLock,
+        lock: inFlightLock,
         message: 'Reviewed content is already locked until it changes.',
-        warnings: existingLock.runtimeWarnings,
+        warnings: inFlightLock.runtimeWarnings,
       };
     }
 
-    const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
-    await recordRuntimeProof(deps, existingLock.subreddit, staleUnignoreResult, now);
+    return {
+      ok: false,
+      message:
+        'Another ReviewLock lock is already being created for this content. Try again in a moment.',
+      warnings: ['lock_creation_in_progress'],
+    };
+  }
 
-    if (!staleUnignoreResult.ok) {
-      const updatedLock = await updateLock(deps.redis, {
-        ...existingLock,
-        lastKnownEdited: resolution.target.edited,
-        lastReportCount: resolution.target.reportCount,
+  await deps.redis.expire(guardKey, LOCK_CREATION_GUARD_SECONDS).catch(() => undefined);
+
+  try {
+    const existingLock = await getActiveLockByTarget(
+      deps.redis,
+      resolution.target.subreddit,
+      resolution.target.id,
+    );
+
+    if (existingLock) {
+      if (
+        existingLock.contentHash === fingerprint.hash &&
+        existingLock.fingerprintVersion === fingerprint.version
+      ) {
+        return {
+          ok: true,
+          lock: existingLock,
+          message: 'Reviewed content is already locked until it changes.',
+          warnings: existingLock.runtimeWarnings,
+        };
+      }
+
+      const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+      await recordRuntimeProof(deps, existingLock.subreddit, staleUnignoreResult, now);
+
+      if (!staleUnignoreResult.ok) {
+        const updatedLock = await updateLock(deps.redis, {
+          ...existingLock,
+          lastKnownEdited: resolution.target.edited,
+          lastReportCount: resolution.target.reportCount,
+          runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
+        });
+        await appendAuditEvent(deps.redis, {
+          id: `audit-${existingLock.id}-stale-unignore-failed-${Date.parse(now)}`,
+          kind: 'runtime_failure',
+          subreddit: existingLock.subreddit,
+          targetId: existingLock.targetId,
+          targetKind: existingLock.targetKind,
+          lockId: existingLock.id,
+          actor: input.actor,
+          createdAt: now,
+          message:
+            'Lock review found changed content, but unignoreReports failed; lock remains active for retry.',
+          data: {
+            operation: 'unignoreReports',
+            error: staleUnignoreResult.errorMessage,
+            source: 'stale_lock_relock',
+          },
+          demo: existingLock.demo,
+        });
+
+        return {
+          ok: false,
+          lock: updatedLock,
+          message:
+            'ReviewLock found changed content but could not return reports to normal handling; the stale lock remains active for retry.',
+          warnings: staleUnignoreResult.warnings,
+        };
+      }
+
+      const reopenEvent = {
+        ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
+        runtimeWarnings: staleUnignoreResult.warnings,
+      };
+      await enqueueReopenEvent(deps.redis, reopenEvent);
+      await markLockReopenedAfterQueue(deps.redis, existingLock, {
+        reopenedAt: now,
+        reopenReason: 'content_changed',
+        reopenEventId: reopenEvent.id,
         runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
       });
+      await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
       await appendAuditEvent(deps.redis, {
-        id: `audit-${existingLock.id}-stale-unignore-failed-${Date.parse(now)}`,
-        kind: 'runtime_failure',
+        id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
+        kind: 'lock_reopened',
         subreddit: existingLock.subreddit,
         targetId: existingLock.targetId,
         targetKind: existingLock.targetKind,
         lockId: existingLock.id,
         actor: input.actor,
         createdAt: now,
-        message:
-          'Lock review found changed content, but unignoreReports failed; lock remains active for retry.',
+        message: 'Lock review reopened a stale lock because reviewed content changed.',
         data: {
-          operation: 'unignoreReports',
-          error: staleUnignoreResult.errorMessage,
-          source: 'stale_lock_relock',
+          reason: 'content_changed',
+          source: 'lock_review',
+          unignoreReportsOk: staleUnignoreResult.ok,
         },
         demo: existingLock.demo,
       });
+    }
+
+    const approveResult = await approveForReviewLock(deps.reddit, resolution.target);
+    const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
+    const warnings = [...approveResult.warnings, ...ignoreResult.warnings];
+
+    if (!ignoreResult.ok) {
+      const failedLock = createLockRecord(
+        input,
+        resolution.target,
+        fingerprint.hash,
+        fingerprint.version,
+        now,
+        warnings,
+      );
+      failedLock.status = 'failed';
+      await updateLock(deps.redis, failedLock);
+      await appendAuditEvent(deps.redis, {
+        id: `audit-${failedLock.id}-failure`,
+        kind: 'runtime_failure',
+        subreddit: failedLock.subreddit,
+        targetId: failedLock.targetId,
+        targetKind: failedLock.targetKind,
+        lockId: failedLock.id,
+        actor: input.actor,
+        createdAt: now,
+        message: 'ReviewLock could not ignore reports, so the review was not locked.',
+        data: { operation: 'ignoreReports', error: ignoreResult.errorMessage },
+        demo: false,
+      });
+      await recordRuntimeProof(deps, failedLock.subreddit, approveResult, now);
+      await recordRuntimeProof(deps, failedLock.subreddit, ignoreResult, now);
 
       return {
         ok: false,
-        lock: updatedLock,
-        message:
-          'ReviewLock found changed content but could not return reports to normal handling; the stale lock remains active for retry.',
-        warnings: staleUnignoreResult.warnings,
+        lock: failedLock,
+        message: 'Reports were not locked because ignoreReports failed.',
+        warnings,
       };
     }
 
-    const reopenEvent = {
-      ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
-      runtimeWarnings: staleUnignoreResult.warnings,
-    };
-    await enqueueReopenEvent(deps.redis, reopenEvent);
-    await markLockReopenedAfterQueue(deps.redis, existingLock, {
-      reopenedAt: now,
-      reopenReason: 'content_changed',
-      reopenEventId: reopenEvent.id,
-      runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
-    });
-    await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
-    await appendAuditEvent(deps.redis, {
-      id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
-      kind: 'lock_reopened',
-      subreddit: existingLock.subreddit,
-      targetId: existingLock.targetId,
-      targetKind: existingLock.targetKind,
-      lockId: existingLock.id,
-      actor: input.actor,
-      createdAt: now,
-      message: 'Lock review reopened a stale lock because reviewed content changed.',
-      data: {
-        reason: 'content_changed',
-        source: 'lock_review',
-        unignoreReportsOk: staleUnignoreResult.ok,
-      },
-      demo: existingLock.demo,
-    });
-  }
-
-  const approveResult = await approveForReviewLock(deps.reddit, resolution.target);
-  const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
-  const warnings = [...approveResult.warnings, ...ignoreResult.warnings];
-
-  if (!ignoreResult.ok) {
-    const failedLock = createLockRecord(
+    const lock = createLockRecord(
       input,
       resolution.target,
       fingerprint.hash,
@@ -243,105 +318,78 @@ export const lockReviewedContent = async (
       now,
       warnings,
     );
-    failedLock.status = 'failed';
-    await updateLock(deps.redis, failedLock);
-    await appendAuditEvent(deps.redis, {
-      id: `audit-${failedLock.id}-failure`,
-      kind: 'runtime_failure',
-      subreddit: failedLock.subreddit,
-      targetId: failedLock.targetId,
-      targetKind: failedLock.targetKind,
-      lockId: failedLock.id,
-      actor: input.actor,
-      createdAt: now,
-      message: 'ReviewLock could not ignore reports, so the review was not locked.',
-      data: { operation: 'ignoreReports', error: ignoreResult.errorMessage },
-      demo: false,
-    });
-    await recordRuntimeProof(deps, failedLock.subreddit, approveResult, now);
-    await recordRuntimeProof(deps, failedLock.subreddit, ignoreResult, now);
 
-    return {
-      ok: false,
-      lock: failedLock,
-      message: 'Reports were not locked because ignoreReports failed.',
-      warnings,
-    };
-  }
-
-  const lock = createLockRecord(
-    input,
-    resolution.target,
-    fingerprint.hash,
-    fingerprint.version,
-    now,
-    warnings,
-  );
-
-  try {
-    await saveLock(deps.redis, lock);
-    await appendAuditEvent(deps.redis, {
-      id: `audit-${lock.id}-created`,
-      kind: 'lock_created',
-      subreddit: lock.subreddit,
-      targetId: lock.targetId,
-      targetKind: lock.targetKind,
-      lockId: lock.id,
-      actor: input.actor,
-      createdAt: now,
-      message: 'Reviewed content locked until it changes.',
-      data: { lockReason: input.lockReason, reportCount: resolution.target.reportCount },
-      demo: false,
-    });
-    await recordLockCreatedMetric(deps.redis, resolution.target, now);
-    await recordRuntimeProof(deps, lock.subreddit, approveResult, now);
-    await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
-
-    return {
-      ok: true,
-      lock,
-      message: 'Reviewed content locked until it changes.',
-      warnings,
-    };
-  } catch (error) {
-    const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
-    await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
-
-    if (rollbackResult.ok) {
-      await removeLock(deps.redis, lock).catch(() => undefined);
-    } else {
-      const failedLock: ReviewLockRecord = {
-        ...lock,
-        status: 'failed',
-        runtimeWarnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
-      };
-
-      await updateLock(deps.redis, failedLock).catch(() => undefined);
+    try {
+      await saveLock(deps.redis, lock);
+      await recordLockCreatedMetric(deps.redis, resolution.target, now);
       await appendAuditEvent(deps.redis, {
-        id: `audit-${lock.id}-rollback-failure`,
-        kind: 'runtime_failure',
+        id: `audit-${lock.id}-created`,
+        kind: 'lock_created',
         subreddit: lock.subreddit,
         targetId: lock.targetId,
         targetKind: lock.targetKind,
         lockId: lock.id,
         actor: input.actor,
         createdAt: now,
-        message:
-          'ReviewLock could not persist the lock and could not unignore reports during rollback.',
-        data: { operation: 'unignoreReports', error: rollbackResult.errorMessage },
+        message: 'Reviewed content locked until it changes.',
+        data: { lockReason: input.lockReason, reportCount: resolution.target.reportCount },
         demo: false,
-      }).catch(() => undefined);
-    }
+      });
+      await recordRuntimeProof(deps, lock.subreddit, approveResult, now);
+      await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
 
-    return {
-      ok: false,
-      lock,
-      message: rollbackResult.ok
-        ? error instanceof Error
-          ? error.message
-          : 'ReviewLock could not persist the lock.'
-        : 'ReviewLock could not persist the lock, and unignoreReports rollback failed.',
-      warnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
-    };
+      return {
+        ok: true,
+        lock,
+        message: 'Reviewed content locked until it changes.',
+        warnings,
+      };
+    } catch (error) {
+      const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+      await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
+
+      if (rollbackResult.ok) {
+        await removeLock(deps.redis, lock).catch(() => undefined);
+      } else {
+        const failedLock: ReviewLockRecord = {
+          ...lock,
+          status: 'failed',
+          runtimeWarnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
+        };
+
+        await updateLock(deps.redis, failedLock).catch(() => undefined);
+        await appendAuditEvent(deps.redis, {
+          id: `audit-${lock.id}-rollback-failure`,
+          kind: 'runtime_failure',
+          subreddit: lock.subreddit,
+          targetId: lock.targetId,
+          targetKind: lock.targetKind,
+          lockId: lock.id,
+          actor: input.actor,
+          createdAt: now,
+          message:
+            'ReviewLock could not persist the lock and could not unignore reports during rollback.',
+          data: { operation: 'unignoreReports', error: rollbackResult.errorMessage },
+          demo: false,
+        }).catch(() => undefined);
+      }
+
+      return {
+        ok: false,
+        lock,
+        message: rollbackResult.ok
+          ? error instanceof Error
+            ? error.message
+            : 'ReviewLock could not persist the lock.'
+          : 'ReviewLock could not persist the lock, and unignoreReports rollback failed.',
+        warnings: [...warnings, 'redis_write_failed', ...rollbackResult.warnings],
+      };
+    }
+  } finally {
+    const currentToken = await deps.redis.get(guardKey).catch(() => undefined);
+
+    if (currentToken === guardToken) {
+      await deps.redis.del(guardKey).catch(() => undefined);
+    }
   }
 };

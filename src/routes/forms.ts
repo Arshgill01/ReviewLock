@@ -9,7 +9,7 @@ import { LOCK_REASON_PRESETS } from '../shared/constants';
 import { appendAuditEvent } from '../server/services/audit';
 import { consumeFormBinding } from '../server/services/formBindings';
 import { lockReviewedContent } from '../server/services/lockFlow';
-import { dismissReopenEvent } from '../server/services/reopenQueue';
+import { dismissReopenEvent, getReopenEvent } from '../server/services/reopenQueue';
 import { normalizeRuntimeSubreddit } from '../server/services/runtimeHardening';
 import { unlockReviewedContent } from '../server/services/unlockFlow';
 
@@ -267,31 +267,33 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     const actor = await actorFromReddit(deps.reddit, body.actor);
-    const dismissed = await dismissReopenEvent(
-      deps.redis,
-      subreddit,
-      body.eventId,
-      deps.clock.now(),
-      actor,
-    );
+    const dismissedAt = deps.clock.now();
+    const event = await getReopenEvent(deps.redis, subreddit, body.eventId);
 
-    if (!dismissed) {
+    if (!event) {
       return context.json<UiResponse>(uiToast('Reopen event was not found.'));
     }
 
-    await appendAuditEvent(deps.redis, {
-      id: `audit-reopen-dismissed-${Date.parse(dismissed.dismissedAt ?? deps.clock.now())}-${dismissed.id}`,
-      kind: 'reopen_dismissed',
-      subreddit: dismissed.subreddit,
-      targetId: dismissed.targetId,
-      targetKind: dismissed.targetKind,
-      lockId: dismissed.lockId,
-      actor,
-      createdAt: dismissed.dismissedAt ?? deps.clock.now(),
-      message: 'Reopened item dismissed from the ReviewLock queue.',
-      data: { reopenReason: dismissed.reason },
-      demo: dismissed.demo,
-    });
+    try {
+      await appendAuditEvent(deps.redis, {
+        id: `audit-reopen-dismissed-${Date.parse(dismissedAt)}-${event.id}`,
+        kind: 'reopen_dismissed',
+        subreddit: event.subreddit,
+        targetId: event.targetId,
+        targetKind: event.targetKind,
+        lockId: event.lockId,
+        actor,
+        createdAt: dismissedAt,
+        message: 'Reopened item dismissed from the ReviewLock queue.',
+        data: { reopenReason: event.reason },
+        demo: event.demo,
+      });
+    } catch {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not record the dismissal audit; reopened item was not dismissed.'),
+      );
+    }
+    await dismissReopenEvent(deps.redis, subreddit, body.eventId, dismissedAt, actor);
 
     return context.json<UiResponse>(uiToast('ReviewLock dismissed this reopened item.', 'success'));
   });

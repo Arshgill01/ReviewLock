@@ -32,7 +32,10 @@ const targetIdFromBody = (
   body: ReviewLockMenuRequest,
   kind: TargetKind,
 ): string | undefined =>
-  normalizeTargetId(kind, kind === 'post' ? body.targetId ?? body.postId : body.targetId ?? body.commentId);
+  normalizeTargetId(
+    kind,
+    kind === 'post' ? body.targetId ?? body.postId : body.commentId ?? body.targetId,
+  );
 
 const targetSummary = (target: {
   id: string;

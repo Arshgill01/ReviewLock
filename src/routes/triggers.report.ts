@@ -65,7 +65,7 @@ const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
       payloads(body).flatMap((payload) =>
         kind === 'post'
           ? [payload.targetId, payload.postId, payload.post?.id]
-          : [payload.targetId, payload.commentId, payload.comment?.id],
+          : [payload.commentId, payload.comment?.id, payload.targetId],
       ),
     ),
   );
@@ -81,15 +81,19 @@ const subreddit = (body: TriggerBody): string | undefined =>
     ]),
   );
 
-const reportCount = (body: TriggerBody): number | undefined =>
+const reportCount = (body: TriggerBody, kind: TargetKind): number | undefined =>
   first(
-    payloads(body).flatMap((payload) => [
-      payload.reportCount,
-      payload.post?.numberOfReports,
-      payload.post?.numReports,
-      payload.comment?.numberOfReports,
-      payload.comment?.numReports,
-    ]),
+    payloads(body).flatMap((payload) =>
+      kind === 'post'
+        ? [payload.reportCount, payload.post?.numberOfReports, payload.post?.numReports]
+        : [
+            payload.comment?.numberOfReports,
+            payload.comment?.numReports,
+            payload.reportCount,
+            payload.post?.numberOfReports,
+            payload.post?.numReports,
+          ],
+    ),
   );
 
 const reportedAt = (body: TriggerBody): string | undefined => body.reportedAt ?? body.timestamp;
@@ -122,7 +126,7 @@ export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
           targetId: id,
           eventId: eventId(body),
           reportedAt: reportedAt(body),
-          reportCount: reportCount(body),
+          reportCount: reportCount(body, kind),
           subreddit: subreddit(body),
         },
       ),

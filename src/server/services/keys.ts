@@ -6,6 +6,8 @@ export const keys = {
   activeLocksByTarget: (subreddit: string) => key(subreddit, 'locks:activeByTarget'),
   lock: (subreddit: string, lockId: string) => key(subreddit, `lock:${lockId}`),
   targetLock: (subreddit: string, targetId: string) => key(subreddit, `target:${targetId}:lock`),
+  targetLockCreation: (subreddit: string, targetId: string) =>
+    key(subreddit, `target:${targetId}:lock:create`),
   reopenQueue: (subreddit: string) => key(subreddit, 'reopen:queue'),
   reopenEvent: (subreddit: string, eventId: string) => key(subreddit, `reopen:${eventId}`),
   audit: (subreddit: string) => key(subreddit, 'audit'),

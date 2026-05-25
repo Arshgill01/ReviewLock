@@ -12,7 +12,7 @@ import {
   getReopenQueueData,
 } from '../server/services/dashboard';
 import { listDailyMetrics, listTopTargetMetrics } from '../server/services/metrics';
-import { dismissReopenEvent } from '../server/services/reopenQueue';
+import { dismissReopenEvent, getReopenEvent } from '../server/services/reopenQueue';
 import { normalizeRuntimeSubreddit } from '../server/services/runtimeHardening';
 import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { unlockReviewedContent } from '../server/services/unlockFlow';
@@ -156,11 +156,27 @@ const resolveScopedSubreddit = async (
     };
   }
 
+  if (demoFrom(context)) {
+    return { ok: true, subreddit: clientSubreddit ?? DEMO_SUBREDDIT };
+  }
+
+  if (!runtimeSubreddit) {
+    return {
+      ok: false,
+      response: context.json(
+        {
+          ok: false,
+          error: 'Dashboard subreddit context is required.',
+          requestId: requestId(),
+        },
+        400,
+      ),
+    };
+  }
+
   return {
     ok: true,
-    subreddit: demoFrom(context)
-      ? (clientSubreddit ?? DEMO_SUBREDDIT)
-      : (runtimeSubreddit ?? clientSubreddit ?? 'reviewlock'),
+    subreddit: runtimeSubreddit,
   };
 };
 
@@ -391,31 +407,26 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
       }
 
       const actor = await actorFromReddit(deps.reddit, body.actor);
-      const dismissed = await dismissReopenEvent(
-        deps.redis,
-        scope.subreddit,
-        body.eventId,
-        dismissedAt,
-        actor,
-      );
+      const event = await getReopenEvent(deps.redis, scope.subreddit, body.eventId);
 
-      if (!dismissed) {
+      if (!event) {
         return context.json({ ok: false, message: 'Reopen event was not found.' });
       }
 
       await appendAuditEvent(deps.redis, {
-        id: `audit-reopen-dismissed-${Date.parse(dismissed.dismissedAt ?? dismissedAt)}-${dismissed.id}`,
+        id: `audit-reopen-dismissed-${Date.parse(dismissedAt)}-${event.id}`,
         kind: 'reopen_dismissed',
-        subreddit: dismissed.subreddit,
-        targetId: dismissed.targetId,
-        targetKind: dismissed.targetKind,
-        lockId: dismissed.lockId,
+        subreddit: event.subreddit,
+        targetId: event.targetId,
+        targetKind: event.targetKind,
+        lockId: event.lockId,
         actor,
-        createdAt: dismissed.dismissedAt ?? dismissedAt,
+        createdAt: dismissedAt,
         message: 'Reopened item dismissed from the ReviewLock queue.',
-        data: { reopenReason: dismissed.reason },
-        demo: dismissed.demo,
+        data: { reopenReason: event.reason },
+        demo: event.demo,
       });
+      await dismissReopenEvent(deps.redis, scope.subreddit, body.eventId, dismissedAt, actor);
 
       return context.json({
         ok: true,

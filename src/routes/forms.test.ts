@@ -374,4 +374,44 @@ describe('form routes', () => {
       }),
     ]);
   });
+
+  it('keeps reopened items visible when form dismiss audit write fails', async () => {
+    class AuditFailingRedisStore extends InMemoryRedisStore {
+      override async zAdd(key: string, entry: { member: string; score: number }): Promise<void> {
+        if (key === 'reviewlock:alpha:audit') {
+          throw new Error('audit unavailable');
+        }
+
+        await super.zAdd(key, entry);
+      }
+    }
+
+    const redis = new AuditFailingRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-action-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        action: 'dismiss',
+        actor: 'client_supplied_actor',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not record the dismissal audit; reopened item was not dismissed.',
+      },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
+  });
 });

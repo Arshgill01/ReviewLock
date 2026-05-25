@@ -70,6 +70,33 @@ class RefetchFailingRedditAdapter extends FakeRedditAdapter {
   }
 }
 
+class PausingIgnoreRedditAdapter extends FakeRedditAdapter {
+  readonly ignoreStarted: Promise<void>;
+  private releaseIgnorePromise: Promise<void>;
+  private resolveIgnoreStarted: () => void = () => undefined;
+  private resolveReleaseIgnore: () => void = () => undefined;
+
+  constructor(targets: ReviewLockTarget[]) {
+    super(targets);
+    this.ignoreStarted = new Promise((resolve) => {
+      this.resolveIgnoreStarted = resolve;
+    });
+    this.releaseIgnorePromise = new Promise((resolve) => {
+      this.resolveReleaseIgnore = resolve;
+    });
+  }
+
+  override async ignoreReports(target: ReviewLockTarget): Promise<void> {
+    await super.ignoreReports(target);
+    this.resolveIgnoreStarted();
+    await this.releaseIgnorePromise;
+  }
+
+  releaseIgnore(): void {
+    this.resolveReleaseIgnore();
+  }
+}
+
 describe('breakLockForChangedContent', () => {
   it('leaves unchanged content locked', async () => {
     const dependencies = await deps();
@@ -254,7 +281,14 @@ describe('breakLockForChangedContent', () => {
     expect(actions.some((action) => action === 'reopen_changed' || action === 'reopened')).toBe(
       true,
     );
-    expect(actions.some((action) => action === 'duplicate' || action === 'no_lock')).toBe(true);
+    expect(
+      actions.some(
+        (action) => action === 'duplicate' || action === 'no_lock' || action === 'runtime_uncertain',
+      ),
+    ).toBe(true);
+    if (reportResult.action === 'runtime_uncertain') {
+      expect(reportResult.warnings).toContain('concurrent_trigger_in_progress');
+    }
     expect(dependencies.reddit.calls).toEqual(['unignoreReports:t3_post']);
     expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeUndefined();
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
@@ -264,5 +298,45 @@ describe('breakLockForChangedContent', () => {
     expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
       locksReopened: 1,
     });
+  });
+
+  it('keeps update-trigger mutex contention retryable while a report suppresses unchanged content', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const clock = fixedClock('2026-05-24T01:00:00.000Z');
+    const reportReddit = new PausingIgnoreRedditAdapter([target()]);
+    const reportResultPromise = handleReportTrigger(
+      {
+        redis,
+        reddit: reportReddit,
+        clock,
+      },
+      { targetId: 't3_post', eventId: 'evt-paused-unchanged-report' },
+    );
+
+    await reportReddit.ignoreStarted;
+
+    const updateResult = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]),
+        clock,
+      },
+      { targetId: 't3_post' },
+    );
+
+    expect(updateResult).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['concurrent_trigger_in_progress'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeDefined();
+
+    reportReddit.releaseIgnore();
+    await expect(reportResultPromise).resolves.toMatchObject({
+      ok: true,
+      action: 'suppress_unchanged',
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeDefined();
   });
 });

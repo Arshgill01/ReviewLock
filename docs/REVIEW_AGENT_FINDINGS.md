@@ -778,3 +778,1139 @@
 - Focused validation:
   - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/menu.test.ts src/client/state/store.test.ts src/client/render.test.ts --reporter verbose`
   - `npm run type-check`
+
+## 2026-05-25 23:00 IST - Finding
+
+- Severity: medium
+- Area: Failed Reddit runtime smoke is not recorded in the proof ledger
+- Evidence: `/api/smoke/redis` stores `smokeSubreddit` after scope resolution
+  and records `failedSmokeResult('redis', ...)` through
+  `recordCapabilityStatus()` when the namespaced write/read/delete check throws
+  (`src/routes/api.ts:145-183`). `/api/smoke/reddit` records
+  `redditContext verified` on success (`src/routes/api.ts:214-234`), but its
+  catch block only returns `{ ok: false, capability: 'redditContext',
+  status: 'failed', error }` and never writes the failed result to runtime proof
+  (`src/routes/api.ts:243-254`). The contract tests include a regression for
+  failed Redis smoke proof persistence (`src/routes/api.contract.test.ts:110-149`)
+  but no corresponding failing Reddit-context case.
+- Why it matters: `Verify runtime` is the moderator-facing proof surface. If
+  Reddit context lookup fails after subreddit scope is known, the dashboard gets
+  an error, but the persisted runtime panel can remain stale as `verified` or
+  `unverified` instead of showing `redditContext failed`. That weakens the
+  claim boundary and makes intermittent Devvit context failures harder to
+  distinguish from never-run proof.
+- Suggested fix: Mirror the Redis smoke path: capture the scoped subreddit
+  before `getCurrentUsername()`, and on failure write the failed `redditContext`
+  capability status when both Redis and subreddit are available. Add a contract
+  regression using a Reddit adapter that returns `undefined` or throws from
+  `getCurrentUsername()`, asserting `/api/smoke/reddit` returns 500 and
+  `loadRuntimeProofStatus(redis, 'alpha')` contains `redditContext` with
+  `status: 'failed'`.
+- Files reviewed: `src/routes/api.ts`, `src/routes/api.contract.test.ts`,
+  `src/client/state/store.ts`, `src/server/services/runtimeHardening.ts`,
+  `docs/RUNTIME_PROOF.md`, `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-25 23:07 IST - Resolution
+
+- Resolved failed Reddit runtime smoke persistence by recording failed
+  `redditContext` capability status when `/api/smoke/reddit` has already
+  resolved a subreddit namespace and Redis is available.
+- Added a contract regression for `getCurrentUsername()` returning `undefined`;
+  the route now returns 500 and `loadRuntimeProofStatus(redis, 'alpha')`
+  includes `redditContext failed`.
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts --reporter verbose`
+
+## 2026-05-25 23:04 IST - Finding
+
+- Severity: low
+- Area: Production trust audit has stale live-trigger claim boundary
+- Evidence: The current proof ledger records controlled live `PostReport`
+  suppression and controlled live `PostUpdate` body-edit reopen as passing
+  evidence (`docs/RUNTIME_PROOF.md:49-56`). The trigger proof doc repeats that
+  `PostReport` payload comparison and `PostUpdate` payload comparison are
+  available, while comment report/update, NSFW, spoiler, and flair remain
+  unverified (`docs/TRIGGER_PROOF.md:23-28`, `docs/TRIGGER_PROOF.md:52-99`).
+  `docs/CLAIM_COPY_AUDIT.md:20-23` now uses the narrower safe wording:
+  controlled post-report suppression and controlled post body-edit reopening are
+  captured, with comment and remaining update variants pending. But
+  `docs/PRODUCTION_TRUST_AUDIT.md:9-10` still says live report/update trigger
+  delivery remains unverified, and `docs/PRODUCTION_TRUST_AUDIT.md:34` still
+  says live trigger payload capture remains open.
+- Why it matters: Wave 34/submission cleanup can accidentally understate or
+  contradict the proof boundary. The safer current claim is not "all live
+  trigger delivery is unverified"; it is "controlled post-report suppression and
+  controlled post body-edit reopening are verified; comment report/update and
+  NSFW/spoiler/flair variants remain unverified."
+- Suggested fix: Update `docs/PRODUCTION_TRUST_AUDIT.md` as a historical audit
+  with a current-status addendum, or point readers to the current proof ledger
+  and remove stale blanket statements about live report/edit trigger delivery.
+  Keep the production-trust answer cautious, but make the remaining proof gaps
+  match `docs/RUNTIME_PROOF.md`, `docs/TRIGGER_PROOF.md`, and
+  `docs/CLAIM_COPY_AUDIT.md`.
+- Files reviewed: `docs/PRODUCTION_TRUST_AUDIT.md`, `docs/RUNTIME_PROOF.md`,
+  `docs/TRIGGER_PROOF.md`, `docs/CLAIM_COPY_AUDIT.md`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:07 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof still carries an unowned broad `triggers` capability after
+  adding granular trigger proof
+- Evidence: The runtime proof default matrix still seeds only
+  `['approve', 'ignoreReports', 'unignoreReports', 'redis', 'triggers']`
+  (`src/server/services/runtimeProof.ts:11`, `src/server/services/runtimeProof.ts:63-72`).
+  Report routes now write granular `postReportTrigger` or
+  `commentReportTrigger` capabilities (`src/server/services/reportTriggers.ts:153-171`),
+  and update routes write `postUpdateTrigger`, `commentUpdateTrigger`,
+  `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`, or
+  `postFlairUpdateTrigger` (`src/server/services/updateTriggers.ts:34-55`).
+  The runtime banner renders only the persisted capability rows it receives
+  (`src/client/components/RuntimeBanner.ts:33-60`). No code records or removes
+  the old broad `triggers` capability after granular trigger proof is added.
+  The runtime proof tests assert the malformed/default fallback contains
+  `triggers`, but do not cover a fully granular trigger matrix or require the
+  specific unverified trigger variants to appear (`src/server/services/runtimeProof.test.ts:8-18`,
+  `src/server/services/runtimeProof.test.ts:53-96`). This also conflicts with
+  D070's decision to keep unrelated trigger capabilities unverified at the
+  specific trigger level (`decisions.md:1138-1158`).
+- Why it matters: During the current partial proof state, the dashboard can show
+  `postReportTrigger verified` and `postUpdateTrigger verified` while the
+  remaining comment/flag/spoiler/flair trigger gaps are represented only by a
+  vague stale `triggers unverified` row, not by explicit unverified capability
+  rows. After the remaining trigger variants are proven, the broad `triggers`
+  row can still keep overall runtime status unverified even if all granular
+  trigger capabilities have passed, unless a human remembers to update that
+  legacy row manually.
+- Suggested fix: Replace the broad default `triggers` capability with explicit
+  granular trigger defaults in `runtimeProof.ts`, or derive the broad trigger
+  row from the granular statuses and remove it once granular proof is active.
+  Add runtime proof tests that load the default matrix and assert every
+  unverified trigger variant is visible, then record all granular trigger
+  capabilities as verified and assert no stale broad `triggers` row keeps
+  `overall` unverified.
+- Files reviewed: `src/server/services/runtimeProof.ts`,
+  `src/server/services/reportTriggers.ts`, `src/server/services/updateTriggers.ts`,
+  `src/client/components/RuntimeBanner.ts`,
+  `src/server/services/runtimeProof.test.ts`, `docs/RUNTIME_PROOF.md`,
+  `decisions.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:09 IST - Resolution
+
+- Resolved the failed Reddit runtime smoke ledger gap from the 23:00 finding.
+- Evidence: `/api/smoke/reddit` now stores the resolved smoke subreddit before
+  checking `getCurrentUsername()` and writes `redditContext failed` to runtime
+  proof when username lookup fails after scope resolution (`src/routes/api.ts:198-265`).
+  The contract test now covers a Reddit adapter returning `undefined`, asserts
+  the route returns HTTP 500 with `capability: 'redditContext'`, and verifies
+  `loadRuntimeProofStatus(redis, 'alpha')` contains a failed `redditContext`
+  capability (`src/routes/api.contract.test.ts:151-185`).
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts --reporter verbose`
+  - PASS, 1 test file and 8 tests.
+
+## 2026-05-25 23:10 IST - Finding
+
+- Severity: low
+- Area: Runtime proof default matrix omits `redditContext`
+- Evidence: `/api/smoke/reddit` records a `redditContext` capability on success
+  and now on scoped failure (`src/routes/api.ts:216-265`), and the live proof
+  docs treat `redditContext` as a first-class runtime capability
+  (`docs/RUNTIME_PROOF.md:95-96`, `docs/PLAYTEST_CHECKLIST.md:71-72`). But the
+  default runtime proof matrix still seeds only
+  `['approve', 'ignoreReports', 'unignoreReports', 'redis', 'triggers']`
+  (`src/server/services/runtimeProof.ts:11`, `src/server/services/runtimeProof.ts:63-72`).
+  The malformed-record fallback tests only require `redis` or `triggers`, not
+  `redditContext` (`src/server/services/runtimeProof.test.ts:53-96`), and the
+  runtime banner renders exactly the capability rows it receives
+  (`src/client/components/RuntimeBanner.ts:33-60`).
+- Why it matters: On first run, or after a malformed runtime proof record falls
+  back to defaults, the moderator-facing runtime panel does not show
+  `redditContext unverified`; the capability simply disappears until someone
+  clicks `Verify runtime`. That makes the proof surface less explicit and can
+  hide a missing Reddit-context check even though the product docs require it as
+  part of the runtime boundary.
+- Suggested fix: Add `redditContext` to the default capability matrix, alongside
+  the granular trigger defaults from the 23:07 finding. Add runtime proof tests
+  that default and malformed-ledger fallbacks include `redditContext` as
+  `unverified`, and that recording a failed or verified Reddit smoke result
+  updates that row rather than introducing it only after the first smoke run.
+- Files reviewed: `src/server/services/runtimeProof.ts`,
+  `src/server/services/runtimeProof.test.ts`, `src/routes/api.ts`,
+  `src/client/components/RuntimeBanner.ts`, `docs/RUNTIME_PROOF.md`,
+  `docs/PLAYTEST_CHECKLIST.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:11 IST - Resolution
+
+- Resolved the runtime proof default-matrix findings from 23:07 and 23:10.
+- Evidence: `defaultCapabilityNames` now includes `redditContext` and granular
+  trigger capabilities (`postReportTrigger`, `commentReportTrigger`,
+  `postUpdateTrigger`, `commentUpdateTrigger`, `postNsfwUpdateTrigger`,
+  `postSpoilerUpdateTrigger`, and `postFlairUpdateTrigger`) and no longer seeds
+  the broad legacy `triggers` row (`src/server/services/runtimeProof.ts:11-24`).
+  Runtime proof tests now assert the default matrix includes granular trigger
+  rows, malformed-ledger fallback returns granular unverified rows, and all
+  granular trigger capabilities can verify without a stale broad `triggers` row
+  keeping `overall` unverified (`src/server/services/runtimeProof.test.ts:11-160`).
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - PASS, 2 test files and 14 tests.
+
+## 2026-05-25 23:13 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof normalization drops the demo-only proof warning
+- Evidence: The seeded demo runtime status explicitly warns
+  `Demo data only. Seeded records are not runtime proof.`
+  (`src/shared/demoScenario.ts:571-622`), and demo seeding persists that status
+  through `saveRuntimeProofStatus()` (`src/server/services/demoMode.ts:84-96`).
+  Dashboard and `/api/runtime` reads then call `loadRuntimeProofStatus()`
+  (`src/server/services/dashboard.ts:66-84`,
+  `src/routes/api.dashboard.ts:287-307`). The new
+  `normalizeRuntimeProofStatus()` path rebuilds `warnings` from capability
+  status only, replacing every stored warning with either
+  `Some runtime capabilities are not verified.` or `[]`
+  (`src/server/services/runtimeProof.ts:104-125`). Existing runtime proof tests
+  cover default/malformed migration and broad-trigger removal, but they do not
+  seed demo runtime status or assert that stored warning text survives
+  normalization (`src/server/services/runtimeProof.test.ts:63-187`,
+  `src/server/services/demoMode.test.ts:14-26`).
+- Why it matters: Demo/live separation is a non-negotiable product guardrail.
+  After demo mode is enabled, the runtime panel can lose the strongest
+  moderator-facing warning that seeded demo records are not runtime proof,
+  showing only a generic unverified-capabilities warning. That makes seeded
+  proof data easier to mistake for live Devvit evidence.
+- Suggested fix: Preserve existing `status.warnings` during normalization and
+  append generic warnings only when absent, or add an explicit demo-aware
+  warning preservation path. Add a regression that seeds demo data, loads
+  runtime proof through `loadRuntimeProofStatus()` or `/api/runtime?demo=true`,
+  and asserts the returned warnings still contain
+  `Demo data only. Seeded records are not runtime proof.`
+- Files reviewed: `src/shared/demoScenario.ts`,
+  `src/server/services/demoMode.ts`, `src/server/services/runtimeProof.ts`,
+  `src/server/services/runtimeProof.test.ts`,
+  `src/server/services/demoMode.test.ts`, `src/routes/api.dashboard.ts`,
+  `src/client/components/RuntimeBanner.ts`.
+
+## 2026-05-25 23:14 IST - Finding
+
+- Severity: low
+- Area: Redis race proof doc has a stale blanket trigger-proof boundary
+- Evidence: The current runtime proof matrix marks controlled `PostReport`
+  delivery, controlled `PostUpdate` body-edit reopening, and controlled
+  `CommentUpdate` body-edit reopening verified, while keeping comment report and
+  post NSFW/spoiler/flair update variants unverified
+  (`docs/RUNTIME_PROOF.md:101-106`, `docs/TRIGGER_PROOF.md:23-28`). But
+  `docs/REDIS_RACE_PROOF.md:80-82` still says live Devvit trigger delivery
+  timing and trigger-driven suppression/reopening require controlled playtest
+  proof before ReviewLock can claim live trigger suppression and reopening as
+  verified. Unlike clearly historical Wave 21 and Wave 31 docs, this section is
+  titled `Remaining Runtime Risk` and reads as the current boundary.
+- Why it matters: Final claim cleanup can accidentally underclaim or contradict
+  the runtime ledger. The safe current boundary is granular: controlled
+  post-report suppression, post body-edit reopen, and comment body-edit reopen
+  are verified; comment-report suppression and post flag/flair update variants
+  remain unverified.
+- Suggested fix: Update the `Remaining Runtime Risk` section to point to
+  `docs/RUNTIME_PROOF.md` for current status and replace the blanket trigger
+  sentence with the granular verified/unverified split. If the section is meant
+  to remain historical for Wave 17, label it explicitly as historical.
+- Files reviewed: `docs/REDIS_RACE_PROOF.md`, `docs/RUNTIME_PROOF.md`,
+  `docs/TRIGGER_PROOF.md`, `docs/DEVVIT_REGISTRATION_PROOF.md`,
+  `docs/INSTALL_DEPLOY_REHEARSAL.md`, `docs/LIVE_WEBVIEW_RUNTIME_SMOKE.md`.
+
+## 2026-05-25 23:16 IST - Finding
+
+- Severity: low
+- Area: Route tests do not prove every granular update-trigger endpoint writes
+  the expected proof row
+- Evidence: `createUpdateTriggersRouter()` registers distinct endpoints for
+  `/on-post-update`, `/on-comment-update`, `/on-post-nsfw-update`,
+  `/on-post-spoiler-update`, and `/on-post-flair-update`
+  (`src/routes/triggers.update.ts:111-115`), and
+  `capabilityForUpdateTrigger()` maps those variants to separate runtime proof
+  capabilities (`src/server/services/updateTriggers.ts:34-44`). The service
+  tests cover reason mapping for flair, NSFW, and spoiler updates through
+  `handleUpdateTrigger()` (`src/server/services/updateTriggers.test.ts:55-101`),
+  and route tests cover post body, comment body, and flair route behavior
+  (`src/routes/triggers.update.test.ts:61-85`,
+  `src/routes/triggers.update.test.ts:253-379`,
+  `src/routes/triggers.update.test.ts:381-427`). There are no route regressions
+  for `/on-post-nsfw-update` or `/on-post-spoiler-update`, and the route tests
+  only assert a runtime proof row for `postUpdateTrigger`, not
+  `commentUpdateTrigger`, `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`,
+  or `postFlairUpdateTrigger` (`src/routes/triggers.update.test.ts:75-84`).
+- Why it matters: The app now exposes a granular runtime proof matrix. A route
+  registration typo or wrong `triggerKind` wiring for NSFW/spoiler/flair could
+  leave the dashboard proving the wrong capability or reopening with the wrong
+  reason while service-level tests still pass. That is exactly the kind of
+  claim-boundary drift the granular matrix is trying to prevent.
+- Suggested fix: Add route-level regressions for `/on-post-nsfw-update` and
+  `/on-post-spoiler-update` that assert `nsfw_changed` / `spoiler_changed` and
+  the matching runtime proof capability. Extend the existing comment and flair
+  route tests to assert `commentUpdateTrigger` and `postFlairUpdateTrigger`
+  become verified without marking unrelated update-trigger capabilities
+  verified.
+- Files reviewed: `src/routes/triggers.update.ts`,
+  `src/routes/triggers.update.test.ts`,
+  `src/server/services/updateTriggers.ts`,
+  `src/server/services/updateTriggers.test.ts`,
+  `src/server/services/runtimeProof.ts`.
+
+## 2026-05-25 23:17 IST - Finding
+
+- Severity: low
+- Area: Runtime proof tests still do not assert `redditContext` appears in the
+  default/fallback matrix
+- Evidence: `defaultCapabilityNames` now includes `redditContext`
+  (`src/server/services/runtimeProof.ts:11-24`), but the default-matrix test
+  asserts only `ignoreReports` and the granular trigger rows
+  (`src/server/services/runtimeProof.test.ts:11-29`). The malformed valid-JSON
+  fallback test asserts granular trigger rows but not `redditContext`
+  (`src/server/services/runtimeProof.test.ts:74-113`). The all-verified test
+  records `redditContext` explicitly through `recordCapabilityStatus()`
+  (`src/server/services/runtimeProof.test.ts:127-145`), so it would still pass
+  even if `redditContext` were accidentally removed from the default matrix.
+- Why it matters: `redditContext` is a first-class runtime smoke capability in
+  the dashboard proof boundary. The code currently includes it, but the test
+  suite does not lock that default/fallback behavior down, so a future edit can
+  silently regress the first-run runtime panel back to hiding
+  `redditContext unverified`.
+- Suggested fix: Extend the default and malformed-ledger fallback tests to
+  require `expect.objectContaining({ name: 'redditContext', status: 'unverified' })`.
+  Optionally add a test that records only `redis verified` and confirms
+  `redditContext` remains present as `unverified`.
+- Files reviewed: `src/server/services/runtimeProof.ts`,
+  `src/server/services/runtimeProof.test.ts`, `src/routes/api.ts`,
+  `docs/RUNTIME_PROOF.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:19 IST - Resolution
+
+- Resolved the 23:13 demo-warning preservation finding.
+- Evidence: runtime proof normalization now preserves explicit stored warnings
+  such as `Demo data only. Seeded records are not runtime proof.` while adding
+  the generic unverified-capabilities warning only when needed
+  (`src/server/services/runtimeProof.ts`). Regression coverage now asserts both
+  direct runtime-proof normalization and seeded demo-mode runtime proof keep the
+  demo warning visible (`src/server/services/runtimeProof.test.ts`,
+  `src/server/services/demoMode.test.ts`).
+
+## 2026-05-25 23:19 IST - Resolution
+
+- Resolved the stale claim-boundary finding in the Redis race proof doc.
+- Evidence: `docs/REDIS_RACE_PROOF.md` now points to `docs/RUNTIME_PROOF.md`
+  for the current live matrix and states the granular split: controlled
+  post-report suppression plus post/comment body-edit reopen paths are verified,
+  while comment-report and post NSFW/spoiler/flair update variants remain
+  unverified.
+
+## 2026-05-25 23:19 IST - Resolution
+
+- Resolved the route-level granular update-trigger proof finding.
+- Evidence: route tests now assert `commentUpdateTrigger`,
+  `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`, and
+  `postFlairUpdateTrigger` write their own runtime proof rows, and that
+  unrelated update-trigger rows remain unverified during focused route
+  exercises (`src/routes/triggers.update.test.ts`).
+
+## 2026-05-25 23:19 IST - Resolution
+
+- Resolved the runtime-proof `redditContext` default/fallback assertion gap.
+- Evidence: `src/server/services/runtimeProof.test.ts` now requires
+  `redditContext` to appear as `unverified` in the first-run default matrix and
+  malformed-ledger fallback path.
+
+## 2026-05-25 23:19 IST - Resolution
+
+- Resolved the earlier stale production-trust claim-boundary finding.
+- Evidence: `docs/PRODUCTION_TRUST_AUDIT.md` now distinguishes verified
+  controlled post-report suppression and post/comment body-edit reopening from
+  still-unverified comment-report and post flag/flair update variants.
+
+## 2026-05-25 23:20 IST - Finding
+
+- Severity: medium
+- Area: Concurrent lock submissions can still create multiple active locks for one target
+- Evidence: The sequential duplicate-submit regression now returns the existing
+  lock when the second call observes the first persisted lock
+  (`src/server/services/lockFlow.test.ts:95-126`). The production flow still
+  performs a read-then-write without a per-target claim or Redis transaction:
+  it loads the active lock by target (`src/server/services/lockFlow.ts:145-161`),
+  then calls Reddit `approve()` / `ignoreReports()`
+  (`src/server/services/lockFlow.ts:233-234`), and only later persists the new
+  lock (`src/server/services/lockFlow.ts:281-299`). `saveLock()` writes the lock
+  record, active sorted-set row, active-by-target hash, and target-lock pointer
+  with ordinary `set`/`hset`/`zAdd` calls (`src/server/services/locks.ts:25-35`);
+  the available `RedisStore.setIfNotExists()` helper is not used for lock
+  creation (`src/server/adapters/redis.ts:6-20`). If two form submissions for
+  the same reviewed content reach line 145 before either reaches `saveLock()`,
+  both can see no active lock, both can call Reddit moderation methods, and
+  both can save distinct active lock records when their clock timestamps differ.
+  The target pointer will reference only the later lock, while
+  `listActiveLocks()` still returns every active zset member
+  (`src/server/services/locks.ts:103-111`). Current tests cover sequential
+  duplicate calls but do not interleave two in-flight lock creations.
+- Why it matters: ReviewLock's ledger should have one current review state per
+  target. A moderator double-click, two moderators locking from stale menus, or
+  a retry racing the original submission can strand an older active row that no
+  target-based unlock/report/update path can reach, inflate lock-created
+  metrics, and make dashboard state disagree with the target lock pointer.
+- Suggested fix: Add an atomic per-target creation guard before Reddit
+  moderation calls, such as a short-lived `setIfNotExists()` lock for
+  `target:{thingId}:lock:create` or a transaction/CAS helper around the
+  target-lock pointer. Recheck `getActiveLockByTarget()` after acquiring the
+  guard and again before saving. Add a regression with a Redis adapter or
+  Reddit adapter that pauses the first `ignoreReports()` call while a second
+  `lockReviewedContent()` starts, then assert only one active lock row, one
+  metrics increment, and one pair of Reddit moderation calls remain.
+- Files reviewed: `src/server/services/lockFlow.ts`,
+  `src/server/services/lockFlow.test.ts`, `src/server/services/locks.ts`,
+  `src/server/adapters/redis.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:26 IST - Resolution
+
+- Resolved the concurrent lock creation race.
+- Evidence: `lockReviewedContent()` now acquires a short-lived per-target Redis
+  creation lease before calling Reddit moderation methods, rechecks the active
+  target lock after acquiring the lease, returns a retryable
+  `lock_creation_in_progress` result when another creation is in flight, and
+  releases the lease in `finally` (`src/server/services/lockFlow.ts`,
+  `src/server/services/keys.ts`).
+- Regression coverage: `src/server/services/lockFlow.test.ts` now pauses the
+  first `ignoreReports()` call, starts a second lock submission for the same
+  target while the first is in flight, and asserts one moderation call pair, one
+  active lock, and one metrics increment.
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 1 test file and 11 tests.
+
+## 2026-05-25 23:21 IST - Finding
+
+- Severity: low
+- Area: Install/deploy rehearsal doc still lists obsolete live-proof blockers
+- Evidence: Current proof docs record controlled post-target moderation methods,
+  post-report suppression, post body-edit reopening, and comment body-edit
+  reopening as verified while keeping comment report and post flag/flair
+  variants unverified (`docs/RUNTIME_PROOF.md:98-105`,
+  `docs/TRIGGER_PROOF.md:52-123`, `docs/KNOWN_LIMITATIONS.md:7-19`). The
+  `Blockers and Next Actions` section in `docs/INSTALL_DEPLOY_REHEARSAL.md`
+  still says live `approve()`, `ignoreReports()`, and `unignoreReports()`
+  behavior is not proven on controlled Reddit content, and that live
+  `PostReport`, update, NSFW, spoiler, and flair trigger delivery is not proven
+  (`docs/INSTALL_DEPLOY_REHEARSAL.md:186-190`). The section is not labeled as a
+  historical rehearsal snapshot, so it reads like the current live-proof TODO
+  list.
+- Why it matters: The final handoff depends on one coherent proof boundary.
+  This stale next-action list can cause the team to underclaim already captured
+  controlled proof, or to overlook the narrower remaining gaps: comment report,
+  comment-target moderation method visibility, and post NSFW/spoiler/flair
+  trigger variants.
+- Suggested fix: Mark `docs/INSTALL_DEPLOY_REHEARSAL.md` as a historical
+  rehearsal snapshot and add a pointer to `docs/RUNTIME_PROOF.md`, or update the
+  blocker list to the current granular boundary: post-target moderation methods,
+  `PostReport`, `PostUpdate`, and `CommentUpdate` verified; comment report and
+  post NSFW/spoiler/flair variants still unverified.
+- Files reviewed: `docs/INSTALL_DEPLOY_REHEARSAL.md`,
+  `docs/RUNTIME_PROOF.md`, `docs/TRIGGER_PROOF.md`,
+  `docs/KNOWN_LIMITATIONS.md`, `docs/CLAIM_COPY_AUDIT.md`,
+  `docs/FULL_SCENARIO_WALKTHROUGH.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:25 IST - Finding
+
+- Severity: medium
+- Area: No-id report dedupe can double-count delayed duplicate deliveries
+- Evidence: Live `PostReport` proof observed no direct top-level target/event id
+  in the sanitized payload; the route had to use nested `post.id` and
+  `post.numReports` (`docs/TRIGGER_PROOF.md:61-68`). When a report event lacks
+  `eventId`, `dedupeKey()` falls back to
+  `missing-event:${targetId}:count-${reportCount}:${bucket}`, where `bucket` is
+  `now.slice(0, 16)` (`src/server/services/reportTriggers.ts:44-50`). For live
+  report payloads without a stable event id or timestamp, `now` is the handler
+  clock (`src/server/services/reportTriggers.ts:178`), so the same duplicate
+  delivery with the same `post.numReports` will get a different dedupe key if it
+  is retried after the minute changes. Existing no-id coverage only calls two
+  same-count deliveries under the same fixed clock and proves the same-minute
+  duplicate is ignored (`src/server/services/reportTriggers.test.ts:236-268`);
+  there is no regression for the same no-id report count crossing a minute
+  boundary.
+- Why it matters: Devvit trigger delivery can be at-least-once, and the live
+  shape already lacks the stable event id the service prefers. A delayed retry
+  of one Reddit report can increment `suppressedReportCount`, daily report
+  churn metrics, and audit entries twice, overstating the core "Reports
+  suppressed" metric that judges and moderators will inspect.
+- Suggested fix: For missing event ids, dedupe by a longer-lived fingerprint such
+  as `targetId + reportCount` with a bounded TTL, or use a payload timestamp if
+  live logs prove it is stable across retries. Keep distinct report-count
+  increments countable, but do not include the processing minute in the primary
+  missing-id dedupe key. Add a regression with two no-id deliveries for the same
+  `targetId` and `reportCount` under different clock minutes, asserting the
+  second returns `duplicate` and metrics/audit stay at one.
+- Files reviewed: `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/routes/triggers.report.ts`, `src/routes/triggers.report.test.ts`,
+  `docs/TRIGGER_PROOF.md`, `docs/RUNTIME_PROOF.md`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:30 IST - Resolution
+
+- Resolved the stale install/deploy rehearsal blocker list.
+- Evidence: `docs/INSTALL_DEPLOY_REHEARSAL.md` now labels the section as a
+  historical rehearsal snapshot, points to `docs/RUNTIME_PROOF.md`, and states
+  the current granular boundary: post-target moderation methods, controlled
+  `PostReport`, `PostUpdate`, and `CommentUpdate` are verified, while
+  `CommentReport`, independent comment-target moderation visibility, and post
+  NSFW/spoiler/flair update variants remain unverified.
+
+## 2026-05-25 23:30 IST - Resolution
+
+- Resolved the delayed no-id report dedupe risk.
+- Evidence: `dedupeKey()` no longer includes the handler clock minute for
+  missing-event fallback keys; it dedupes by target and report count under the
+  existing seven-day TTL while still counting distinct report-count increases
+  (`src/server/services/reportTriggers.ts`).
+- Regression coverage: `src/server/services/reportTriggers.test.ts` now sends
+  two no-id report deliveries with the same target and report count across
+  different clock minutes and asserts the second is `duplicate`, with one
+  moderation call, one suppressed-report increment, and one audit row.
+
+## 2026-05-25 23:27 IST - Finding
+
+- Severity: medium
+- Area: Lock creation guard can delete a newer owner after TTL rollover
+- Evidence: The new per-target lock creation guard stores only
+  `JSON.stringify({ actor, createdAt })` and then always deletes the guard key
+  in `finally` (`src/server/services/lockFlow.ts:148-182`,
+  `src/server/services/lockFlow.ts:387-388`). Production Redis applies the
+  30-second TTL (`src/server/adapters/redis.ts:164-165`). If the first
+  `lockReviewedContent()` call stalls longer than that while waiting on Reddit
+  or Redis, a second call can acquire the expired `target:{id}:lock:create`
+  guard. When the first call eventually reaches `finally`, it deletes the same
+  guard key without checking ownership, potentially removing the second call's
+  lease and allowing a third creation to enter. The trigger mutex already avoids
+  this exact stale-owner release problem by writing a token and deleting only
+  when `redis.get(mutexKey) === token` (`src/server/services/triggerMutex.ts:24-39`).
+  The new lock-flow regression covers an in-flight overlap before TTL expiry,
+  but it does not simulate the first lease expiring and a newer owner acquiring
+  the guard (`src/server/services/lockFlow.test.ts:128-189`).
+- Why it matters: The guard is protecting the core one-active-lock-per-target
+  invariant and preventing duplicate Reddit moderation calls. A slow Devvit
+  Reddit call, Redis latency, or runtime suspension past 30 seconds can reopen
+  the duplicate-creation window the guard was added to close.
+- Suggested fix: Match `withTriggerMutex()`: generate a per-acquisition token,
+  store that token in `setIfNotExists()`, and in `finally` read the guard key
+  and delete it only when the stored token matches. Add a regression with a
+  Redis test double that lets the first guard expire, lets a second call acquire
+  a newer token, then completes the first call and asserts the second guard is
+  not deleted.
+- Files reviewed: `src/server/services/lockFlow.ts`,
+  `src/server/services/lockFlow.test.ts`, `src/server/services/triggerMutex.ts`,
+  `src/server/adapters/redis.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:28 IST - Finding
+
+- Severity: medium
+- Area: Concurrent distinct report events are collapsed as duplicates
+- Evidence: `handleReportTrigger()` resolves the target, then enters
+  `withTriggerMutex()` for the whole per-target report operation
+  (`src/server/services/reportTriggers.ts:178-190`). The dedupe key is marked
+  only inside the mutex (`src/server/services/reportTriggers.ts:190-197`). If
+  another report trigger for the same target arrives while the first one is
+  still processing, `withTriggerMutex()` throws before checking that second
+  event's `eventId` or `reportCount`, and the catch block returns
+  `action: 'duplicate'` with `ok: true`
+  (`src/server/services/reportTriggers.ts:431-439`). The mutex itself blocks
+  every same-target operation, not just same-event retries
+  (`src/server/services/triggerMutex.ts:24-39`). Current report-trigger tests
+  cover concurrent duplicate deliveries with the same `eventId`
+  (`src/server/services/reportTriggers.test.ts:166-185`) and a sequential burst
+  of distinct event ids (`src/server/services/reportTriggers.test.ts:308-335`),
+  but there is no regression for two different event ids or two increasing
+  no-id report counts arriving concurrently.
+- Why it matters: Devvit can deliver report triggers close together during a
+  report burst. Returning HTTP-success `duplicate` for a distinct second report
+  means the platform has no reason to retry it, while ReviewLock skips the
+  suppression metric, target metric, and audit row for that delivery. That
+  undercounts the product's core "Reports suppressed" metric and can leave
+  `lastReportCount` stale for active locks.
+- Suggested fix: Distinguish mutex contention from true duplicate delivery.
+  Options include marking/checking event dedupe before the per-target mutex and
+  returning a retryable failure for distinct in-flight events, or queueing the
+  second event after the first finishes and then applying normal
+  event-id/report-count dedupe. Add regressions for concurrent distinct
+  `eventId`s and concurrent no-id `reportCount` 5 then 6, asserting both are
+  eventually counted once while same-event retries still collapse.
+- Files reviewed: `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/triggerMutex.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:32 IST - Resolution
+
+- Resolved the stale-owner lock creation guard release risk.
+- Evidence: lock creation guards now store an owner token and delete the guard
+  in `finally` only when the stored token still matches the owner
+  (`src/server/services/lockFlow.ts`). Regression coverage overwrites the
+  in-flight guard with a newer owner token before the older flow finishes and
+  asserts the older owner does not delete it (`src/server/services/lockFlow.test.ts`).
+
+## 2026-05-25 23:32 IST - Resolution
+
+- Resolved distinct report-event mutex contention being reported as successful
+  duplicates.
+- Evidence: report trigger dedupe is now checked before the per-target mutex.
+  Same-event retries still return `duplicate`; distinct in-flight events clear
+  their dedupe marker and return retryable `runtime_uncertain` with
+  `concurrent_trigger_in_progress` (`src/server/services/reportTriggers.ts`).
+  Regression coverage proves both distinct event ids and distinct no-id report
+  counts become retryable during mutex contention and are counted once when
+  retried (`src/server/services/reportTriggers.test.ts`).
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - PASS, 2 test files and 36 tests.
+
+## 2026-05-25 23:30 IST - Finding
+
+- Severity: medium
+- Area: No-id reports without report counts collapse for seven days
+- Evidence: The fixed missing-event fallback dedupe key is now
+  `missing-event:${targetId}:count-${reportCount ?? 'unknown'}`
+  (`src/server/services/reportTriggers.ts:44-47`) and successful dedupe markers
+  live for seven days (`src/server/services/reportTriggers.ts:64`,
+  `src/server/services/reportTriggers.ts:106-118`). Report routes try to extract
+  `reportCount`, `post.numberOfReports`, `post.numReports`,
+  `comment.numberOfReports`, and `comment.numReports`
+  (`src/routes/triggers.report.ts:84-93`), but if a live or future Devvit
+  payload omits both a stable event id and those count fields, every report
+  trigger for that target uses the same `count-unknown` key. Current tests cover
+  no-id deliveries with explicit report counts 5 and 6, and delayed duplicates
+  with the same count (`src/server/services/reportTriggers.test.ts:236-306`),
+  but there is no regression for `eventId === undefined` and `reportCount ===
+  undefined`.
+- Why it matters: The live post-report payload happened to expose
+  `post.numReports`, but comment report proof is still unverified and Devvit
+  payload shape is treated as runtime evidence, not a permanent contract. If a
+  report trigger arrives without count data, ReviewLock will suppress and count
+  the first report, then treat all subsequent no-id/no-count report deliveries
+  for the same locked target as duplicates for seven days. That undercounts
+  "Reports suppressed", leaves `lastReportCount` stale, and hides churn on the
+  reviewed item.
+- Suggested fix: Make the missing-event fallback conditional: use
+  `targetId + reportCount` only when `reportCount` is a finite number; when both
+  event id and report count are absent, either return a retryable
+  `runtime_uncertain` result without writing a long-lived dedupe marker, use a
+  short processing-window key, or derive a bounded identity from a proven stable
+  payload timestamp. Add a regression with two no-id/no-count deliveries for
+  the same target that proves they are not collapsed for seven days.
+- Files reviewed: `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/routes/triggers.report.ts`, `src/routes/triggers.report.test.ts`,
+  `docs/TRIGGER_PROOF.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:31 IST - Finding
+
+- Severity: medium
+- Area: Reopen dismiss can remove queue visibility before audit is durable
+- Evidence: `dismissReopenEvent()` marks the event dismissed and removes it
+  from the reopen queue before returning (`src/server/services/reopenQueue.ts:58-75`).
+  Both the dashboard API dismiss route and the Devvit form dismiss route call
+  `dismissReopenEvent()` first, then append the required `reopen_dismissed`
+  audit event afterward (`src/routes/api.dashboard.ts:393-418`,
+  `src/routes/forms.ts:269-296`). If the event write/zrem succeeds but the
+  subsequent audit append fails, `withErrors()` returns a 500 for the dashboard
+  route while the reopen item is already gone from the open queue, and a retry
+  sees `Reopen event was not found.` The service and route tests cover happy
+  path dismissal and audit output (`src/server/services/reopenQueue.test.ts:40-47`,
+  `src/routes/api.dashboard.test.ts:230-247`,
+  `src/routes/forms.test.ts:339-371`), but there is no regression where audit
+  Redis writes fail after the queue mutation.
+- Why it matters: `reopen_dismissed` is one of ReviewLock's required audit
+  event kinds, and dismissing a reopened item is a human-confirmed moderation
+  workflow action. Losing the queue item without a durable audit entry weakens
+  moderator traceability and makes the UI report a failure even though retrying
+  can no longer restore or audit the original action.
+- Suggested fix: Make dismiss audit and queue mutation atomic enough for this
+  workflow. The narrowest fix is to write the `reopen_dismissed` audit event
+  before removing the event from the open queue, then only mark/zrem the reopen
+  item after the audit write succeeds. Add dashboard API and form regressions
+  with a Redis adapter that fails audit writes, asserting the route returns a
+  failure and `listOpenReopenEvents()` still includes the event for retry.
+- Files reviewed: `src/server/services/reopenQueue.ts`,
+  `src/routes/api.dashboard.ts`, `src/routes/forms.ts`,
+  `src/server/services/reopenQueue.test.ts`, `src/routes/api.dashboard.test.ts`,
+  `src/routes/forms.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:32 IST - Finding
+
+- Severity: medium
+- Area: Dashboard runtime-context failure falls back to the `reviewlock` namespace
+- Evidence: The embedded dashboard initializes its store with
+  `requestedSubreddit ?? embeddedSubreddit ?? 'reviewlock'`
+  (`src/client/main.ts:18-22`). When no explicit subreddit or embedded context
+  is available, it calls `/api/context`, but catches and ignores failures before
+  calling `store.fetchState()` (`src/client/main.ts:104-124`). The server
+  `/api/context` route directly awaits `deps.reddit?.getCurrentSubredditName()`
+  without a try/catch (`src/routes/api.ts:101-108`). The dashboard API scope
+  resolver catches runtime subreddit lookup failures, treats the runtime
+  subreddit as unavailable, and for non-demo requests falls back to
+  `runtimeSubreddit ?? clientSubreddit ?? 'reviewlock'`
+  (`src/routes/api.dashboard.ts:69-95`, `src/routes/api.dashboard.ts:159-164`).
+  Runtime smoke uses the same pattern: if runtime context is unavailable but the
+  client-supplied subreddit is `reviewlock`, smoke proof is accepted under that
+  namespace (`src/routes/api.ts:39-90`). Existing contract tests cover
+  mismatched runtime/client namespaces and missing smoke subreddit only when no
+  client subreddit is supplied (`src/routes/api.contract.test.ts:72-108`), but
+  not the embedded-dashboard case where runtime context throws and the client
+  default supplies `reviewlock`.
+- Why it matters: `reviewlock` is the app name, not evidence of the current
+  subreddit. If Devvit context lookup is temporarily unavailable, the dashboard
+  can show empty or stale data and `Verify runtime` can write `redis verified`
+  or `redditContext verified` to `reviewlock:*` rather than the controlled
+  subreddit. That weakens the runtime-proof boundary and can make a missing
+  context look like a verified runtime state.
+- Suggested fix: Remove the production `reviewlock` fallback for live embedded
+  dashboard reads and smoke writes. If neither Devvit runtime context nor a
+  trusted embedded subreddit can be resolved, fail closed with an explicit
+  context error and avoid reading or writing runtime proof. Keep test/local
+  defaults only behind explicit test setup. Add contract/client regressions
+  where `getCurrentSubredditName()` throws and no embedded/requested subreddit
+  exists, asserting dashboard reads and smoke routes do not use
+  `reviewlock:*`.
+- Files reviewed: `src/client/main.ts`, `src/client/state/store.ts`,
+  `src/client/state/api.ts`, `src/routes/api.ts`, `src/routes/api.dashboard.ts`,
+  `src/routes/api.contract.test.ts`, `src/integration.test.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:39 IST - Resolution
+
+- Resolved the no-id/no-count seven-day dedupe collapse.
+- Evidence: missing-event report dedupe now uses `targetId + reportCount` only
+  when `reportCount` is finite; when both event id and report count are absent,
+  it uses a processing-window key instead of a seven-day `count-unknown` key
+  (`src/server/services/reportTriggers.ts`). Regression coverage sends two
+  no-id/no-count report deliveries for the same target across clock minutes and
+  asserts both are counted (`src/server/services/reportTriggers.test.ts`).
+
+## 2026-05-25 23:39 IST - Resolution
+
+- Resolved reopen-dismiss audit durability ordering.
+- Evidence: dashboard and form dismiss routes now fetch the reopen event and
+  write `reopen_dismissed` audit before calling `dismissReopenEvent()`.
+  Regressions simulate audit index write failure and assert the reopen item
+  remains visible for retry (`src/routes/api.dashboard.ts`,
+  `src/routes/forms.ts`, `src/routes/api.dashboard.test.ts`,
+  `src/routes/forms.test.ts`).
+
+## 2026-05-25 23:39 IST - Resolution
+
+- Resolved the live dashboard/runtime smoke `reviewlock` namespace fallback.
+- Evidence: the embedded client no longer initializes live mode with
+  `reviewlock` when requested and embedded subreddit context are absent, and
+  server-side dashboard/smoke scope resolution rejects `reviewlock` when runtime
+  context is unavailable (`src/client/main.ts`, `src/routes/api.dashboard.ts`,
+  `src/routes/api.ts`). Contract coverage asserts dashboard reads and runtime
+  smoke writes fail closed instead of using `reviewlock:*`
+  (`src/routes/api.contract.test.ts`).
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - PASS, 4 test files and 56 tests.
+
+## 2026-05-25 23:42 IST - Resolution
+
+- Resolved runtime proof capability writes dropping explicit warnings.
+- Evidence: `recordCapabilityStatus()` now uses the same non-generic warning
+  preservation path as runtime proof normalization, so demo/runtime warnings
+  survive later capability transitions (`src/server/services/runtimeProof.ts`).
+  Regression coverage seeds a warning-bearing runtime status, records a later
+  capability transition, and asserts the explicit warning remains
+  (`src/server/services/runtimeProof.test.ts`).
+
+## 2026-05-25 23:42 IST - Resolution
+
+- Tightened the dashboard/runtime smoke context fix so live routes require a
+  trusted runtime subreddit, not just a non-`reviewlock` client query value.
+- Evidence: live dashboard scope resolution now fails when Devvit runtime
+  subreddit context is unavailable; runtime smoke scope resolution also fails
+  without runtime context instead of trusting `subreddit=alpha`
+  (`src/routes/api.dashboard.ts`, `src/routes/api.ts`). Dashboard tests provide
+  explicit runtime context for live success paths, and contract coverage
+  continues to assert context-outage requests fail closed
+  (`src/routes/api.dashboard.test.ts`, `src/routes/api.contract.test.ts`).
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reportTriggers.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - PASS, 5 test files and 65 tests.
+
+## 2026-05-25 23:35 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof writes drop explicit demo/runtime warnings
+- Evidence: The new runtime proof normalization path preserves stored explicit
+  warnings while adding missing granular capability rows
+  (`src/server/services/runtimeProof.ts:104-137`), and the new regression only
+  proves that read-time normalization keeps the demo warning
+  (`src/server/services/runtimeProof.test.ts:191-224`). However
+  `recordCapabilityStatus()` rebuilds `warnings` from the capability matrix and
+  writes either `['Some runtime capabilities are not verified.']` or `[]`
+  (`src/server/services/runtimeProof.ts:160-186`). It does not carry forward
+  `current.warnings` after `loadRuntimeProofStatus()` has already normalized
+  and preserved them. `recordCapabilityStatus()` is used by Redis/Reddit smoke
+  routes and trigger proof writes (`src/routes/api.ts:145-176`,
+  `src/routes/api.ts:224-265`, `src/server/services/reportTriggers.ts:159-168`,
+  `src/server/services/reopenFlow.ts:109-121`).
+- Why it matters: Demo/live separation is a product guardrail, and the seeded
+  demo status explicitly warns `Demo data only. Seeded records are not runtime
+  proof.` (`src/shared/demoScenario.ts:642`). A later capability write under a
+  warning-bearing namespace can erase that warning from the runtime proof panel,
+  even though the recent TODO/log entries say explicit demo warnings are
+  preserved. The same pattern would also drop any future non-generic runtime
+  proof warning the service stores before the next capability transition.
+- Suggested fix: In `recordCapabilityStatus()`, preserve non-generic
+  `current.warnings` the same way `normalizeRuntimeProofStatus()` does, then
+  append or remove only the generic unverified-capabilities warning based on
+  the updated capability matrix. Add a regression that seeds a runtime status
+  with the demo warning, calls `recordCapabilityStatus()`, and asserts the demo
+  warning remains alongside the generic warning when any capability is still
+  unverified.
+- Files reviewed: `src/server/services/runtimeProof.ts`,
+  `src/server/services/runtimeProof.test.ts`, `src/shared/demoScenario.ts`,
+  `src/routes/api.ts`, `src/server/services/reportTriggers.ts`,
+  `src/server/services/reopenFlow.ts`, `src/client/components/RuntimeBanner.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:37 IST - Resolution
+
+- Resolved the no-id/no-count report dedupe collapse from the 23:30 finding.
+- Evidence: missing-event report dedupe now uses `targetId + reportCount` only
+  when `reportCount` is finite, and otherwise uses a bounded
+  `unknown-count:${now.slice(0, 16)}` processing window instead of a seven-day
+  `count-unknown` key (`src/server/services/reportTriggers.ts:44-52`,
+  `src/server/services/reportTriggers.ts:111-123`). Regression coverage sends
+  two no-id/no-count deliveries for the same target across different clock
+  minutes and asserts both are counted (`src/server/services/reportTriggers.test.ts`).
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/server/services/reportTriggers.test.ts src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 4 test files and 55 tests.
+
+## 2026-05-25 23:37 IST - Resolution
+
+- Resolved the reopen-dismiss audit durability ordering risk from the 23:31
+  finding.
+- Evidence: both dashboard API and form dismiss flows now read the reopen event,
+  append the `reopen_dismissed` audit event, and only then call
+  `dismissReopenEvent()` to mark and remove the queue item
+  (`src/routes/api.dashboard.ts:407-427`, `src/routes/forms.ts:269-290`).
+  Regression coverage forces audit `zAdd` failure and asserts the reopened item
+  remains visible for retry in both routes (`src/routes/api.dashboard.test.ts`,
+  `src/routes/forms.test.ts`).
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/server/services/reportTriggers.test.ts src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 4 test files and 55 tests.
+
+## 2026-05-25 23:37 IST - Finding
+
+- Severity: medium
+- Area: Dashboard and runtime smoke still trust client subreddit when runtime
+  context is unavailable
+- Evidence: The new dashboard guard correctly rejects live requests when there
+  is no runtime subreddit and the client namespace is missing or exactly
+  `reviewlock` (`src/routes/api.dashboard.ts:159-171`). But the same resolver
+  then returns `runtimeSubreddit ?? clientSubreddit` for live requests
+  (`src/routes/api.dashboard.ts:173-178`), so `/api/locks?subreddit=alpha` is
+  accepted when `deps.reddit?.getCurrentSubredditName()` throws or returns
+  undefined. Runtime smoke has the same shape: it rejects `reviewlock` when
+  runtime context is absent, but accepts any other client-supplied subreddit via
+  `runtimeSubreddit ?? clientSubreddit` (`src/routes/api.ts:75-103`). Existing
+  regressions cover mismatched runtime/client namespaces and the app-name
+  fallback (`src/routes/api.contract.test.ts:72-130`,
+  `src/routes/api.dashboard.test.ts:289-305`), but not runtime-context
+  unavailable plus a non-`reviewlock` client namespace.
+- Why it matters: The original runtime-context fix needs to fail closed when no
+  trusted Devvit runtime subreddit is available. A query string or header
+  supplied by the client is not proof of the current subreddit, so accepting
+  arbitrary values during context outages can still read dashboard state or
+  write runtime proof under the wrong `reviewlock:{subreddit}:*` namespace. That
+  leaves the runtime-proof boundary vulnerable to stale or cross-namespace
+  evidence even though the literal app-name fallback is blocked.
+- Suggested fix: Distinguish trusted embedded/context-derived subreddit values
+  from untrusted request query/header values, or require runtime subreddit
+  context for all live dashboard and smoke requests unless the caller is in an
+  explicit test/local mode. Add regressions where `getCurrentSubredditName()`
+  throws or returns undefined and the request supplies `subreddit=alpha`,
+  asserting dashboard reads and both smoke routes fail without touching
+  `reviewlock:alpha:*`.
+- Files reviewed: `src/routes/api.dashboard.ts`,
+  `src/routes/api.dashboard.test.ts`, `src/routes/api.ts`,
+  `src/routes/api.contract.test.ts`, `src/client/main.ts`,
+  `src/client/state/runtimeContext.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:42 IST - Resolution
+
+- Resolved runtime proof writes dropping explicit demo/runtime warnings.
+- Evidence: runtime proof warning composition now preserves non-generic stored
+  warnings and only recalculates the generic unverified-capabilities warning
+  (`src/server/services/runtimeProof.ts:104-121`,
+  `src/server/services/runtimeProof.ts:166-188`). Regression coverage seeds the
+  demo warning, records a later capability transition, and asserts the demo
+  warning remains visible alongside the generic warning
+  (`src/server/services/runtimeProof.test.ts`).
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 3 test files and 28 tests.
+
+## 2026-05-25 23:42 IST - Resolution
+
+- Resolved the remaining client-supplied namespace fallback when runtime
+  context is unavailable.
+- Evidence: dashboard scope resolution now fails closed whenever live mode has
+  no runtime subreddit and returns only the runtime subreddit for live
+  namespaces (`src/routes/api.dashboard.ts:159-180`). Runtime smoke scope
+  resolution now also requires runtime subreddit context and no longer accepts a
+  query/header subreddit as a substitute (`src/routes/api.ts:39-103`).
+  Contract coverage includes missing runtime context and rejects smoke/dashboard
+  requests instead of writing proof under the app-name namespace
+  (`src/routes/api.contract.test.ts`).
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 3 test files and 28 tests.
+
+## 2026-05-25 23:45 IST - Finding
+
+- Severity: medium
+- Area: Lock creation rollback can leave a false `lock_created` audit event
+- Evidence: The success path saves the active lock, immediately appends a
+  `lock_created` audit event, and only then records created-lock metrics
+  (`src/server/services/lockFlow.ts:322-339`). If the later metrics write
+  fails, the catch path calls `unignoreReports()` and removes the active lock
+  when rollback succeeds (`src/server/services/lockFlow.ts:347-353`), then
+  returns `ok: false` with `redis_write_failed`
+  (`src/server/services/lockFlow.ts:377-386`). The regression for this exact
+  failure mode verifies the lock and active-target index are removed, but does
+  not assert anything about the audit ledger
+  (`src/server/services/lockFlow.test.ts:426-459`). Because `removeLock()` only
+  clears lock indexes and the lock body (`src/server/services/locks.ts:82-85`),
+  the already-written `lock_created` audit event remains.
+- Why it matters: ReviewLock's audit log is the moderator-visible ledger for
+  lock, unlock, suppress, reopen, dismiss, and runtime failure events. A failed
+  lock attempt that has been unignored and removed from active locks should not
+  leave the same durable audit signal as a successful lock. Otherwise the
+  dashboard can show an audit trail claiming "Reviewed content locked until it
+  changes" for content that ReviewLock explicitly returned as not locked.
+- Suggested fix: Move `lock_created` audit append after all fallible
+  success-path persistence that can still trigger rollback, or write a
+  compensating `runtime_failure`/rollback audit when a post-audit step fails.
+  Add a regression using the existing `MetricsFailingRedisStore` that asserts a
+  successful rollback leaves no standalone `lock_created` event for the failed
+  lock, or leaves an explicit failure audit that makes the rollback outcome
+  unambiguous.
+- Files reviewed: `src/server/services/lockFlow.ts`,
+  `src/server/services/lockFlow.test.ts`, `src/server/services/locks.ts`,
+  `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:02 IST - Finding
+
+- Severity: medium
+- Area: Comment route payloads still prefer generic `targetId` before
+  comment-specific ids
+- Evidence: The comment report route builds the candidate id list as
+  `[payload.targetId, payload.commentId, payload.comment?.id]` for comment
+  triggers (`src/routes/triggers.report.ts:61-71`). The comment update route
+  uses the same order (`src/routes/triggers.update.ts:58-68`), and comment menu
+  actions also choose `body.targetId ?? body.commentId`
+  (`src/routes/menu.ts:31-35`). The new regressions cover sibling `post.id`
+  plus `comment.id` payloads and `postId` plus `commentId` menu fallbacks
+  (`src/routes/triggers.report.test.ts:296-317`,
+  `src/routes/triggers.update.test.ts:352-395`,
+  `src/routes/menu.test.ts:85-104`), but they do not cover a Devvit payload
+  that includes a generic `targetId` for the sibling post alongside
+  `commentId` or `comment.id`. In that shape, the comment routes normalize the
+  generic `targetId` as a comment id before the actual comment id is examined.
+- Why it matters: The hardening intent is to prefer the comment thing id over a
+  sibling post id on comment menu/report/update callbacks. If Devvit supplies
+  both a generic target field and a comment-specific field, ReviewLock can
+  refetch the wrong thing, miss a known active comment lock, or reopen/suppress
+  using a synthetic `t1_...` id derived from the post id. That is directly in
+  the live trigger proof boundary for comment reports and comment updates.
+- Suggested fix: For `kind === 'comment'`, order candidates as
+  `commentId`, `comment.id`, then generic `targetId` only as a last fallback.
+  For comment menu actions, use `body.commentId ?? body.targetId`. Add
+  regressions where `/on-comment-report`, `/on-comment-update`,
+  `/lock-comment`, and `/unlock-comment` receive both `targetId: 't3_parent'`
+  and a valid comment id, asserting the comment id wins.
+- Files reviewed: `src/routes/triggers.report.ts`,
+  `src/routes/triggers.update.ts`, `src/routes/menu.ts`,
+  `src/routes/triggers.report.test.ts`, `src/routes/triggers.update.test.ts`,
+  `src/routes/menu.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:08 IST - Finding
+
+- Severity: medium
+- Area: Bare `demo=true` dashboard URLs can be overwritten to a live subreddit
+  before the first demo fetch
+- Evidence: The client store correctly initializes `initialDemo` sessions with
+  `subreddit = 'reviewlock_demo'` (`src/client/state/store.ts:44-52`). But
+  `main.ts` still applies inferred embedded subreddit context before the first
+  fetch whenever no explicit `subreddit` query parameter exists
+  (`src/client/main.ts:105-118`). `updateSubredditContext()` always assigns
+  `this.subreddit = subreddit`, even while `this.demo` is true
+  (`src/client/state/store.ts:201-206`). A URL such as `...?demo=true` opened
+  inside the Reddit WebView can therefore initialize to `reviewlock_demo`, then
+  immediately overwrite the active request namespace to `reviewlock_dev` before
+  `fetchState()`. The dashboard API intentionally rejects
+  `demo=true&subreddit=reviewlock_dev` with
+  `Demo dashboard requests must use the isolated ReviewLock demo namespace.`
+  (`src/routes/api.dashboard.ts:110-121`). Existing store coverage constructs
+  demo boot with an explicit initial live subreddit and calls `fetchState()`
+  directly (`src/client/state/store.test.ts:205-221`), but it does not exercise
+  the `main.ts` bootstrap sequence where runtime context arrives while
+  `store.demo === true`.
+- Why it matters: Demo mode is mandatory and must be visibly labeled. The
+  recent hardening intent was to bootstrap `demo=true` dashboard URLs into the
+  deterministic demo namespace, but a bare demo URL in an embedded context can
+  fail before rendering seeded data because the live subreddit context overwrote
+  the demo namespace. This creates a brittle demo entrypoint exactly where
+  judges or reviewers are likely to use a short demo URL.
+- Suggested fix: Make `updateSubredditContext()` update only `liveSubreddit`
+  when `this.demo` is true, leaving `this.subreddit` as `reviewlock_demo`, or
+  have `main.ts` skip runtime-context writes to the active namespace during
+  demo mode. Add a regression for a demo-mode store receiving
+  `updateSubredditContext('reviewlock_dev')` before `fetchState()`, asserting
+  the fetch still uses `reviewlock_demo` with `demo=true` while
+  `getLiveSubreddit()` is preserved for exiting demo.
+- Files reviewed: `src/client/main.ts`, `src/client/state/store.ts`,
+  `src/client/state/store.test.ts`, `src/routes/api.dashboard.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:47 IST - Resolution
+
+- Resolved comment callback target precedence for mixed Devvit payloads.
+- Evidence: comment report/update routes now check `commentId` and
+  `comment.id` before falling back to generic `targetId`, while comment menu
+  routes use `commentId` before generic `targetId`
+  (`src/routes/triggers.report.ts`, `src/routes/triggers.update.ts`,
+  `src/routes/menu.ts`).
+- Regression coverage:
+  - `/on-comment-report` with `targetId: 't3_parent_post'` and
+    `commentId: 't1_comment'` suppresses `t1_comment`.
+  - `/on-comment-update` with `targetId: 't3_parent_post'` and
+    `commentId: 't1_comment'` reopens `t1_comment`.
+  - `/lock-comment` and `/unlock-comment` with generic post `targetId` plus
+    bare `commentId` resolve to `t1_comment`.
+- Resolved bare `demo=true` namespace overwrite during dashboard bootstrap.
+- Evidence: `ReviewLockStore.updateSubredditContext()` now preserves
+  `subreddit = 'reviewlock_demo'` while demo mode is active and only records
+  the live subreddit for later demo exit (`src/client/state/store.ts`).
+- Regression coverage asserts a demo-mode store receiving runtime context
+  before `fetchState()` still fetches `reviewlock_demo` with `demo=true`.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/routes/menu.test.ts src/client/state/store.test.ts --reporter verbose`
+  - PASS, 4 test files and 53 tests.
+
+## 2026-05-26 00:14 IST - Finding
+
+- Severity: medium
+- Area: Comment report payloads can use the parent post report count
+- Evidence: `reportCount()` in the report trigger router is not target-kind
+  aware. It scans every candidate payload in the order
+  `payload.reportCount`, `payload.post?.numberOfReports`,
+  `payload.post?.numReports`, `payload.comment?.numberOfReports`,
+  `payload.comment?.numReports` (`src/routes/triggers.report.ts:84-93`).
+  On `/on-comment-report`, a live-shaped payload with both a parent `post`
+  object and the reported `comment` object will therefore prefer the parent
+  post's report count over the comment's count. The report service uses
+  `input.reportCount` for the dedupe key when no event id exists
+  (`src/server/services/reportTriggers.ts:47-52`), the lock's
+  `lastReportCount`, and the `report_suppressed` audit data
+  (`src/server/services/reportTriggers.ts:313-332`). Existing comment-report
+  route tests cover `comment.numReports` alone and `post.id` plus
+  `comment.id`, but they do not include a conflicting parent
+  `post.numReports`/`numberOfReports` value
+  (`src/routes/triggers.report.test.ts:244-359`).
+- Why it matters: Suppressed-report metrics and audit output are ReviewLock's
+  proof that repeat report churn was avoided. For comment reports, recording
+  the parent post report count can make the comment lock ledger show the wrong
+  count, dedupe unrelated deliveries by the wrong number, or fail to dedupe
+  retries consistently. This is especially risky because the current live
+  `CommentReport` path remains unverified and depends on local route fixtures
+  matching Devvit payload shape.
+- Suggested fix: Make `reportCount()` accept the target kind and, for comment
+  routes, prefer `comment.numberOfReports` / `comment.numReports` before any
+  parent post counts. Keep generic top-level `reportCount` only if it is known
+  to describe the target object, or use it after target-specific fields. Add a
+  regression where `/on-comment-report` receives both `post.numReports = 99`
+  and `comment.numReports = 5`, asserting the persisted lock
+  `lastReportCount` and audit `reportCount` use `5`.
+- Files reviewed: `src/routes/triggers.report.ts`,
+  `src/routes/triggers.report.test.ts`, `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:20 IST - Finding
+
+- Severity: high
+- Area: Update-trigger mutex contention can drop an edit-break event
+- Evidence: `breakLockForChangedContent()` catches
+  `TriggerConcurrencyError` and returns `{ ok: true, action: 'no_lock' }`
+  with `concurrent_trigger_in_progress` (`src/server/services/reopenFlow.ts:203-210`).
+  Report triggers were recently hardened in the same situation to clear the
+  dedupe marker and return retryable `runtime_uncertain` instead
+  (`src/server/services/reportTriggers.ts:437-445`). The mixed report/update
+  race test only proves that when both paths see already-edited content, one
+  path reopens and the other may be `no_lock`/`runtime_uncertain`
+  (`src/server/services/reopenFlow.test.ts:246-267`). It does not cover the
+  dangerous ordering where an update trigger for an edit arrives while a report
+  trigger is still holding the mutex for an unchanged suppression path. In that
+  ordering, the update trigger exits as a successful terminal no-op and Devvit
+  may not retry it, while the report trigger can complete with
+  `suppress_unchanged`, leaving the active lock in place after the edit.
+- Why it matters: The edit-aware reopen loop is ReviewLock's core product
+  promise. A content-edit trigger should not be acknowledged as a successful
+  no-op merely because another trigger is processing the same target. If the
+  winning trigger does not itself observe and reopen the edited content, the
+  losing update delivery is the only signal that should break the lock.
+- Suggested fix: Treat update-trigger mutex contention as retryable
+  `runtime_uncertain`, matching the report-trigger behavior, or enqueue a
+  follow-up/runtime-uncertain reopen when a known active lock exists. Add a
+  regression with a report trigger paused inside `ignoreReports()` on unchanged
+  content while `breakLockForChangedContent()` is called for the same target
+  with edited current content; assert the update result is not terminal
+  `no_lock` and the lock cannot remain active without a retryable warning.
+- Files reviewed: `src/server/services/reopenFlow.ts`,
+  `src/server/services/reopenFlow.test.ts`,
+  `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/triggerMutex.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:50 IST - Resolution
+
+- Resolved comment report count precedence for mixed parent/comment payloads.
+- Evidence: `reportCount()` is now target-kind aware. Comment report routes
+  inspect `comment.numberOfReports` and `comment.numReports` before generic or
+  parent post counts (`src/routes/triggers.report.ts`).
+- Regression coverage sends `/on-comment-report` a parent `post.numReports =
+  99` and target `comment.numReports = 5`, then asserts the active lock
+  `lastReportCount` and `report_suppressed` audit data use `5`
+  (`src/routes/triggers.report.test.ts`).
+- Resolved update-trigger mutex contention as retryable instead of terminal.
+- Evidence: `breakLockForChangedContent()` now returns
+  `ok: false`, `action: 'runtime_uncertain'`, and
+  `concurrent_trigger_in_progress` when another trigger already holds the
+  target mutex (`src/server/services/reopenFlow.ts`).
+- Regression coverage pauses a report trigger inside `ignoreReports()` on
+  unchanged content, sends an edited update for the same target, and asserts the
+  update result is retryable rather than `no_lock`
+  (`src/server/services/reopenFlow.test.ts`).
+- Focused validation:
+  - `npm run test -- src/routes/triggers.report.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 25 tests.
+
+## 2026-05-25 23:44 IST - Resolution
+
+- Resolved false `lock_created` audit entries after rollback-triggering metrics
+  failures.
+- Evidence: the lock success path now records lock-created metrics before
+  appending the `lock_created` audit event, so a metrics failure rolls back the
+  active lock before a success audit is written (`src/server/services/lockFlow.ts`).
+  Regression coverage asserts the existing metrics-failure rollback leaves no
+  `lock_created` audit event for the removed lock
+  (`src/server/services/lockFlow.test.ts`).
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 1 test file and 12 tests.

@@ -185,7 +185,8 @@ Results:
 
 ## Blockers and Next Actions
 
-- Live `approve()`, `ignoreReports()`, and `unignoreReports()` behavior is still not proven on controlled Reddit content. Next action: create controlled post/comment content in `r/reviewlock_dev`, use the menu flows, and verify each moderation method separately.
-- Live `PostReport`, `CommentReport`, update, NSFW, spoiler, and flair trigger delivery is still not proven. Next action: generate controlled report and edit events in `r/reviewlock_dev`, stream logs, and compare Redis/audit/dashboard results.
+- This section is a historical install/deploy rehearsal snapshot. See `docs/RUNTIME_PROOF.md` for the current live capability matrix.
+- Current proof boundary: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are verified; controlled `PostReport` suppression is verified; controlled post and comment body-edit reopen paths are verified through `PostUpdate` and `CommentUpdate`.
+- Remaining live proof gaps: `CommentReport` delivery, independent native-visible comment-target moderation method effects, and post NSFW/spoiler/flair update variants.
 - `devvit view --json` reports `isWebviewEnabled: false` even though the uploaded version includes WebView assets and playtest reached the ready state. Next action: verify the playtest URL in an isolated ReviewLock Zen/Aerospace window before making any live dashboard claim.
 - No browser login was needed for this rehearsal. If a future command requests browser login, it must use the dedicated ReviewLock Zen/Aerospace window and must not open links in the user's active workspace.

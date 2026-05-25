@@ -220,7 +220,15 @@ describe('update triggers', () => {
     const actions = results.map((result) => result.action);
 
     expect(actions).toContain('reopened');
-    expect(actions).toContain('no_lock');
+    expect(actions).toContain('runtime_uncertain');
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'runtime_uncertain',
+          warnings: ['concurrent_trigger_in_progress'],
+        }),
+      ]),
+    );
     expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
     expect(await listOpenReopenEvents(redis, 'alpha')).toHaveLength(1);
     expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({

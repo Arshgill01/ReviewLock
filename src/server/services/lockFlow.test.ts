@@ -9,6 +9,7 @@ import { lockReviewedContent } from './lockFlow';
 import { getDailyMetrics, getTargetMetrics } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { loadRuntimeProofStatus } from './runtimeProof';
+import { keys } from './keys';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't3_post',
@@ -123,6 +124,114 @@ describe('lockReviewedContent', () => {
     expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
       locksCreated: 1,
     });
+  });
+
+  it('rejects concurrent in-flight lock creation without double-counting or duplicate moderation calls', async () => {
+    class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
+      private firstIgnoreStartedResolver: (() => void) | undefined;
+      private releaseFirstIgnoreResolver: (() => void) | undefined;
+      private firstIgnorePaused = false;
+
+      readonly firstIgnoreStarted = new Promise<void>((resolve) => {
+        this.firstIgnoreStartedResolver = resolve;
+      });
+
+      releaseFirstIgnore(): void {
+        this.releaseFirstIgnoreResolver?.();
+      }
+
+      override async ignoreReports(target: ReviewLockTarget): Promise<void> {
+        if (!this.firstIgnorePaused) {
+          this.firstIgnorePaused = true;
+          this.firstIgnoreStartedResolver?.();
+          await new Promise<void>((resolve) => {
+            this.releaseFirstIgnoreResolver = resolve;
+          });
+        }
+
+        await super.ignoreReports(target);
+      }
+    }
+
+    const reddit = new PausingIgnoreReportsRedditAdapter([target()]);
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const firstPromise = lockReviewedContent(dependencies, input);
+    await reddit.firstIgnoreStarted;
+    const second = await lockReviewedContent(dependencies, input);
+    reddit.releaseFirstIgnore();
+    const first = await firstPromise;
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({
+      ok: false,
+      message:
+        'Another ReviewLock lock is already being created for this content. Try again in a moment.',
+      warnings: ['lock_creation_in_progress'],
+    });
+    expect(reddit.calls).toEqual(['approve:t3_post', 'ignoreReports:t3_post']);
+    expect(await listActiveLocks(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 1,
+    });
+    expect(await getTargetMetrics(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      locksCreated: 1,
+    });
+  });
+
+  it('does not delete a newer lock creation guard when an older owner finishes', async () => {
+    class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
+      private firstIgnoreStartedResolver: (() => void) | undefined;
+      private releaseFirstIgnoreResolver: (() => void) | undefined;
+
+      readonly firstIgnoreStarted = new Promise<void>((resolve) => {
+        this.firstIgnoreStartedResolver = resolve;
+      });
+
+      releaseFirstIgnore(): void {
+        this.releaseFirstIgnoreResolver?.();
+      }
+
+      override async ignoreReports(target: ReviewLockTarget): Promise<void> {
+        this.firstIgnoreStartedResolver?.();
+        await new Promise<void>((resolve) => {
+          this.releaseFirstIgnoreResolver = resolve;
+        });
+        await super.ignoreReports(target);
+      }
+    }
+
+    const reddit = new PausingIgnoreReportsRedditAdapter([target()]);
+    const redis = new InMemoryRedisStore();
+    const dependencies = {
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    };
+
+    const firstPromise = lockReviewedContent(dependencies, {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant',
+    });
+    await reddit.firstIgnoreStarted;
+    await redis.set(keys.targetLockCreation('alpha', 't3_post'), 'newer-owner-token');
+    reddit.releaseFirstIgnore();
+    await expect(firstPromise).resolves.toMatchObject({ ok: true });
+
+    await expect(redis.get(keys.targetLockCreation('alpha', 't3_post'))).resolves.toBe(
+      'newer-owner-token',
+    );
   });
 
   it('reopens a stale active lock before relocking changed content from the lock form', async () => {
@@ -347,6 +456,11 @@ describe('lockReviewedContent', () => {
     ]);
     expect(await getLock(redis, 'alpha', result.lock?.id ?? '')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(
+      (await listAuditEvents(redis, 'alpha')).some(
+        (event) => event.kind === 'lock_created' && event.lockId === result.lock?.id,
+      ),
+    ).toBe(false);
   });
 
   it('keeps a visible failed lock when Redis persistence fails and unignore rollback also fails', async () => {

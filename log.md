@@ -1490,3 +1490,151 @@
 - Open risks:
   - Comment report/update and post NSFW/spoiler/flair trigger variants remain
     unverified.
+
+## 2026-05-25 - Wave 33 controlled comment update proof and Reddit smoke hardening
+
+- Created and locked S08 comment under S02:
+  `/r/reviewlock_dev/comments/1tnfgqf/comment/ontlx1k/` (`t1_ontlx1k`,
+  author `u/BrightyBrainiac`).
+- Verified `Lock review` on the comment created lock
+  `lock-t1_ontlx1k-1779730303805` at `5/25/2026, 11:01:43 PM` with reason
+  `reviewed policy compliant`.
+- Edited the S08 comment body to the planned material rewrite and verified the
+  live `CommentUpdate` path:
+  - sanitized `reviewlock.trigger.payload_shape` emitted for
+    `on-comment-update`;
+  - active locks changed from `3` to `2`;
+  - `Reopened after edit` increased from `1` to `2`;
+  - latest reopen event was `comment:ontlx1k`, reason `content changed`;
+  - reopen queue showed fingerprint delta `9da841c1` to `20abf990`;
+  - audit recorded `Lock Reopened 5/25/2026, 11:05:07 PM`;
+  - runtime proof showed `commentUpdateTrigger verified`.
+- Integrated reviewer finding: failed `/api/smoke/reddit` checks now record a
+  failed `redditContext` capability in runtime proof when subreddit scope has
+  already been resolved.
+- Integrated reviewer finding: runtime proof now uses explicit granular trigger
+  defaults and removes the legacy broad `triggers` row on read, so partial or
+  complete trigger proof cannot be hidden behind a stale bucket.
+- Integrated reviewer finding: runtime proof normalization now preserves
+  explicit demo warnings while adding missing default capability rows.
+- Integrated reviewer finding: update-trigger route tests now prove the
+  comment, NSFW, spoiler, and flair endpoints write the matching granular
+  runtime proof capabilities without marking unrelated variants verified.
+- Integrated reviewer finding: concurrent lock submissions now acquire a
+  per-target Redis creation lease before Reddit moderation side effects, so a
+  double-click or two stale menus cannot create duplicate active lock rows.
+- Integrated reviewer finding: no-id report dedupe now uses target plus report
+  count without the processing-minute bucket, preventing delayed duplicate
+  deliveries from inflating suppressed-report metrics.
+- Integrated reviewer finding: lock creation leases now delete only when the
+  stored owner token still matches, preventing stale owners from clearing newer
+  in-flight guards.
+- Integrated reviewer finding: report trigger mutex contention now keeps
+  distinct events retryable instead of returning a successful duplicate result.
+- Integrated reviewer finding: no-id/no-count report deliveries now avoid the
+  seven-day `count-unknown` dedupe collapse.
+- Integrated reviewer finding: reopen dismiss routes now write audit before
+  removing queue visibility, leaving items retryable if audit persistence fails.
+- Integrated reviewer finding: live dashboard and runtime smoke no longer fall
+  back to the app-name `reviewlock` namespace when runtime context is missing.
+- Integrated reviewer finding: runtime proof capability writes now preserve
+  explicit demo/runtime warnings across later status transitions.
+- Tightened live dashboard and runtime smoke scope resolution to require
+  trusted Devvit runtime subreddit context rather than arbitrary client query
+  values.
+- Integrated reviewer finding: `lock_created` audit is now written after
+  metrics persistence, so rollback-triggering metrics failures do not leave a
+  false success audit.
+- Updated `docs/PRODUCTION_TRUST_AUDIT.md` to reflect the current controlled
+  live proof boundary instead of the older blanket "live triggers unverified"
+  statement.
+- Updated `docs/REDIS_RACE_PROOF.md` to point to the current granular live
+  trigger proof boundary.
+- Updated `docs/INSTALL_DEPLOY_REHEARSAL.md` to label its blocker section as a
+  historical snapshot and link the current granular runtime proof boundary.
+- Commands run so far:
+  - `npm run dev -- reviewlock_dev`
+  - `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`
+  - Zen browser S08 comment creation, `Lock review`, body edit, and dashboard
+    inspection on playtest `v0.0.2.109`
+  - `npm run test -- src/routes/api.contract.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/demoMode.test.ts src/routes/triggers.update.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reportTriggers.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts --reporter verbose`
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src || true`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+- Pass/fail status: PASS for controlled comment update proof, targeted
+  regressions, type-check, lint, full test suite, build, diff whitespace check,
+  and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+- Open risks:
+  - Comment report and post NSFW/spoiler/flair trigger variants remain
+    unverified.
+  - Comment-target moderation method effects are not independently visible yet
+    beyond successful lock persistence and later reopen.
+
+## 2026-05-25 23:47 IST - Reviewer finding integration
+
+- Integrated reviewer finding: comment report/update/menu routes now prefer
+  comment-specific ids over generic `targetId` values when both are present.
+- Integrated reviewer finding: demo-mode runtime context updates now preserve
+  the active `reviewlock_demo` namespace while still remembering the live
+  subreddit for exiting demo.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/routes/menu.test.ts src/client/state/store.test.ts --reporter verbose`
+  - PASS, 4 test files and 53 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 282 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+
+## 2026-05-25 23:50 IST - Reviewer finding integration
+
+- Integrated reviewer finding: comment report routes now prefer
+  comment-specific report counts over parent post report counts.
+- Integrated reviewer finding: update-trigger mutex contention now returns
+  retryable `runtime_uncertain` instead of terminal `no_lock`.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.report.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 25 tests.
+- Follow-up validation:
+  - `npm run test` initially failed because
+    `src/server/services/updateTriggers.test.ts` still expected concurrent
+    update contention to return terminal `no_lock`.
+  - Updated that regression to require retryable `runtime_uncertain` with
+    `concurrent_trigger_in_progress`.
+  - `npm run test -- src/server/services/updateTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 18 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 284 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

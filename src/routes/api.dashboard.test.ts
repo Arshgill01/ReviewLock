@@ -65,6 +65,7 @@ describe('dashboard API routes', () => {
     const router = createDashboardApiRouter({
       redis,
       clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
     });
 
     const response = await router.request('/overview?subreddit=alpha&demo=false');
@@ -82,6 +83,7 @@ describe('dashboard API routes', () => {
     const router = createDashboardApiRouter({
       redis,
       clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
     });
 
     expect(await (await router.request('/locks?subreddit=alpha')).json()).toMatchObject({
@@ -247,6 +249,42 @@ describe('dashboard API routes', () => {
         kind: 'reopen_dismissed',
         actor: 'dash_mod',
       }),
+    ]);
+  });
+
+  it('keeps reopened items visible when dashboard dismiss audit write fails', async () => {
+    class AuditFailingRedisStore extends InMemoryRedisStore {
+      override async zAdd(key: string, entry: { member: string; score: number }): Promise<void> {
+        if (key === 'reviewlock:alpha:audit') {
+          throw new Error('audit unavailable');
+        }
+
+        await super.zAdd(key, entry);
+      }
+    }
+
+    const redis = new AuditFailingRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    const router = createDashboardApiRouter({
+      reddit: new FakeRedditAdapter([target()], 'dash_mod'),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-queue/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        actor: 'client_supplied_actor',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ ok: false, error: 'audit unavailable' });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
     ]);
   });
 

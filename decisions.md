@@ -1272,3 +1272,259 @@ Reason:
 - The product can now honestly demonstrate the core edit-aware reopen loop for
   posts, while avoiding an inflated runtime claim for trigger variants that
   still need live payload evidence.
+
+### D077 - Treat live comment body edit proof as comment-update only
+
+S08 verified the real Devvit comment update path for a controlled body edit, but
+it did not exercise comment report delivery or post flag/flair update payloads.
+
+Decision:
+
+- Mark `commentUpdateTrigger` verified after the S08 proof.
+- Keep comment report, post flair, post NSFW, and post spoiler trigger
+  capabilities unverified until their own controlled events run.
+- Keep comment-target moderation method claims separate because the live
+  dashboard proves lock persistence and reopen behavior but not an independent
+  native-visible comment `ignoreReports()`/`unignoreReports()` state.
+
+Reason:
+
+- The product can now honestly demonstrate the edit-aware reopen loop for both
+  posts and comments, while avoiding inflated runtime claims for report and
+  flag/flair variants that still need live payload evidence.
+
+### D078 - Record failed Reddit context smoke attempts in runtime proof when scope is known
+
+Runtime Reddit context smoke checks can fail after the route has already
+resolved the subreddit namespace.
+
+Decision:
+
+- If Reddit context smoke cannot return a current username after subreddit
+  scope is known, record the failed `redditContext` capability in runtime proof
+  before returning the failing response.
+- If subreddit scope is not known or Redis is unavailable, return the failing
+  response without guessing a namespace or pretending persistence succeeded.
+- Keep the HTTP response failing so the dashboard action still exposes the
+  immediate runtime error.
+
+Reason:
+
+- Moderators need failed Reddit runtime checks to be visible in the same proof
+  panel as successful checks. This keeps `Verify runtime` honest during
+  intermittent Devvit context failures and mirrors the Redis smoke failure
+  ledger behavior.
+
+### D079 - Use granular runtime proof capabilities for trigger variants
+
+The dashboard proof panel needs to distinguish verified trigger paths from
+unverified trigger variants.
+
+Decision:
+
+- Replace the broad legacy `triggers` runtime proof row with explicit rows for
+  `postReportTrigger`, `commentReportTrigger`, `postUpdateTrigger`,
+  `commentUpdateTrigger`, `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`,
+  and `postFlairUpdateTrigger`.
+- Keep `redditContext` in the first-run default matrix so the runtime smoke
+  boundary is visible before anyone clicks `Verify runtime`.
+- Drop legacy broad `triggers` rows when reading older runtime proof records and
+  add missing default rows as `unverified`.
+- Preserve explicit stored warnings such as the demo-mode warning while adding
+  the generic unverified-capabilities warning when appropriate.
+
+Reason:
+
+- A single broad trigger row overclaims some paths and underclaims others. The
+  live evidence is now granular: controlled post report suppression and
+  post/comment body-edit reopen paths are verified, while comment reports and
+  post flag/flair variants still need separate proof.
+- Demo/live separation is a product guardrail, so runtime normalization must not
+  erase the warning that seeded demo data is not live proof.
+
+### D080 - Serialize lock creation per target before moderation side effects
+
+Concurrent lock submissions can otherwise race between the active-lock read and
+the final lock write.
+
+Decision:
+
+- Acquire a short-lived Redis `setIfNotExists` creation lease at
+  `target:{thingId}:lock:create` before calling `approve()` or
+  `ignoreReports()`.
+- Recheck the active target lock after the lease is acquired.
+- If another creation is already in progress and no finished matching lock is
+  visible yet, return a retryable `lock_creation_in_progress` result without
+  calling Reddit moderation methods.
+- Release the lease in `finally`; the TTL remains a fallback if the runtime dies
+  mid-flow.
+
+Reason:
+
+- ReviewLock must maintain one current review state per target. A double-click,
+  retry, or two moderators acting from stale menus must not leave duplicate
+  active lock rows, inflated metrics, or an unreachable active lock in the
+  dashboard ledger.
+
+### D081 - Deduplicate no-id report deliveries by target and report count
+
+Live report payload proof showed useful nested target and report-count data but
+not a stable top-level event id.
+
+Decision:
+
+- For report triggers with no `eventId`, use `targetId + reportCount` as the
+  fallback dedupe identity for the existing seven-day dedupe TTL.
+- Do not include the handler clock minute in that fallback identity.
+- If both `eventId` and `reportCount` are absent, use a processing-window
+  fallback identity instead of a seven-day `count-unknown` key.
+- Keep distinct `reportCount` increases countable, because they represent new
+  report churn against the same reviewed item.
+
+Reason:
+
+- Devvit delivery can be at-least-once. A delayed duplicate of the same no-id
+  report payload should not inflate `Reports suppressed`, target metrics, or
+  audit rows simply because the retry crossed a clock-minute boundary.
+
+### D082 - Treat report mutex contention as retryable unless the event is already deduped
+
+The per-target trigger mutex protects lock state while a report delivery is
+being processed, but distinct report events can arrive during that window.
+
+Decision:
+
+- Mark/check the report dedupe key before entering the per-target mutex.
+- If the dedupe marker already exists, return `duplicate`.
+- If a distinct event acquires its dedupe marker but the target mutex is busy,
+  clear that marker and return `runtime_uncertain` with
+  `concurrent_trigger_in_progress` so the delivery can be retried without being
+  permanently undercounted.
+
+Reason:
+
+- Same-event retries should still collapse. Distinct report bursts must not be
+  treated as successful duplicates simply because another report for the same
+  target is currently mutating lock state.
+
+### D083 - Fail closed instead of using `reviewlock` as a live subreddit fallback
+
+`reviewlock` is the app name. It is not proof of the current Devvit subreddit
+context.
+
+Decision:
+
+- Do not initialize the embedded live dashboard with `reviewlock` when no
+  requested or embedded subreddit is available.
+- Reject live dashboard API requests and runtime smoke writes that would use
+  `reviewlock` only because runtime context is unavailable.
+- Keep the isolated `reviewlock_demo` namespace for explicit demo mode only.
+
+Reason:
+
+- Runtime proof must be namespaced to a real subreddit. Falling back to the app
+  name can make missing Devvit context look like empty live state or verified
+  proof under the wrong Redis namespace.
+
+### D084 - Preserve reopen queue visibility until dismissal audit is durable
+
+Dismissing a reopened item is a human-confirmed moderation workflow action.
+
+Decision:
+
+- Fetch the reopen event, write the `reopen_dismissed` audit event, and only
+  then mark the reopen event dismissed and remove it from the open queue.
+- If audit write fails, leave the reopen event visible so the moderator can
+  retry and traceability is not lost.
+
+Reason:
+
+- The audit ledger is required product behavior. Removing queue visibility
+  before audit durability can make a failed dismiss non-retryable and leave no
+  durable record of the moderator action.
+
+### D085 - Write lock-created audit only after rollback-triggering persistence succeeds
+
+Lock creation can still roll back if a later Redis write fails after the lock
+record itself is saved.
+
+Decision:
+
+- Persist lock-created metrics before appending the `lock_created` audit event.
+- If metrics persistence fails and rollback succeeds, do not leave a
+  `lock_created` audit event for the removed lock.
+
+Reason:
+
+- The audit ledger should not claim "Reviewed content locked until it changes"
+  for a lock attempt that ReviewLock rolled back and returned as not locked.
+
+### D086 - Prefer comment-specific identifiers over generic target identifiers
+
+Devvit comment callbacks can include both a generic target field and
+comment-specific fields.
+
+Decision:
+
+- On comment report and comment update routes, inspect `commentId` and
+  `comment.id` before generic `targetId`.
+- On comment menu routes, inspect `commentId` before generic `targetId`.
+- Keep generic `targetId` as a fallback only when no comment-specific id exists.
+
+Reason:
+
+- A generic target can refer to the parent post in mixed callback payloads.
+  ReviewLock must not synthesize a comment id from a parent post id and miss the
+  active comment lock.
+
+### D087 - Demo mode runtime context updates preserve the demo namespace
+
+Embedded dashboard runtime context can arrive after a bare `demo=true` URL has
+initialized the client.
+
+Decision:
+
+- While demo mode is active, `updateSubredditContext()` updates only the stored
+  live subreddit used for exiting demo mode.
+- The active request namespace remains the isolated `reviewlock_demo`
+  namespace until the moderator leaves demo mode.
+
+Reason:
+
+- Demo mode must be deterministic and visibly labeled. Runtime context from the
+  live subreddit should not turn a demo dashboard fetch into a rejected or mixed
+  live/demo request.
+
+### D088 - Comment report counts prefer the comment object over parent post counts
+
+Comment report payloads may include both parent post metadata and target
+comment metadata.
+
+Decision:
+
+- On post report routes, use top-level or post report counts.
+- On comment report routes, use comment-specific report counts before generic
+  or parent post counts.
+
+Reason:
+
+- Suppressed-report metrics and audit entries must describe the locked target.
+  Parent post counts can overstate or mis-dedupe comment report churn.
+
+### D089 - Update trigger mutex contention is retryable runtime uncertainty
+
+An update trigger can arrive while another report/update delivery is already
+mutating the same target.
+
+Decision:
+
+- If `breakLockForChangedContent()` cannot acquire the target trigger mutex,
+  return `runtime_uncertain` with `concurrent_trigger_in_progress` and
+  `ok: false`.
+- Do not acknowledge that delivery as a successful `no_lock` no-op.
+
+Reason:
+
+- The edit-aware reopen loop is the core product guarantee. If a concurrent
+  report path is only suppressing unchanged content, the update delivery may be
+  the signal that should break the lock and must remain retryable.

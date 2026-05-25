@@ -184,6 +184,75 @@ describe('handleReportTrigger', () => {
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
   });
 
+  it('keeps concurrent distinct report event ids retryable instead of marking them duplicate', async () => {
+    class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
+      private firstIgnoreStartedResolver: (() => void) | undefined;
+      private releaseFirstIgnoreResolver: (() => void) | undefined;
+      private firstIgnorePaused = false;
+
+      readonly firstIgnoreStarted = new Promise<void>((resolve) => {
+        this.firstIgnoreStartedResolver = resolve;
+      });
+
+      releaseFirstIgnore(): void {
+        this.releaseFirstIgnoreResolver?.();
+      }
+
+      override async ignoreReports(target: ReviewLockTarget): Promise<void> {
+        if (!this.firstIgnorePaused) {
+          this.firstIgnorePaused = true;
+          this.firstIgnoreStartedResolver?.();
+          await new Promise<void>((resolve) => {
+            this.releaseFirstIgnoreResolver = resolve;
+          });
+        }
+
+        await super.ignoreReports(target);
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new PausingIgnoreReportsRedditAdapter([target()]);
+    const dependencies = {
+      redis,
+      reddit,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    };
+
+    const firstPromise = handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-race-a',
+    });
+    await reddit.firstIgnoreStarted;
+    const secondWhileBusy = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-race-b',
+    });
+    reddit.releaseFirstIgnore();
+    const first = await firstPromise;
+    const secondRetry = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      eventId: 'evt-race-b',
+    });
+
+    expect(first.action).toBe('suppress_unchanged');
+    expect(secondWhileBusy).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['concurrent_trigger_in_progress'],
+    });
+    expect(secondRetry.action).toBe('suppress_unchanged');
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 2,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 2,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(2);
+  });
+
   it('dedupes duplicate changed-content report event ids before reopening twice', async () => {
     const dependencies = await deps(target('Edited body'));
     const first = await handleReportTrigger(dependencies, {
@@ -265,6 +334,140 @@ describe('handleReportTrigger', () => {
       locksReopened: 0,
     });
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(2);
+  });
+
+  it('dedupes delayed no-id report retries with the same report count across clock minutes', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T01:00:00.000Z', '2026-05-24T01:05:00.000Z'];
+    const dependencies = {
+      redis,
+      reddit,
+      clock: { now: () => times.shift() ?? '2026-05-24T01:10:00.000Z' },
+    };
+
+    const first = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 5,
+    });
+    const delayedDuplicate = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 5,
+    });
+
+    expect(first.action).toBe('suppress_unchanged');
+    expect(delayedDuplicate.action).toBe('duplicate');
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 1,
+      lastReportCount: 5,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 1,
+      locksReopened: 0,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      reportsSuppressed: 1,
+      locksReopened: 0,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('does not collapse no-id no-count report deliveries for the full dedupe TTL', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T01:00:00.000Z', '2026-05-24T01:05:00.000Z'];
+    const dependencies = {
+      redis,
+      reddit,
+      clock: { now: () => times.shift() ?? '2026-05-24T01:10:00.000Z' },
+    };
+
+    const first = await handleReportTrigger(dependencies, { targetId: 't3_post' });
+    const second = await handleReportTrigger(dependencies, { targetId: 't3_post' });
+
+    expect(first.action).toBe('suppress_unchanged');
+    expect(second.action).toBe('suppress_unchanged');
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 2,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 2,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(2);
+  });
+
+  it('keeps concurrent distinct no-id report counts retryable and countable once retried', async () => {
+    class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
+      private firstIgnoreStartedResolver: (() => void) | undefined;
+      private releaseFirstIgnoreResolver: (() => void) | undefined;
+      private firstIgnorePaused = false;
+
+      readonly firstIgnoreStarted = new Promise<void>((resolve) => {
+        this.firstIgnoreStartedResolver = resolve;
+      });
+
+      releaseFirstIgnore(): void {
+        this.releaseFirstIgnoreResolver?.();
+      }
+
+      override async ignoreReports(target: ReviewLockTarget): Promise<void> {
+        if (!this.firstIgnorePaused) {
+          this.firstIgnorePaused = true;
+          this.firstIgnoreStartedResolver?.();
+          await new Promise<void>((resolve) => {
+            this.releaseFirstIgnoreResolver = resolve;
+          });
+        }
+
+        await super.ignoreReports(target);
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new PausingIgnoreReportsRedditAdapter([target()]);
+    const dependencies = {
+      redis,
+      reddit,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    };
+
+    const firstPromise = handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 5,
+    });
+    await reddit.firstIgnoreStarted;
+    const secondWhileBusy = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 6,
+    });
+    reddit.releaseFirstIgnore();
+    const first = await firstPromise;
+    const secondRetry = await handleReportTrigger(dependencies, {
+      targetId: 't3_post',
+      reportCount: 6,
+    });
+
+    expect(first.action).toBe('suppress_unchanged');
+    expect(secondWhileBusy).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['concurrent_trigger_in_progress'],
+    });
+    expect(secondRetry.action).toBe('suppress_unchanged');
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 2,
+      lastReportCount: 6,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 2,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(2);
   });
 
   it('handles a high-volume burst of distinct unchanged reports deterministically', async () => {

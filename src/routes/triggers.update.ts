@@ -62,7 +62,7 @@ const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
       payloads(body).flatMap((payload) =>
         kind === 'post'
           ? [payload.targetId, payload.postId, payload.post?.id]
-          : [payload.targetId, payload.commentId, payload.comment?.id],
+          : [payload.commentId, payload.comment?.id, payload.targetId],
       ),
     ),
   );

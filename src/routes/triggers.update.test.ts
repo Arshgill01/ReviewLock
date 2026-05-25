@@ -73,7 +73,8 @@ describe('update trigger routes', () => {
     });
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
-    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+    const runtimeStatus = await loadRuntimeProofStatus(redis, 'alpha');
+    expect(runtimeStatus).toMatchObject({
       capabilities: expect.arrayContaining([
         expect.objectContaining({
           name: 'postUpdateTrigger',
@@ -82,6 +83,12 @@ describe('update trigger routes', () => {
         }),
       ]),
     });
+    expect(runtimeStatus.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'commentUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+      ]),
+    );
   });
 
   it('accepts Devvit nested post update payloads', async () => {
@@ -269,6 +276,16 @@ describe('update trigger routes', () => {
     expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({ reason: 'content_changed', targetKind: 'comment' }),
     ]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'commentUpdateTrigger',
+          status: 'verified',
+          evidence: 'commentUpdateTrigger on t1_comment',
+        }),
+        expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
   });
 
   it('accepts Devvit nested comment update payloads', async () => {
@@ -354,6 +371,28 @@ describe('update trigger routes', () => {
     expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
   });
 
+  it('prefers comment-specific ids over generic target ids on comment update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_parent_post',
+        commentId: 't1_comment',
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+  });
+
   it('prefers wrapped comment ids over sibling post ids on comment update payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));
@@ -396,6 +435,81 @@ describe('update trigger routes', () => {
       ok: true,
       action: 'reopened',
       event: { reason: 'flair_changed' },
+    });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postFlairUpdateTrigger',
+          status: 'verified',
+          evidence: 'postFlairUpdateTrigger on t3_post',
+        }),
+        expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
+  });
+
+  it('maps NSFW update route to nsfw_changed proof capability', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isNsfw: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isNsfw: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-nsfw-update', {
+      method: 'POST',
+      body: JSON.stringify({ postId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'nsfw_changed' },
+    });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postNsfwUpdateTrigger',
+          status: 'verified',
+          evidence: 'postNsfwUpdateTrigger on t3_post',
+        }),
+        expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
+  });
+
+  it('maps spoiler update route to spoiler_changed proof capability', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isSpoiler: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isSpoiler: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-spoiler-update', {
+      method: 'POST',
+      body: JSON.stringify({ postId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'spoiler_changed' },
+    });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postSpoilerUpdateTrigger',
+          status: 'verified',
+          evidence: 'postSpoilerUpdateTrigger on t3_post',
+        }),
+        expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+      ]),
     });
   });
 

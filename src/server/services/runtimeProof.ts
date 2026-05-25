@@ -8,7 +8,20 @@ import { RUNTIME_CAPABILITY_STATUSES } from '../../shared/constants';
 import type { ModerationOperationResult } from './moderation';
 import { keys } from './keys';
 
-const defaultCapabilityNames = ['approve', 'ignoreReports', 'unignoreReports', 'redis', 'triggers'];
+const defaultCapabilityNames = [
+  'approve',
+  'ignoreReports',
+  'unignoreReports',
+  'redditContext',
+  'redis',
+  'postReportTrigger',
+  'commentReportTrigger',
+  'postUpdateTrigger',
+  'commentUpdateTrigger',
+  'postNsfwUpdateTrigger',
+  'postSpoilerUpdateTrigger',
+  'postFlairUpdateTrigger',
+];
 
 const parseJson = <T>(value: string | undefined): T | undefined => {
   if (value === undefined) {
@@ -88,6 +101,47 @@ const summarizeOverall = (capabilities: RuntimeProofCapability[]): RuntimeCapabi
   return worst;
 };
 
+const warningsForCapabilities = (
+  existingWarnings: string[],
+  capabilities: RuntimeProofCapability[],
+): string[] => {
+  const genericWarning =
+    capabilities.some((entry) => entry.status !== 'verified')
+      ? 'Some runtime capabilities are not verified.'
+      : undefined;
+  const preservedWarnings = existingWarnings.filter(
+    (warning) =>
+      warning !== 'Some runtime capabilities are not verified.' &&
+      warning !== 'Runtime capabilities have not been playtested yet.',
+  );
+
+  return genericWarning && !preservedWarnings.includes(genericWarning)
+    ? [...preservedWarnings, genericWarning]
+    : preservedWarnings;
+};
+
+const normalizeRuntimeProofStatus = (status: RuntimeProofStatus): RuntimeProofStatus => {
+  const withoutLegacy = status.capabilities.filter((entry) => entry.name !== 'triggers');
+  const existingNames = new Set(withoutLegacy.map((entry) => entry.name));
+  const missingDefaults: RuntimeProofCapability[] = defaultCapabilityNames
+    .filter((name) => !existingNames.has(name))
+    .map((name) => ({
+      name,
+      status: 'unverified',
+      notes: [],
+    }));
+  const capabilities = [...withoutLegacy, ...missingDefaults].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+
+  return {
+    ...status,
+    capabilities,
+    overall: summarizeOverall(capabilities),
+    warnings: warningsForCapabilities(status.warnings, capabilities),
+  };
+};
+
 export const loadRuntimeProofStatus = async (
   redis: RedisStore,
   subreddit: string,
@@ -95,7 +149,9 @@ export const loadRuntimeProofStatus = async (
 ): Promise<RuntimeProofStatus> => {
   const parsed = parseJson<unknown>(await redis.get(keys.runtime(subreddit)));
 
-  return isRuntimeProofStatus(parsed) ? parsed : defaultRuntimeStatus(now);
+  return isRuntimeProofStatus(parsed)
+    ? normalizeRuntimeProofStatus(parsed)
+    : defaultRuntimeStatus(now);
 };
 
 export const saveRuntimeProofStatus = async (
@@ -128,9 +184,7 @@ export const recordCapabilityStatus = async (
     generatedAt: now,
     capabilities,
     overall: summarizeOverall(capabilities),
-    warnings: capabilities.some((entry) => entry.status !== 'verified')
-      ? ['Some runtime capabilities are not verified.']
-      : [],
+    warnings: warningsForCapabilities(current.warnings, capabilities),
   };
 
   return saveRuntimeProofStatus(redis, subreddit, next);

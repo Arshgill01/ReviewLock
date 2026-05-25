@@ -41,11 +41,14 @@ export interface ReportTriggerResult {
   warnings: string[];
 }
 
+const unknownCountDedupeWindow = (now: string): string => now.slice(0, 16);
+
 const dedupeKey = (input: ReportTriggerInput, now: string): string => {
-  const bucket = now.slice(0, 16);
   const id =
     input.eventId ??
-    `missing-event:${input.targetId}:count-${input.reportCount ?? 'unknown'}:${bucket}`;
+    (Number.isFinite(input.reportCount)
+      ? `missing-event:${input.targetId}:count-${input.reportCount}`
+      : `missing-event:${input.targetId}:unknown-count:${unknownCountDedupeWindow(now)}`);
   return key(input.subreddit ?? 'unknown', `report:dedupe:${id}`);
 };
 
@@ -185,17 +188,17 @@ export const handleReportTrigger = async (
     await recordReportTriggerDelivery(deps, subreddit, targetKind, input.targetId, now);
   }
 
+  if (!(await markDedupe(deps.redis, dedupeInput, now))) {
+    return {
+      ok: true,
+      action: 'duplicate',
+      message: 'Duplicate report trigger ignored.',
+      warnings: [],
+    };
+  }
+
   try {
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
-      if (!(await markDedupe(deps.redis, dedupeInput, now))) {
-        return {
-          ok: true,
-          action: 'duplicate',
-          message: 'Duplicate report trigger ignored.',
-          warnings: [],
-        };
-      }
-
       if (!resolution.ok || !resolution.target) {
         if (input.subreddit) {
           const lock = await getActiveLockByTarget(deps.redis, input.subreddit, input.targetId);
@@ -432,11 +435,13 @@ export const handleReportTrigger = async (
     });
   } catch (error) {
     if (isTriggerConcurrencyError(error)) {
+      await clearDedupe(deps.redis, dedupeInput, now);
+
       return {
-        ok: true,
-        action: 'duplicate',
+        ok: false,
+        action: 'runtime_uncertain',
         message:
-          'Concurrent report trigger ignored while ReviewLock is already processing this target.',
+          'Concurrent report trigger is already processing this target; retry this delivery.',
         warnings: ['concurrent_trigger_in_progress'],
       };
     }

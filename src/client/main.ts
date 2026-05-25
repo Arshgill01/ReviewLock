@@ -17,7 +17,7 @@ const embeddedSubreddit = requestedSubreddit
     );
 const store = new ReviewLockStore(
   api,
-  requestedSubreddit ?? embeddedSubreddit ?? 'reviewlock',
+  requestedSubreddit ?? embeddedSubreddit ?? '',
   params.get('demo') === 'true',
 );
 

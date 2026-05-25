@@ -107,6 +107,30 @@ describe('API/client route contract', () => {
     });
   });
 
+  it('does not fall back to the app-name namespace when runtime context is unavailable', async () => {
+    const app = createApp({
+      redis: new InMemoryRedisStore(),
+      reddit: new FakeRedditAdapter([], 'mod_test', ''),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+
+    const dashboardResponse = await app.request('/api/locks?subreddit=reviewlock&demo=false');
+    const smokeResponse = await app.request('/api/smoke/redis?subreddit=reviewlock', {
+      method: 'POST',
+    });
+
+    expect(dashboardResponse.status).toBe(400);
+    await expect(dashboardResponse.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Dashboard subreddit context is required.',
+    });
+    expect(smokeResponse.status).toBe(400);
+    await expect(smokeResponse.json()).resolves.toMatchObject({
+      ok: false,
+      error: 'Runtime smoke subreddit context is required.',
+    });
+  });
+
   it('records failed Redis smoke proof when Redis readback does not match', async () => {
     class ReadMismatchRedisStore extends InMemoryRedisStore {
       override async get(key: string): Promise<string | undefined> {
@@ -143,6 +167,42 @@ describe('API/client route contract', () => {
           status: 'failed',
           evidence:
             'POST /api/smoke/redis could not complete the namespaced write/read/delete check.',
+        }),
+      ]),
+    });
+  });
+
+  it('records failed Reddit smoke proof when Reddit context cannot return a username', async () => {
+    class MissingUsernameRedditAdapter extends FakeRedditAdapter {
+      override async getCurrentUsername(): Promise<string | undefined> {
+        return undefined;
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    const app = createApp({
+      redis,
+      reddit: new MissingUsernameRedditAdapter(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
+    });
+
+    const response = await app.request('/api/smoke/reddit?subreddit=alpha', { method: 'POST' });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      capability: 'redditContext',
+      status: 'failed',
+      error: 'Reddit context did not return a current username.',
+    });
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      overall: 'failed',
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'redditContext',
+          status: 'failed',
+          evidence: 'POST /api/smoke/reddit could not confirm the Devvit Reddit context.',
         }),
       ]),
     });

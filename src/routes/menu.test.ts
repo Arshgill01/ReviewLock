@@ -90,7 +90,7 @@ describe('menu routes', () => {
     });
     const response = await router.request('/lock-comment', {
       method: 'POST',
-      body: JSON.stringify({ postId: 'post', commentId: 'comment' }),
+      body: JSON.stringify({ targetId: 't3_post', commentId: 'comment' }),
     });
 
     expect(await response.json()).toMatchObject({
@@ -198,7 +198,7 @@ describe('menu routes', () => {
     });
     const response = await router.request('/unlock-comment', {
       method: 'POST',
-      body: JSON.stringify({ postId: 'post', commentId: 'comment' }),
+      body: JSON.stringify({ targetId: 't3_post', commentId: 'comment' }),
     });
 
     expect(await response.json()).toMatchObject({

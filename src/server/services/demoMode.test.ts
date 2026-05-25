@@ -9,6 +9,7 @@ import { keys } from './keys';
 import { listActiveLocks } from './locks';
 import { listDailyMetrics, listTopTargetMetrics } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
+import { loadRuntimeProofStatus } from './runtimeProof';
 
 describe('demo mode service', () => {
   it('seeds deterministic data through persistence services', async () => {
@@ -23,6 +24,11 @@ describe('demo mode service', () => {
     expect(
       (await listAuditEvents(redis, DEMO_SUBREDDIT)).some((event) => event.kind === 'demo_reset'),
     ).toBe(true);
+    await expect(loadRuntimeProofStatus(redis, DEMO_SUBREDDIT)).resolves.toMatchObject({
+      warnings: expect.arrayContaining([
+        'Demo data only. Seeded records are not runtime proof.',
+      ]),
+    });
   });
 
   it('reset is idempotent for indexed demo records', async () => {

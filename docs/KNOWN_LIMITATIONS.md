@@ -1,21 +1,22 @@
 # Known Limitations
 
-Last updated: 2026-05-25 22:56 IST.
+Last updated: 2026-05-25 23:07 IST.
 
 ## Runtime proof gaps
 
-- `approve()` and `ignoreReports()` are live-verified for controlled post target `t3_1tm8nak` through ReviewLock `Lock review`, but still need repeat proof on a controlled comment target.
-- `unignoreReports()` is live-verified on controlled post target `t3_1tm8nak` through the dashboard unlock flow, but still needs repeat proof on a controlled comment target.
+- `approve()` and `ignoreReports()` are live-verified for controlled post target `t3_1tm8nak` through ReviewLock `Lock review`. S08 proves the comment lock flow persisted and later reopened, but comment-target moderation method proof is not independently visible yet and still needs a stronger runtime check.
+- `unignoreReports()` is live-verified on controlled post target `t3_1tm8nak` through the dashboard unlock flow. S08 proves the comment update reopen path reached ReviewLock, but comment-target `unignoreReports()` still needs an independently visible runtime check.
 - `PostReport` trigger delivery is live-verified for unchanged controlled post
   target `t3_1tm8nak`; `CommentReport` trigger delivery is implemented and
   locally tested but still needs live payload proof.
 - `PostUpdate` trigger delivery is live-verified for controlled body edit
-  target `t3_1tnfgqf`; `CommentUpdate`, `PostNsfwUpdate`,
-  `PostSpoilerUpdate`, and `PostFlairUpdate` are implemented and locally
-  tested but still need live payload proof.
-- `devvit logs` captured sanitized `on-post-report` and `on-post-update`
-  payload-shape evidence; remaining trigger variants have not yet been
-  captured.
+  target `t3_1tnfgqf`; `CommentUpdate` trigger delivery is live-verified for
+  controlled body edit target `t1_ontlx1k`; `PostNsfwUpdate`,
+  `PostSpoilerUpdate`, and `PostFlairUpdate` are implemented and locally tested
+  but still need live payload proof.
+- `devvit logs` captured sanitized `on-post-report`, `on-post-update`, and
+  `on-comment-update` payload-shape evidence; remaining trigger variants have
+  not yet been captured.
 
 ## Browser proof gaps
 
@@ -35,8 +36,9 @@ Last updated: 2026-05-25 22:56 IST.
 - ReviewLock must not be described as making content unreportable.
 - ReviewLock must not claim to disable user reporting.
 - ReviewLock may claim controlled live post-report suppression on unchanged
-  locked post target `t3_1tm8nak` and controlled live post body-edit reopening
-  on locked post target `t3_1tnfgqf`; it must not claim live comment-report,
-  comment-update, NSFW, spoiler, or flair-trigger proof until controlled
+  locked post target `t3_1tm8nak`, controlled live post body-edit reopening on
+  locked post target `t3_1tnfgqf`, and controlled live comment body-edit
+  reopening on locked comment target `t1_ontlx1k`; it must not claim live
+  comment-report, NSFW, spoiler, or flair-trigger proof until controlled
   playtest demonstrates those paths.
 - ReviewLock may claim live moderation-method proof only for the controlled post-target paths documented in `docs/MODERATION_METHOD_PROOF.md`.

@@ -4,7 +4,8 @@ import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
 import { fingerprintTarget } from '../server/services/fingerprint';
-import { saveLock } from '../server/services/locks';
+import { getActiveLockByTarget, saveLock } from '../server/services/locks';
+import { listAuditEvents } from '../server/services/audit';
 import { listOpenReopenEvents } from '../server/services/reopenQueue';
 import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { createReportTriggersRouter } from './triggers.report';
@@ -314,6 +315,60 @@ describe('report trigger routes', () => {
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
     expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
+  it('prefers comment-specific ids over generic target ids on comment report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'evt-comment-generic-target',
+        targetId: 't3_parent_post',
+        commentId: 't1_comment',
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
+  it('uses comment report counts before parent post report counts on comment reports', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-comment-count-conflict',
+        post: { id: 't3_parent_post', numReports: 99 },
+        comment: { id: 't1_comment', numReports: 5 },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't1_comment')).toMatchObject({
+      lastReportCount: 5,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'report_suppressed',
+        data: expect.objectContaining({ reportCount: 5 }),
+      }),
+    ]);
   });
 
   it('accepts Devvit nested comment report payloads', async () => {

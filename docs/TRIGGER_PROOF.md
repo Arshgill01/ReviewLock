@@ -1,6 +1,6 @@
 # Trigger Proof
 
-Last updated: 2026-05-25 22:56 IST.
+Last updated: 2026-05-25 23:07 IST.
 
 This document traces every ReviewLock trigger path from incoming payload to target resolution, lock decision, moderation operation, Redis mutation, metrics, audit, and reopen queue effects.
 
@@ -21,11 +21,11 @@ Local route tests use payload fields accepted by ReviewLock trigger routes:
   locks cannot accidentally resolve against the parent post.
 
 Live `PostReport` payload comparison is now available for a controlled
-unchanged locked post in `r/reviewlock_dev`. Live `PostUpdate` payload
-comparison is now available for a controlled locked post body edit in
-`r/reviewlock_dev`. Comment report/update, NSFW, spoiler, and flair update
-payloads have not been captured from Reddit runtime yet, so those route payloads
-remain representative local fixtures only.
+unchanged locked post in `r/reviewlock_dev`. Live `PostUpdate` and
+`CommentUpdate` payload comparison is now available for controlled locked body
+edits in `r/reviewlock_dev`. Comment report, NSFW, spoiler, and flair update
+payloads have not been captured from Reddit runtime yet, so those route
+payloads remain representative local fixtures only.
 
 The live bootstrap now passes `console` into the trigger router so playtest logs
 include `reviewlock.trigger.payload_shape` entries for report and update
@@ -98,6 +98,30 @@ Verified on 2026-05-25 in `r/reviewlock_dev` against locked proof post
   `c322d267` to `fc05f41b`, audit recorded `Lock Reopened 5/25/2026,
   10:53:00 PM`, and runtime proof showed `postUpdateTrigger verified`.
 
+### Controlled Live CommentUpdate Evidence
+
+Verified on 2026-05-25 in `r/reviewlock_dev` against locked proof comment
+`t1_ontlx1k` on playtest `v0.0.2.109`.
+
+- Browser action: created S08 under S02, locked the comment with reason
+  `reviewed_policy_compliant`, then edited the comment body from the original
+  reviewed text to the material rewrite documented in
+  `docs/LIVE_SCENARIO_CONTENT.md`.
+- Log command:
+  `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`.
+- Sanitized log event: `reviewlock.trigger.payload_shape` for
+  `route: 'on-comment-update'`, `targetKind: 'comment'`.
+- Observed shape: direct top-level target/event ids absent; nested `post` and
+  `comment` objects were present. Both nested objects exposed `id`,
+  `subredditId`, and `numReports`; `subreddit` arrived as an object, not a raw
+  logged subreddit string.
+- Dashboard after refresh: active locks decreased from `3` to `2`, `Reopened
+  after edit` increased from `1` to `2`, latest reopen event was
+  `comment:ontlx1k` with reason `content changed`, reopen queue included
+  fingerprint delta `9da841c1` to `20abf990`, audit recorded `Lock Reopened
+  5/25/2026, 11:05:07 PM`, and runtime proof showed
+  `commentUpdateTrigger verified`.
+
 ## Fail-Open Rule
 
 No trigger path suppresses reports when ReviewLock cannot prove the current content fingerprint matches the reviewed fingerprint.
@@ -151,7 +175,6 @@ Covered files:
 ## Remaining Runtime Work
 
 - Generate live `CommentReport` events in `r/reviewlock_dev`.
-- Generate live comment update, NSFW, spoiler, and flair update events in
-  `r/reviewlock_dev`.
+- Generate live NSFW, spoiler, and flair update events in `r/reviewlock_dev`.
 - Capture sanitized `devvit logs` payload shape evidence for the remaining
   trigger variants and compare it with the local route fixtures above.

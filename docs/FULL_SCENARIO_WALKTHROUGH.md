@@ -27,9 +27,9 @@ not a full live end-to-end comment proof. Later controlled playtest verified
 post-target `approve()`, `ignoreReports()`, and `unignoreReports()` on
 `t3_1tm8nak`; live `PostReport` suppression on `t3_1tm8nak`; and live
 `PostUpdate` body-edit reopening on S02 `t3_1tnfgqf`. Comment-target moderation
-methods, comment report/update triggers, and post NSFW/spoiler/flair update
-triggers remain unverified. See `docs/RUNTIME_PROOF.md` for the current claim
-boundary.
+methods, comment report triggers, and post NSFW/spoiler/flair update triggers
+remain unverified; live `CommentUpdate` body-edit reopening is now verified on
+S08 `t1_ontlx1k`. See `docs/RUNTIME_PROOF.md` for the current claim boundary.
 
 ## Route Payloads
 

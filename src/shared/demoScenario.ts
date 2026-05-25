@@ -590,10 +590,52 @@ export const demoRuntimeStatus: RuntimeProofStatus = {
       ],
     },
     {
-      name: 'triggers',
+      name: 'postReportTrigger',
       status: 'unverified',
       notes: [
-        'Demo events model report and edit triggers without claiming Devvit trigger delivery.',
+        'Demo report events model suppression without claiming Devvit post report delivery.',
+      ],
+    },
+    {
+      name: 'commentReportTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo comment report events are illustrative and not live Devvit trigger proof.',
+      ],
+    },
+    {
+      name: 'postUpdateTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo post edit-break events are illustrative and not live Devvit trigger proof.',
+      ],
+    },
+    {
+      name: 'commentUpdateTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo comment edit-break events are illustrative and not live Devvit trigger proof.',
+      ],
+    },
+    {
+      name: 'postNsfwUpdateTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo NSFW edit-break events are illustrative and not live Devvit trigger proof.',
+      ],
+    },
+    {
+      name: 'postSpoilerUpdateTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo spoiler edit-break events are illustrative and not live Devvit trigger proof.',
+      ],
+    },
+    {
+      name: 'postFlairUpdateTrigger',
+      status: 'unverified',
+      notes: [
+        'Demo flair edit-break events are illustrative and not live Devvit trigger proof.',
       ],
     },
   ],

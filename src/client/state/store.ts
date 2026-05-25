@@ -199,8 +199,10 @@ export class ReviewLockStore {
   }
 
   updateSubredditContext(subreddit: string) {
-    this.subreddit = subreddit;
     if (!this.demo) {
+      this.subreddit = subreddit;
+      this.liveSubreddit = subreddit;
+    } else {
       this.liveSubreddit = subreddit;
     }
     this.notify();

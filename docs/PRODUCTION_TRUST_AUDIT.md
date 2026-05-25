@@ -6,8 +6,10 @@ Wave 30 reviewed the hardening record from Waves 15 through 29 and made one fina
 
 The weakest area is not local correctness. The lock, reopen, dashboard, demo, namespace, race, and browser-mocked paths have substantial local coverage. The weakest area is production trust around runtime proof and release safety:
 
-- Historical Wave 30 note: at the time of this audit, live moderation method proof was still unverified. Current status is narrower: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are now verified; comment-target methods and live report/update trigger delivery remain unverified. See `docs/RUNTIME_PROOF.md`.
-- Live report and edit trigger delivery remains unverified.
+- Historical Wave 30 note: at the time of this audit, live moderation method proof was still unverified. Current status is narrower: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are now verified; comment-target methods still need independently visible runtime proof. See `docs/RUNTIME_PROOF.md`.
+- Controlled live `PostReport` suppression, `PostUpdate` body-edit reopening,
+  and `CommentUpdate` body-edit reopening are verified. `CommentReport`,
+  post NSFW, post spoiler, and post flair trigger variants remain unverified.
 - The app can upload, install, and reach playtest, but a public publish must not happen until the claim boundary is resolved.
 - `package.json` still exposed an `npm run launch` script that executed `npm run deploy && devvit publish`.
 
@@ -31,7 +33,9 @@ This keeps the developer workflow for private upload rehearsal while preventing 
 
 ## Evidence Reviewed
 
-- `docs/TRIGGER_PROOF.md`: local trigger decisions are covered, live payload capture remains open.
+- `docs/TRIGGER_PROOF.md`: local trigger decisions are covered; controlled
+  `PostReport`, `PostUpdate`, and `CommentUpdate` payload capture has passed;
+  `CommentReport`, NSFW, spoiler, and flair payload capture remains open.
 - `docs/FINGERPRINT_STRESS.md`: fingerprint edge cases are covered locally.
 - `docs/REDIS_RACE_PROOF.md`: duplicate and failure behavior is locally covered against the adapter contract.
 - `docs/UI_AUDIT.md`: dashboard states render locally with mocked API responses.
@@ -50,12 +54,15 @@ The app is locally strong and safe to keep hardening in the controlled test subr
 
 1. A moderator locks controlled post and comment targets.
 2. `approve()` and `ignoreReports()` are separately observed to succeed or fail honestly. Post-target proof has passed; comment-target proof remains open.
-3. Repeat report events are generated and shown to hit `PostReport` and `CommentReport`.
+3. Repeat report events are generated and shown to hit `PostReport` and `CommentReport`; `PostReport` proof has passed, while `CommentReport` remains open.
 4. Unchanged locked content increments suppressed metrics and audit records.
-5. Edited content breaks the lock, calls `unignoreReports()` when supported, and appears in the reopen queue.
+5. Edited content breaks the lock, calls `unignoreReports()` when supported, and appears in the reopen queue; controlled post and comment body-edit proof has passed, while flag/flair variants remain open.
 6. The dashboard WebView runtime smoke writes under `r/reviewlock_dev`, not a fallback namespace.
 
-Until those steps pass, ReviewLock should be described as implemented, locally tested, uploaded, installed, and playtest-booted, not live-proven.
+Until the remaining steps pass, ReviewLock should be described as implemented,
+locally tested, uploaded, installed, playtest-booted, and live-proven only for
+the controlled post-report suppression plus post/comment body-edit reopen paths
+documented in `docs/RUNTIME_PROOF.md`.
 
 ## Follow-up Waves
 

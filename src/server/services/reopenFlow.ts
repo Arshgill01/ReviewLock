@@ -203,9 +203,10 @@ export const breakLockForChangedContent = async (
   } catch (error) {
     if (isTriggerConcurrencyError(error)) {
       return {
-        ok: true,
-        action: 'no_lock',
-        message: 'Concurrent trigger ignored while ReviewLock is already processing this target.',
+        ok: false,
+        action: 'runtime_uncertain',
+        message:
+          'Concurrent trigger is already processing this target; retry this update delivery.',
         warnings: ['concurrent_trigger_in_progress'],
       };
     }

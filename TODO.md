@@ -98,12 +98,34 @@
 - [x] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
 - [x] Capture sanitized `devvit logs` payload evidence for live post update triggers.
 - [x] Capture sanitized `devvit logs` payload evidence for live post report triggers.
+- [x] Generate controlled live comment edit/update trigger event in `r/reviewlock_dev`.
+- [x] Capture sanitized `devvit logs` payload evidence for live comment update trigger.
+- [x] Record failed Reddit-context runtime smoke checks in runtime proof when subreddit scope is known.
 - [x] Record update-trigger `unignoreReports()` results in runtime proof.
 - [x] Surface item-level runtime warnings on active dashboard locks.
 - [x] Surface item-level runtime warnings on reopened dashboard items.
 - [x] Record granular trigger delivery capabilities in runtime proof.
+- [x] Preserve explicit demo runtime proof warnings during runtime normalization.
+- [x] Add route-level regressions for granular comment, NSFW, spoiler, and flair update proof rows.
+- [x] Pin `redditContext` in the runtime proof default/fallback matrix.
+- [x] Update stale Redis race-proof runtime boundary after live trigger proof.
+- [x] Guard concurrent lock submissions with a per-target Redis creation lease.
+- [x] Deduplicate delayed no-id report retries across clock-minute boundaries.
+- [x] Release lock creation leases only when the owner token still matches.
+- [x] Keep concurrent distinct report deliveries retryable instead of marking them duplicate.
+- [x] Avoid seven-day dedupe collapse for no-id/no-count report deliveries.
+- [x] Write reopen-dismiss audit entries before removing reopen queue visibility.
+- [x] Remove the live dashboard `reviewlock` namespace fallback when runtime context is unavailable.
+- [x] Require trusted runtime subreddit context for live dashboard reads and smoke writes.
+- [x] Preserve explicit runtime proof warnings during capability writes.
+- [x] Avoid false `lock_created` audit entries when lock creation rolls back after metrics failure.
+- [x] Update install/deploy rehearsal blockers to the current live proof boundary.
 - [x] Prefer comment ids over sibling post ids in comment report/update trigger payloads.
 - [x] Prefer comment ids over sibling post ids in comment lock/unlock menu payloads.
+- [x] Prefer comment-specific ids over generic target ids in comment report/update/menu payloads.
+- [x] Preserve the isolated demo namespace when runtime context arrives before the first demo fetch.
+- [x] Prefer comment report counts over parent post report counts in mixed comment report payloads.
+- [x] Keep update-trigger mutex contention retryable instead of terminal `no_lock`.
 - [x] Fail open when Reddit target refetch throws during report/update trigger handling.
 - [x] Keep demo-mode exit retryable when server-side demo disable fails.
 - [x] Surface runtime-failure audit target, lock, operation, reason, and error details.

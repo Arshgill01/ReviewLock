@@ -220,6 +220,18 @@ describe('ReviewLockStore', () => {
     expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_dev', false);
   });
 
+  it('keeps bare demo URLs in the demo namespace when runtime context arrives before fetch', async () => {
+    store = new ReviewLockStore(apiClient, 'reviewlock_dev', true);
+
+    store.updateSubredditContext('reviewlock_dev');
+    await store.fetchState();
+
+    expect(store.demo).toBe(true);
+    expect(store.subreddit).toBe('reviewlock_demo');
+    expect(store.getLiveSubreddit()).toBe('reviewlock_dev');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_demo', true);
+  });
+
   it('returns to the live subreddit when demo mode is disabled', async () => {
     store.updateSubredditContext('reviewlock_dev');
     await store.setDemo(true);

@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 22:56 IST.
+Last updated: 2026-05-25 23:07 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -28,8 +28,10 @@ is explicitly selected.
   `t3_1tm8nak` on playtest `v0.0.2.87`.
 - Controlled live `PostUpdate` body-edit delivery is verified for locked proof
   post `t3_1tnfgqf` on playtest `v0.0.2.107`.
-- Comment report/update, post NSFW/spoiler, and post flair update trigger
-  deliveries remain unverified.
+- Controlled live `CommentUpdate` body-edit delivery is verified for locked
+  proof comment `t1_ontlx1k` on playtest `v0.0.2.109`.
+- Comment report, post NSFW/spoiler, and post flair update trigger deliveries
+  remain unverified.
 - S01 is authored by the currently logged-in dev account, so Reddit does not
   expose a `Report` action for S01 from this session. The first unchanged-report
   proof candidate is the already locked dashboard post `t3_1tm8nak`, authored
@@ -165,6 +167,26 @@ Observed proof on 2026-05-25:
   fingerprint delta `c322d267` to `fc05f41b`, audit `Lock Reopened
   5/25/2026, 10:53:00 PM`, and runtime proof `postUpdateTrigger verified`.
 
+## S08 Proof Sequence
+
+S08 proves comment body edit reopen.
+
+Observed proof on 2026-05-25:
+
+- S08 was created under S02 at
+  `/r/reviewlock_dev/comments/1tnfgqf/comment/ontlx1k/` with thing id
+  `t1_ontlx1k`.
+- `Lock review` on the comment created lock
+  `lock-t1_ontlx1k-1779730303805` at `5/25/2026, 11:01:43 PM`.
+- Editing the comment body emitted sanitized `reviewlock.trigger.payload_shape`
+  for `on-comment-update` from
+  `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`.
+- The dashboard showed active locks `3 -> 2`, `Reopened after edit = 2`,
+  latest reopen `comment:ontlx1k` with reason `content changed`, reopen queue
+  fingerprint delta `9da841c1` to `20abf990`, audit `Lock Reopened
+  5/25/2026, 11:05:07 PM`, and runtime proof
+  `commentUpdateTrigger verified`.
+
 ## Evidence To Record
 
 For each live scenario, update:
@@ -190,7 +212,6 @@ Record:
 Until the remaining runbook sections are executed and evidence is captured:
 
 - Do not claim live comment report suppression is verified.
-- Do not claim live comment edit-trigger reopening is verified.
 - Do not claim live post NSFW/spoiler/flair-trigger reopening is verified.
 - Do not claim comment-target moderation methods are verified.
 - Do not claim trigger payload logs have been captured for untested trigger

@@ -1,6 +1,6 @@
 # Live Scenario Matrix
 
-Last updated: 2026-05-25 01:24 IST.
+Last updated: 2026-05-25 23:07 IST.
 
 This file defines how ReviewLock should gather real runtime proof without
 confusing seeded demo data with live evidence.
@@ -61,7 +61,7 @@ without storing private user data.
 | S05      | Post    | `[ReviewLock proof S05] Spoiler toggle reopen`                                | Lock succeeds; spoiler toggle changes fingerprint; lock reopens with `spoiler_changed`.            |
 | S06      | Post    | `[ReviewLock proof S06] Whitespace-only edit`                                 | Lock succeeds; whitespace-only body edit should not reopen if normalized fingerprint is unchanged. |
 | S07      | Comment | Comment on S01: `Reviewed unchanged comment context.`                         | Comment lock succeeds if the comment menu is available; repeated report suppresses.                |
-| S08      | Comment | Comment on S02: `Comment body edit proof.`                                    | Comment lock succeeds; body rewrite reopens.                                                       |
+| S08      | Comment | Comment on S02: `Comment body edit proof.`                                    | Verified: comment lock succeeded; body rewrite reopened `t1_ontlx1k`.                              |
 | S09      | Post    | `[ReviewLock proof S09] High churn unchanged post`                            | Multiple repeat reports on unchanged content suppress without duplicate active locks.              |
 | S10      | Post    | `[ReviewLock proof S10] Relock after missed edit`                             | If old lock exists and content changed, relock reopens stale lock before creating a replacement.   |
 
@@ -97,8 +97,8 @@ that exact action in the current live pass.
 
 - Live `PostReport` trigger delivery is proven for unchanged controlled post
   target `t3_1tm8nak`; `CommentReport` trigger delivery is not yet proven.
-- Live post/comment update trigger delivery is not yet proven.
-- Comment menu proof is still pending because comment menu availability needs a
-  controlled browser pass.
+- Live post body edit and comment body edit update trigger delivery are proven.
+- Comment menu proof is available for S08 lock creation, but comment-target
+  moderation method effects still need an independently visible runtime check.
 - A second account or a clearly safe reporting workflow may be needed if Reddit
   does not reliably trigger reports submitted by the same moderator account.

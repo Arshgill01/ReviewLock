@@ -72,9 +72,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       };
     }
 
-    const subreddit = runtimeSubreddit ?? clientSubreddit;
-
-    if (!subreddit) {
+    if (!runtimeSubreddit) {
       return {
         ok: false,
         response: new Response(
@@ -87,7 +85,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       };
     }
 
-    return { ok: true, subreddit };
+    return { ok: true, subreddit: runtimeSubreddit };
   };
 
   router.get('/health', (context) =>
@@ -196,6 +194,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
     }
 
     const checkedAt = deps.clock?.now() ?? new Date().toISOString();
+    let smokeSubreddit: string | undefined;
 
     try {
       const scope = await resolveSmokeSubreddit(context.req.query('subreddit'));
@@ -205,6 +204,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       }
 
       const subreddit = scope.subreddit;
+      smokeSubreddit = subreddit;
       const username = await deps.reddit.getCurrentUsername();
 
       if (!username) {
@@ -247,6 +247,20 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         error,
         checkedAt,
       );
+      if (deps.redis && smokeSubreddit) {
+        await recordCapabilityStatus(
+          deps.redis,
+          smokeSubreddit,
+          {
+            name: result.capability,
+            status: result.status,
+            checkedAt: result.checkedAt,
+            evidence: result.evidence,
+            notes: result.notes,
+          },
+          checkedAt,
+        ).catch(() => undefined);
+      }
 
       return context.json(
         { ok: false, capability: result.capability, status: result.status, error: result.notes[0] },

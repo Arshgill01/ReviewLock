@@ -1,6 +1,6 @@
 # Live Scenario Content
 
-Last updated: 2026-05-25 22:56 IST.
+Last updated: 2026-05-25 23:07 IST.
 
 This file contains the exact controlled content to create in
 `r/reviewlock_dev` for live ReviewLock proof. These are not demo fixtures and
@@ -274,6 +274,20 @@ Expected result:
 
 ## S08 - Comment Body Edit Reopen
 
+Live record:
+
+- Status: posted, locked, edited, and verified as reopened after edit in the
+  live dashboard on playtest `v0.0.2.109`.
+- Parent:
+  `/r/reviewlock_dev/comments/1tnfgqf/reviewlock_proof_s02_body_edit_reopen/`
+- Comment permalink:
+  `/r/reviewlock_dev/comments/1tnfgqf/comment/ontlx1k/`
+- Thing id: `t1_ontlx1k`
+- Author: `u/BrightyBrainiac`
+- Lock created: `5/25/2026, 11:01:43 PM`, lock id
+  `lock-t1_ontlx1k-1779730303805`.
+- Reopen observed: `5/25/2026, 11:05:07 PM`.
+
 Parent:
 
 - Use S02 after it is posted.
@@ -296,6 +310,22 @@ Expected result:
   refetch.
 - Lock moves to `reopened`.
 - Reopen event reason is `content_changed`.
+
+Observed result:
+
+- Verified on playtest `v0.0.2.109`.
+- Devvit emitted sanitized `reviewlock.trigger.payload_shape` for
+  `on-comment-update`; the payload had nested `post` and `comment` objects with
+  ids and subreddit ids present. Direct top-level `targetId`, `commentId`, and
+  `eventId` were absent.
+- ReviewLock dashboard showed active locks decrease from `3` to `2`,
+  `Reopened after edit` increase from `1` to `2`, latest reopen event
+  `comment:ontlx1k` with reason `content changed`, and runtime proof
+  `commentUpdateTrigger verified`.
+- Reopen queue showed `comment:ontlx1k content changed 5/25/2026,
+  11:05:07 PM` with fingerprint delta `9da841c1` to `20abf990`.
+- Audit timeline showed `Lock Reopened 5/25/2026, 11:05:07 PM · reviewlock`
+  for target `t1_ontlx1k` and lock `lock-t1_ontlx1k-1779730303805`.
 
 ## S09 - High Churn Unchanged Post
 
@@ -358,3 +388,5 @@ Expected result:
 - Same-account report proof against S01 is blocked by Reddit author controls.
 - The current unchanged-report proof candidate is locked dashboard post
   `t3_1tm8nak`.
+- S08 comment body edit reopen is verified; comment report proof still needs a
+  non-author report path or a controlled app-authored comment.

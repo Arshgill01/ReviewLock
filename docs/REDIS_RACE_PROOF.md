@@ -79,4 +79,6 @@ npm run build
 
 ## Remaining Runtime Risk
 
-The race guarantees are locally verified against the Redis adapter contract and fake Reddit adapter. Controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are verified in later runtime proof. Live Devvit trigger delivery timing, trigger-driven suppression/reopening, and comment-target moderation methods still require controlled playtest proof before the app can claim live trigger suppression and reopening as verified.
+The race guarantees are locally verified against the Redis adapter contract and fake Reddit adapter. See `docs/RUNTIME_PROOF.md` for the current live capability matrix.
+
+As of the latest controlled playtest, post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are verified, controlled `PostReport` suppression is verified, and controlled post/comment body-edit reopen paths are verified through `PostUpdate` and `CommentUpdate`. `CommentReport` delivery and post NSFW/spoiler/flair update variants remain unverified until their own controlled playtest events run.

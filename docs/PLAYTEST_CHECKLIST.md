@@ -37,9 +37,9 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Use `Lock review` on the test post.
 - [x] Confirm lock form shows target summary, reports, edit state, and reason.
 - [x] Submit lock reason and confirm post approval/ignoreReports behavior.
-- [ ] Create a controlled test comment.
-- [ ] Use `Lock review` on the test comment.
-- [ ] Submit lock reason and confirm comment approval/ignoreReports behavior.
+- [x] Create a controlled test comment.
+- [x] Use `Lock review` on the test comment.
+- [x] Submit lock reason and confirm the comment lock is persisted and audited.
 
 ## Report trigger flow
 
@@ -61,8 +61,8 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Confirm lock status changes to `reopened`.
 - [x] Confirm `unignoreReports()` is called when supported.
 - [x] Confirm reopen queue event and audit event are written.
-- [ ] Edit the locked test comment.
-- [ ] Confirm comment update trigger path and reopen behavior.
+- [x] Edit the locked test comment.
+- [x] Confirm comment update trigger path and reopen behavior.
 
 ## Dashboard runtime proof
 
@@ -75,6 +75,7 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Confirm dashboard unlock records `unignoreReports verified` on the controlled post target.
 - [x] Confirm lock review records `approve verified` and `ignoreReports verified` on the controlled post target.
 - [x] Confirm `postUpdateTrigger verified` after controlled S02 body edit reopen.
+- [x] Confirm `commentUpdateTrigger verified` after controlled S08 comment body edit reopen.
 - [x] Confirm no product copy says "not reportable", "disable reports", or "blocked reports".
 
 ## Browser safety notes
