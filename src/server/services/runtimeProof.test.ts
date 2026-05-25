@@ -6,6 +6,7 @@ import {
   recordModerationOperationStatus,
 } from './runtimeProof';
 import { keys } from './keys';
+import { appendAuditEvent } from './audit';
 
 describe('runtime proof status', () => {
   it('loads an unverified default matrix', async () => {
@@ -112,6 +113,89 @@ describe('runtime proof status', () => {
         warnings: ['Runtime capabilities have not been playtested yet.'],
       });
     }
+  });
+
+  it('reconciles unverified report trigger proof from durable suppression audit evidence', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, {
+      id: 'audit-report-suppressed-1',
+      kind: 'report_suppressed',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      lockId: 'lock-1',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:00:00.000Z',
+      message: 'Repeat report suppressed because reviewed content was unchanged.',
+      data: { reportCount: 1 },
+      demo: false,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'approve', status: 'unverified' }),
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'commentUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'ignoreReports', status: 'unverified' }),
+        expect.objectContaining({
+          name: 'postReportTrigger',
+          status: 'verified',
+          checkedAt: '2026-05-24T01:00:00.000Z',
+          evidence: 'report_suppressed audit audit-report-suppressed-1',
+        }),
+        expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'redditContext', status: 'unverified' }),
+        expect.objectContaining({ name: 'redis', status: 'unverified' }),
+        expect.objectContaining({ name: 'unignoreReports', status: 'unverified' }),
+      ]),
+    );
+    expect(status.warnings).toContain('Some runtime capabilities are not verified.');
+  });
+
+  it('does not upgrade failed or demo report trigger proof from audit evidence', async () => {
+    const redis = new InMemoryRedisStore();
+    await recordCapabilityStatus(
+      redis,
+      'alpha',
+      {
+        name: 'postReportTrigger',
+        status: 'failed',
+        evidence: 'latest report proof failed',
+        notes: ['latest report proof failed'],
+      },
+      '2026-05-24T01:00:00.000Z',
+    );
+    await appendAuditEvent(redis, {
+      id: 'audit-report-suppressed-demo',
+      kind: 'report_suppressed',
+      subreddit: 'alpha',
+      targetId: 't3_demo',
+      targetKind: 'post',
+      lockId: 'lock-demo',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:30:00.000Z',
+      message: 'Repeat report suppressed because reviewed content was unchanged.',
+      data: { reportCount: 1 },
+      demo: true,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postReportTrigger',
+          status: 'failed',
+          evidence: 'latest report proof failed',
+        }),
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+      ]),
+    );
   });
 
   it('can verify all granular trigger capabilities without a stale broad trigger row', async () => {

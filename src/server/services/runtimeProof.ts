@@ -1,5 +1,6 @@
 import type { RedisStore } from '../adapters/redis';
 import type {
+  AuditEvent,
   RuntimeCapabilityStatus,
   RuntimeProofCapability,
   RuntimeProofStatus,
@@ -7,6 +8,7 @@ import type {
 import { RUNTIME_CAPABILITY_STATUSES } from '../../shared/constants';
 import type { ModerationOperationResult } from './moderation';
 import { keys } from './keys';
+import { listAuditEvents } from './audit';
 
 const defaultCapabilityNames = [
   'approve',
@@ -142,16 +144,78 @@ const normalizeRuntimeProofStatus = (status: RuntimeProofStatus): RuntimeProofSt
   };
 };
 
+const capabilityFromReportAudit = (event: AuditEvent): RuntimeProofCapability | undefined => {
+  if (event.kind !== 'report_suppressed' || event.demo) {
+    return undefined;
+  }
+
+  return {
+    name: event.targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger',
+    status: 'verified',
+    checkedAt: event.createdAt,
+    evidence: `report_suppressed audit ${event.id}`,
+    notes: [
+      `${event.targetKind} report trigger verified by durable suppression audit for ${event.targetId}.`,
+    ],
+  };
+};
+
+const reconcileAuditEvidence = async (
+  redis: RedisStore,
+  subreddit: string,
+  status: RuntimeProofStatus,
+): Promise<RuntimeProofStatus> => {
+  let events: AuditEvent[];
+
+  try {
+    events = await listAuditEvents(redis, subreddit);
+  } catch {
+    return status;
+  }
+
+  const derived = new Map<string, RuntimeProofCapability>();
+
+  for (const event of events) {
+    const capability = capabilityFromReportAudit(event);
+
+    if (capability && !derived.has(capability.name)) {
+      derived.set(capability.name, capability);
+    }
+  }
+
+  if (derived.size === 0) {
+    return status;
+  }
+
+  const capabilities = status.capabilities
+    .map((capability) => {
+      const auditCapability = derived.get(capability.name);
+
+      return auditCapability && capability.status === 'unverified'
+        ? auditCapability
+        : capability;
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    ...status,
+    capabilities,
+    overall: summarizeOverall(capabilities),
+    warnings: warningsForCapabilities(status.warnings, capabilities),
+  };
+};
+
 export const loadRuntimeProofStatus = async (
   redis: RedisStore,
   subreddit: string,
   now = new Date().toISOString(),
 ): Promise<RuntimeProofStatus> => {
   const parsed = parseJson<unknown>(await redis.get(keys.runtime(subreddit)));
-
-  return isRuntimeProofStatus(parsed)
+  const status = isRuntimeProofStatus(parsed)
     ? normalizeRuntimeProofStatus(parsed)
     : defaultRuntimeStatus(now);
+
+  return reconcileAuditEvidence(redis, subreddit, status);
 };
 
 export const saveRuntimeProofStatus = async (

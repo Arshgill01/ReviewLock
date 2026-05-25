@@ -1876,3 +1876,24 @@ Reason:
 - Demo mode must stay deterministic even if a caller bypasses rendered controls.
   The read-only contract belongs at the route boundary, not only in client
   button visibility.
+
+### D109 - Runtime report-trigger proof reconciles durable suppression audits
+
+The runtime proof ledger and audit ledger are separate Redis records. A report
+trigger can durably suppress a report and write the required
+`report_suppressed` audit while the granular runtime capability row is missing
+or from an older matrix shape.
+
+Decision:
+
+- When loading runtime proof, reconcile unverified post/comment report-trigger
+  capability rows from non-demo `report_suppressed` audit events.
+- Do not upgrade `failed` rows from audit evidence.
+- Do not use seeded demo audit events as runtime proof.
+
+Reason:
+
+- A durable suppression audit is stronger evidence than a missing unverified
+  capability row for the same live namespace. The dashboard should surface that
+  proof without weakening failure visibility or confusing demo fixtures with
+  live runtime behavior.
