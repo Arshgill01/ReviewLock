@@ -2521,3 +2521,37 @@
   - `rg -n "TODO" src` returned no source TODOs.
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:00 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof audit reconciliation can falsely verify comment report delivery.
+- Evidence:
+  - `capabilityFromReportAudit()` derives the trigger capability with `event.targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger'`: `src/server/services/runtimeProof.ts:147-160`.
+  - `AuditEvent.targetKind` is optional in the shared type: `src/shared/schema.ts:95-101`.
+  - The audit schema guard accepts audit events with no `targetKind`: `src/shared/schema.ts:291-298`.
+  - That means a non-demo `report_suppressed` audit with missing `targetKind` is treated as `commentReportTrigger` proof, even though live comment-report proof is still explicitly unverified in `docs/RUNTIME_PROOF.md` and `docs/KNOWN_LIMITATIONS.md`.
+- Why it matters: comment report suppression is one of the remaining runtime-proof gaps. A legacy, partial, or manually malformed-but-schema-valid `report_suppressed` audit can turn the dashboard/runtime proof row for `commentReportTrigger` green without a controlled `CommentReport` delivery.
+- Suggested fix: make `capabilityFromReportAudit()` return `undefined` unless `event.targetKind` is exactly `post` or `comment`, and add a regression in `src/server/services/runtimeProof.test.ts` showing a `report_suppressed` audit with missing `targetKind` does not verify either report-trigger capability.
+- Files reviewed: `src/server/services/runtimeProof.ts`, `src/shared/schema.ts`, `docs/RUNTIME_PROOF.md`, `docs/KNOWN_LIMITATIONS.md`.
+
+## 2026-05-26 01:02 IST - Integration Status
+
+- Resolved medium finding added at 01:00: runtime proof audit reconciliation
+  now ignores `report_suppressed` audit events unless `targetKind` is exactly
+  `post` or `comment`.
+- Regression added in `src/server/services/runtimeProof.test.ts` for a
+  schema-valid missing-kind suppression audit, asserting neither
+  `postReportTrigger` nor `commentReportTrigger` is verified.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts --reporter verbose`
+    PASS, 1 file / 12 tests.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 315 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.

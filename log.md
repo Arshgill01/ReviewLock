@@ -1822,9 +1822,14 @@
   reconcile from durable non-demo `report_suppressed` audit events.
 - Demo audit events do not upgrade runtime proof rows, and explicit `failed`
   runtime rows remain failed.
+- Integrated reviewer finding: audit reconciliation now requires
+  `targetKind` to be exactly `post` or `comment`, preventing legacy
+  missing-kind suppression audits from falsely verifying comment report proof.
 - Focused validation:
   - `npm run test -- src/server/services/runtimeProof.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
   - PASS, 2 test files and 24 tests.
+  - `npm run test -- src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 1 test file and 12 tests.
 - Full validation:
   - `npm run type-check`
   - `npm run lint`
@@ -1833,7 +1838,7 @@
   - `git diff --check`
   - `rg -n "TODO" src`
   - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
-- Pass/fail status: PASS for type-check, lint, 40 test files / 314 tests,
+- Pass/fail status: PASS for type-check, lint, 40 test files / 315 tests,
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.

@@ -198,6 +198,31 @@ describe('runtime proof status', () => {
     );
   });
 
+  it('does not reconcile report trigger proof from suppression audits with missing target kind', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, {
+      id: 'audit-report-suppressed-missing-kind',
+      kind: 'report_suppressed',
+      subreddit: 'alpha',
+      targetId: 't3_legacy',
+      lockId: 'lock-legacy',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:00:00.000Z',
+      message: 'Repeat report suppressed because reviewed content was unchanged.',
+      data: { reportCount: 1 },
+      demo: false,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+      ]),
+    );
+  });
+
   it('can verify all granular trigger capabilities without a stale broad trigger row', async () => {
     const redis = new InMemoryRedisStore();
     const triggerCapabilities = [

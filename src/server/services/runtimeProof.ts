@@ -149,6 +149,10 @@ const capabilityFromReportAudit = (event: AuditEvent): RuntimeProofCapability | 
     return undefined;
   }
 
+  if (event.targetKind !== 'post' && event.targetKind !== 'comment') {
+    return undefined;
+  }
+
   return {
     name: event.targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger',
     status: 'verified',

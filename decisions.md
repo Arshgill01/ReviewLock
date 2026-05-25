@@ -1888,6 +1888,8 @@ Decision:
 
 - When loading runtime proof, reconcile unverified post/comment report-trigger
   capability rows from non-demo `report_suppressed` audit events.
+- Require the audit event `targetKind` to be exactly `post` or `comment`
+  before deriving a report-trigger capability.
 - Do not upgrade `failed` rows from audit evidence.
 - Do not use seeded demo audit events as runtime proof.
 
