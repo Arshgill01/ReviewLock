@@ -170,6 +170,25 @@ export const listDailyMetrics = async (
   return metrics.filter((entry): entry is DailyMetrics => entry !== undefined);
 };
 
+export const sumDailyMetrics = async (
+  redis: RedisStore,
+  subreddit: string,
+): Promise<Pick<DailyMetrics, 'locksCreated' | 'reportsSuppressed' | 'locksReopened'>> => {
+  const entries = await redis.zRange(keys.metricsDailyIndex(subreddit), 0, -1, true);
+  const metrics = await Promise.all(
+    entries.map((entry) => getDailyMetrics(redis, subreddit, entry.member)),
+  );
+
+  return metrics.reduce(
+    (total, entry) => ({
+      locksCreated: total.locksCreated + (entry?.locksCreated ?? 0),
+      reportsSuppressed: total.reportsSuppressed + (entry?.reportsSuppressed ?? 0),
+      locksReopened: total.locksReopened + (entry?.locksReopened ?? 0),
+    }),
+    { locksCreated: 0, reportsSuppressed: 0, locksReopened: 0 },
+  );
+};
+
 export const getTargetMetrics = async (
   redis: RedisStore,
   subreddit: string,

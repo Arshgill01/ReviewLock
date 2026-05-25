@@ -1900,3 +1900,44 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:18 IST - Client/runtime dashboard hardening
+
+- Used ModMirror's client resilience pattern as a reference and added
+  ReviewLock-specific dashboard error notice classification for subreddit
+  context mismatch, unavailable runtime dependencies, static preview, network
+  failures, API errors, and unexpected contract responses.
+- Preserved raw error detail while adding a concrete, non-destructive recovery
+  action in both full-page and stale-data inline error states.
+- Full-page initial-load errors now include a direct demo-mode action alongside
+  Retry when the dashboard is not already in demo mode.
+- Integrated reviewer finding: update-trigger proof now requires successful
+  `unignoreReports()` before the trigger row can be verified through direct
+  processing or durable reopen-audit reconciliation.
+- Integrated reviewer finding: dashboard active-lock headline totals now count
+  all active locks even when the rendered table remains capped.
+- Integrated reviewer finding: dashboard suppressed-report and reopened totals
+  now sum all persisted daily metric records while keeping the daily metrics
+  response capped for UI display.
+- Focused validation:
+  - `npm run test -- src/client/state/clientNotice.test.ts src/client/render.test.ts --reporter verbose`
+  - PASS, 2 test files and 21 tests after adding the full-page demo action
+    regression.
+  - `npm run lint`
+  - PASS.
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 29 tests.
+  - `npm run test -- src/server/services/dashboard.test.ts src/server/services/metrics.test.ts --reporter verbose`
+  - PASS, 2 test files and 9 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 41 test files / 326 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

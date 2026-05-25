@@ -311,8 +311,9 @@ describe('client render helpers', () => {
 
     const html = renderDashboardPage(store);
 
-    expect(html).toContain('Dashboard refresh failed.');
+    expect(html).toContain('Dashboard request failed');
     expect(html).toContain('API error: Service unavailable');
+    expect(html).toContain('avoid live mutations until the refresh succeeds');
     expect(html).toContain('Retry');
     expect(html).toContain('Active locks');
     expectSafeCopy(html);
@@ -326,8 +327,35 @@ describe('client render helpers', () => {
 
     expect(html).toContain('ReviewLock');
     expect(html).toContain('API contract error at /api/locks: missing locks array');
+    expect(html).toContain('Unexpected API response');
+    expect(html).toContain('keep live actions paused');
     expect(html).toContain('Retry');
     expect(html.trim()).not.toBe('');
+    expectSafeCopy(html);
+  });
+
+  it('renders subreddit context recovery guidance on initial load failures', () => {
+    const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock', false);
+    store.error = 'API error: Dashboard subreddit scope does not match the Devvit runtime subreddit.';
+
+    const html = renderDashboardPage(store);
+
+    expect(html).toContain('Subreddit context mismatch');
+    expect(html).toContain('target subreddit');
+    expect(html).toContain('Retry');
+    expect(html.trim()).not.toBe('');
+    expectSafeCopy(html);
+  });
+
+  it('renders a demo action when static preview guidance mentions demo mode', () => {
+    const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock', false);
+    store.error = 'API contract error at /api/overview: response was not valid JSON';
+
+    const html = renderDashboardPage(store);
+
+    expect(html).toContain('Live API unavailable');
+    expect(html).toContain('use demo mode');
+    expect(html).toContain('data-action="toggle-mode" data-mode="demo"');
     expectSafeCopy(html);
   });
 });

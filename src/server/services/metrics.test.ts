@@ -9,6 +9,7 @@ import {
   listDailyMetrics,
   listTopTargetMetrics,
   recordLockCreatedMetric,
+  sumDailyMetrics,
 } from './metrics';
 import { keys } from './keys';
 
@@ -101,6 +102,24 @@ describe('metrics persistence', () => {
     expect((await listTopTargetMetrics(redis, 'alpha')).map((entry) => entry.targetId)[0]).toBe(
       't3_high',
     );
+  });
+
+  it('sums daily metrics across the full persisted index', async () => {
+    const redis = new InMemoryRedisStore();
+
+    for (let index = 0; index < 35; index += 1) {
+      const day = new Date(Date.parse('2026-04-01T00:00:00.000Z') + index * 86_400_000);
+      await incrementSuppressedReportMetric(
+        redis,
+        target({ id: `t3_${index}` }),
+        day.toISOString(),
+      );
+    }
+
+    expect(await listDailyMetrics(redis, 'alpha')).toHaveLength(30);
+    expect(await sumDailyMetrics(redis, 'alpha')).toMatchObject({
+      reportsSuppressed: 35,
+    });
   });
 
   it('skips malformed daily and target metric records', async () => {

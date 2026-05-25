@@ -15,8 +15,8 @@ import type {
 } from '../../shared/schema';
 import type { RedisStore } from '../adapters/redis';
 import { listAuditEvents } from './audit';
-import { listActiveLocks } from './locks';
-import { listDailyMetrics, listTopTargetMetrics } from './metrics';
+import { countActiveLocks, listActiveLocks } from './locks';
+import { listDailyMetrics, listTopTargetMetrics, sumDailyMetrics } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { loadRuntimeProofStatus } from './runtimeProof';
 
@@ -27,24 +27,17 @@ export interface DashboardDataOptions {
   limit?: number;
 }
 
-const totalSuppressed = (metrics: DailyMetrics[]): number =>
-  metrics.reduce((total, metric) => total + metric.reportsSuppressed, 0);
-
-const totalReopened = (metrics: DailyMetrics[], reopenQueue: ReopenEvent[]): number => {
-  const metricsTotal = metrics.reduce((total, metric) => total + metric.locksReopened, 0);
-  return Math.max(metricsTotal, reopenQueue.length);
-};
-
 export const aggregateDashboardOverview = (
   activeLocks: ReviewLockRecord[],
   reopenQueue: ReopenEvent[],
-  dailyMetrics: DailyMetrics[],
+  metricTotals: { reportsSuppressed: number; locksReopened: number },
   topChurnTargets: TargetMetrics[],
   runtimeStatus: RuntimeProofStatus,
+  activeLockCount = activeLocks.length,
 ): DashboardOverview => ({
-  activeLockCount: activeLocks.length,
-  reportsSuppressed: totalSuppressed(dailyMetrics),
-  reopenedAfterEditCount: totalReopened(dailyMetrics, reopenQueue),
+  activeLockCount,
+  reportsSuppressed: metricTotals.reportsSuppressed,
+  reopenedAfterEditCount: Math.max(metricTotals.locksReopened, reopenQueue.length),
   latestReopenEvent: reopenQueue[0],
   topChurnTargets,
   runtimeStatus,
@@ -63,15 +56,25 @@ export const getDashboardData = async (
   dailyMetrics: DailyMetrics[];
 }> => {
   const limit = options.limit ?? MAX_ACTIVE_LOCKS;
-  const [activeLocks, reopenQueue, auditEvents, dailyMetrics, topChurnTargets, runtimeStatus] =
-    await Promise.all([
-      listActiveLocks(redis, options.subreddit, limit),
-      listOpenReopenEvents(redis, options.subreddit, MAX_REOPEN_EVENTS),
-      listAuditEvents(redis, options.subreddit, MAX_AUDIT_EVENTS),
-      listDailyMetrics(redis, options.subreddit, MAX_DAILY_METRICS),
-      listTopTargetMetrics(redis, options.subreddit, 10),
-      loadRuntimeProofStatus(redis, options.subreddit, options.now),
-    ]);
+  const [
+    activeLocks,
+    activeLockCount,
+    reopenQueue,
+    auditEvents,
+    dailyMetrics,
+    metricTotals,
+    topChurnTargets,
+    runtimeStatus,
+  ] = await Promise.all([
+    listActiveLocks(redis, options.subreddit, limit),
+    countActiveLocks(redis, options.subreddit),
+    listOpenReopenEvents(redis, options.subreddit, MAX_REOPEN_EVENTS),
+    listAuditEvents(redis, options.subreddit, MAX_AUDIT_EVENTS),
+    listDailyMetrics(redis, options.subreddit, MAX_DAILY_METRICS),
+    sumDailyMetrics(redis, options.subreddit),
+    listTopTargetMetrics(redis, options.subreddit, 10),
+    loadRuntimeProofStatus(redis, options.subreddit, options.now),
+  ]);
 
   return {
     generatedAt: options.now ?? new Date().toISOString(),
@@ -79,9 +82,10 @@ export const getDashboardData = async (
     overview: aggregateDashboardOverview(
       activeLocks,
       reopenQueue,
-      dailyMetrics,
+      metricTotals,
       topChurnTargets,
       runtimeStatus,
+      activeLockCount,
     ),
     activeLocks,
     reopenQueue,

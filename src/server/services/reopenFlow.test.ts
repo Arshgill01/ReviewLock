@@ -168,13 +168,17 @@ describe('breakLockForChangedContent', () => {
   it('records unignore failure but still shows reopened item', async () => {
     const dependencies = await deps(target({ body: 'Edited body', edited: true }));
     dependencies.reddit.failOperation('unignoreReports', 'permission denied');
-    const result = await breakLockForChangedContent(dependencies, { targetId: 't3_post' });
+    const result = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
 
     expect(result.action).toBe('reopened');
     expect(result.warnings).toContain('unignoreReports failed for t3_post');
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
     expect(await loadRuntimeProofStatus(dependencies.redis, 'alpha')).toMatchObject({
       capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
         expect.objectContaining({
           name: 'unignoreReports',
           status: 'failed',

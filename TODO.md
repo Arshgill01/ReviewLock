@@ -154,3 +154,6 @@
 - [x] Reconcile update-trigger runtime proof from durable reopen audits with strict reason matching.
 - [x] Preserve live subreddit context when reloaded demo URLs use the demo namespace.
 - [x] Require update-trigger runtime proof audits to match the trigger target kind.
+- [x] Classify client dashboard failures into actionable moderator recovery notices.
+- [x] Require update-trigger runtime proof to include successful report unignore.
+- [x] Keep dashboard headline counts independent from bounded display lists.

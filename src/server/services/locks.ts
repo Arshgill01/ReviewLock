@@ -111,6 +111,16 @@ export const listActiveLocks = async (
   return locks.filter((lock): lock is ReviewLockRecord => lock?.status === 'active');
 };
 
+export const countActiveLocks = async (
+  redis: RedisStore,
+  subreddit: string,
+): Promise<number> => {
+  const entries = await redis.zRange(keys.activeLocks(subreddit), 0, -1, true);
+  const locks = await Promise.all(entries.map((entry) => getLock(redis, subreddit, entry.member)));
+
+  return locks.filter((lock): lock is ReviewLockRecord => lock?.status === 'active').length;
+};
+
 export const incrementLockSuppression = async (
   redis: RedisStore,
   lock: ReviewLockRecord,

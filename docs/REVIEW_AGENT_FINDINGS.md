@@ -2522,6 +2522,92 @@
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
 
+## 2026-05-26 01:14 IST - Finding
+
+- Severity: medium
+- Area: Update-trigger audit reconciliation can verify edit-break proof when `unignoreReports()` failed.
+- Evidence:
+  - `breakLockForChangedContent()` records `unignoreReportsOk: unignoreResult?.ok ?? false` in the `lock_reopened` audit data after changed content reopens: `src/server/services/reopenFlow.ts:197-211`.
+  - `capabilityFromUpdateAudit()` verifies the update-trigger capability from that audit using only known `triggerCapabilityName`, matching reason, and matching target kind; it does not inspect `event.data.unignoreReportsOk`: `src/server/services/runtimeProof.ts:191-214`.
+  - The existing unignore-failure regression proves the lock is reopened and the `unignoreReports` capability becomes `failed`, but it does not pass `triggerCapabilityName` or assert the corresponding update-trigger row stays unverified when unignore fails: `src/server/services/reopenFlow.test.ts:168-185`.
+  - Runtime proof docs describe verified post/comment update trigger delivery as the edit-break path that reopened the lock and surfaced it back to the queue: `docs/RUNTIME_PROOF.md:109-110`.
+- Why it matters: fail-open reopening is correct, but a green `postUpdateTrigger` or `commentUpdateTrigger` row can overstate the full edit-break loop if Reddit reports are still ignored because `unignoreReports()` failed. The separate `unignoreReports` row may be failed, but the trigger row evidence text still reads as durable reopen proof for the target. Judges inspecting capability rows could see the update trigger as verified even though the lock did not fully return reports to normal handling.
+- Suggested fix: decide the proof boundary explicitly. If update-trigger proof is meant to prove the complete edit-break moderation loop, require `event.data.unignoreReportsOk === true` before reconciling update-trigger audits, and add a regression with `triggerCapabilityName` plus forced unignore failure. If the row is only meant to prove Devvit trigger delivery and local reopen queueing, change the capability notes/docs to say that unignore success is tracked separately and keep a regression proving the failed `unignoreReports` row remains visible beside the verified trigger row.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/runtimeProof.ts`, `src/server/services/reopenFlow.test.ts`, `docs/RUNTIME_PROOF.md`.
+
+## 2026-05-26 01:16 IST - Finding
+
+- Severity: medium
+- Area: Dashboard headline active-lock count is capped by the display list limit.
+- Evidence:
+  - `MAX_ACTIVE_LOCKS` is `50`: `src/shared/constants.ts:5`.
+  - `getDashboardData()` loads active locks with `listActiveLocks(redis, options.subreddit, limit)` where `limit` defaults to `MAX_ACTIVE_LOCKS`: `src/server/services/dashboard.ts:65-69`.
+  - `aggregateDashboardOverview()` sets `activeLockCount` to `activeLocks.length`, so the overview count cannot exceed the loaded display list length: `src/server/services/dashboard.ts:38-51`.
+  - `listActiveLocks()` itself reads only the requested sorted-set range: `src/server/services/locks.ts:103-111`.
+  - The high-volume dashboard test seeds `MAX_ACTIVE_LOCKS + 20` active locks and asserts the returned list is capped, but it does not assert that `overview.activeLockCount` reflects the true 70 active locks rather than the capped 50: `src/server/services/dashboard.test.ts:144-220`.
+- Why it matters: the first-viewport metric is supposed to show how many reviewed items are locked. For larger communities, the dashboard can understate active locks as soon as more than 50 locks exist. That makes the cap look like a product scale limit instead of a UI display limit and weakens the measurable-impact story.
+- Suggested fix: separate list limits from aggregate counts. Add a `countActiveLocks()` helper that counts the active-lock sorted-set members without truncating, or store/maintain an active-lock counter. Use that true count for `overview.activeLockCount` while keeping the table capped at `MAX_ACTIVE_LOCKS`. Add a regression that seeds `MAX_ACTIVE_LOCKS + 20` locks and expects `data.activeLocks.length === MAX_ACTIVE_LOCKS` but `data.overview.activeLockCount === MAX_ACTIVE_LOCKS + 20`.
+- Files reviewed: `src/shared/constants.ts`, `src/server/services/dashboard.ts`, `src/server/services/dashboard.test.ts`, `src/server/services/locks.ts`.
+
+## 2026-05-26 01:18 IST - Finding
+
+- Severity: medium
+- Area: Dashboard "Reports suppressed" headline is a capped 30-day slice but reads like an unqualified total.
+- Evidence:
+  - `getDashboardData()` loads daily metrics through `listDailyMetrics(redis, options.subreddit, MAX_DAILY_METRICS)`: `src/server/services/dashboard.ts:65-72`.
+  - `MAX_DAILY_METRICS` is `30`: `src/shared/constants.ts:8`.
+  - `listDailyMetrics()` only reads the requested sorted-set range, so older daily metric records are not included in the returned metrics array: `src/server/services/metrics.ts:155-170`.
+  - `aggregateDashboardOverview()` computes `reportsSuppressed` by summing only the loaded `dailyMetrics`: `src/server/services/dashboard.ts:30-47`.
+  - The first-viewport metric label and tooltip say `Reports suppressed` without indicating a 30-day/recent window: `src/client/components/MetricStrip.ts:15-18`.
+- Why it matters: the app's strongest impact proof is suppressed report churn. If a community has more than 30 days of use, the headline can understate total value while presenting the number as a total. That is a claim/documentation mismatch and can confuse judges or moderators comparing dashboard totals to the audit/history.
+- Suggested fix: either make the UI label explicit, such as `Reports suppressed, 30d`, and document the window in dashboard/API docs, or maintain a cumulative metric counter separate from the bounded daily chart. Add a regression with `MAX_DAILY_METRICS + 5` daily records that asserts the intended behavior: either the overview is labeled/windowed or the total includes all persisted days.
+- Files reviewed: `src/server/services/dashboard.ts`, `src/server/services/metrics.ts`, `src/shared/constants.ts`, `src/client/components/MetricStrip.ts`.
+
+## 2026-05-26 01:20 IST - Finding
+
+- Severity: low
+- Area: Initial-load error guidance can mention demo mode without rendering a demo action.
+- Evidence:
+  - The initial-load error branch renders only the notice text and a single `Retry` button when `store.error && !store.overview`: `src/client/pages/DashboardPage.ts:58-69`.
+  - `classifyClientNotice()` tells users to "switch to labeled demo data" for runtime-unavailable errors: `src/client/state/clientNotice.ts:39-50`.
+  - Static-preview/API-unavailable errors say "or use demo mode": `src/client/state/clientNotice.ts:80-91`.
+  - The new render tests cover retryable initial-load errors and subreddit-context guidance, but they do not cover runtime-unavailable or static-preview notices on the full-page error branch, nor do they assert that a demo toggle/action is present when the text recommends demo mode: `src/client/render.test.ts:322-348`.
+- Why it matters: demo mode is the judge-facing fallback for non-live contexts. If the dashboard fails before any overview has loaded, the UI can instruct a reviewer to use demo mode while only giving them Retry. That can turn a recoverable static-preview/runtime-context failure into a dead end during judging or screenshots.
+- Suggested fix: either render the Live/Demo toggle or a dedicated `Try demo` action on initial-load notices whose action copy references demo mode, or change those action strings to only recommend a path that the current screen can perform. Add a render regression for a static-preview error asserting either `data-action="toggle-mode" data-mode="demo"` is present or the notice copy does not mention demo mode.
+- Files reviewed: `src/client/pages/DashboardPage.ts`, `src/client/state/clientNotice.ts`, `src/client/render.test.ts`.
+
+## 2026-05-26 01:18 IST - Integration Status
+
+- Resolved medium finding added at 01:14: update-trigger proof reconciliation
+  now requires concrete successful unignore evidence before durable reopen
+  audits can upgrade granular update trigger capability rows.
+- Resolved medium finding added at 01:16: dashboard overview active-lock count
+  now uses an uncapped active-lock count while keeping the displayed active-lock
+  list bounded by `MAX_ACTIVE_LOCKS`.
+- Resolved medium finding added at 01:18: dashboard overview reports-suppressed
+  count now uses cumulative daily metric totals while keeping the daily chart
+  bounded by `MAX_DAILY_METRICS`.
+- Regressions added for high-volume active-lock count, cumulative suppressed
+  reports, strict update-trigger proof reconciliation, and client notice
+  classification/rendering.
+- Resolved low finding added at 01:20: the initial-load error view now renders
+  a direct demo-mode action alongside Retry when not already in demo mode.
+- Focused validation:
+  - `npm run type-check` PASS.
+  - `npm run test -- src/server/services/dashboard.test.ts src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts src/client/state/clientNotice.test.ts src/client/render.test.ts --reporter verbose`
+    PASS, 5 files / 53 tests.
+  - `npm run test -- src/client/state/clientNotice.test.ts src/client/render.test.ts --reporter verbose`
+    PASS, 2 files / 21 tests after the demo-action regression.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 41 files / 326 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.
+
 ## 2026-05-26 01:00 IST - Finding
 
 - Severity: medium

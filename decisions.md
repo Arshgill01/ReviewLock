@@ -1955,3 +1955,60 @@ Reason:
 
 - Post-only runtime rows such as flair, NSFW, and spoiler updates must not be
   verified by partial legacy audits or comment-target reopen records.
+
+### D113 - Dashboard failures get actionable client notices
+
+ReviewLock's dashboard can fail from several distinct runtime states: Devvit
+context mismatch, static preview without live API routes, unavailable runtime
+dependencies, network failure, or malformed API responses.
+
+Decision:
+
+- Classify client-side dashboard errors into a small notice taxonomy before
+  rendering error states.
+- Preserve the raw error text while adding a concrete moderator recovery action.
+- Keep these notices non-destructive: no live mutation is suggested while state
+  is stale or unverified.
+
+Reason:
+
+- A raw error string is hard to act on during live judging or moderation. The
+  dashboard should make the next safe step obvious without hiding the exact
+  failure.
+
+### D114 - Update-trigger proof includes successful report unignore
+
+An edit-trigger can correctly reopen a lock even when the Reddit
+`unignoreReports()` operation fails.
+
+Decision:
+
+- Continue failing open by surfacing the reopened item when `unignoreReports()`
+  fails.
+- Do not mark the update-trigger runtime proof row verified from that reopen.
+- Reconcile update-trigger audit proof only when `unignoreReportsOk` is true.
+
+Reason:
+
+- ReviewLock's runtime proof for the edit-break loop should mean content was
+  resolved, lock state reopened, and reports were unignored. A reopen with a
+  failed unignore remains visible operationally, but it is not complete proof
+  of the loop.
+
+### D115 - Dashboard headline totals are not display-window counts
+
+Dashboard lists are intentionally bounded, but first-viewport headline metrics
+represent product impact.
+
+Decision:
+
+- Count all active lock records for `activeLockCount`, even when the rendered
+  active-lock table is capped.
+- Sum all persisted daily metrics for `reportsSuppressed` and
+  `reopenedAfterEditCount`, while still keeping the daily chart/list response
+  bounded.
+
+Reason:
+
+- Display limits should protect the UI, not understate product value for larger
+  communities.

@@ -240,7 +240,7 @@ export const breakLockForChangedContent = async (
         };
       }
 
-      if (resolution.target) {
+      if (resolution.target && unignoreResult?.ok) {
         await recordUpdateTriggerProcessed(
           deps,
           lock.subreddit,

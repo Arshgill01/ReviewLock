@@ -238,6 +238,7 @@ describe('runtime proof status', () => {
       data: {
         reason: 'flair_changed',
         triggerCapabilityName: 'postFlairUpdateTrigger',
+        unignoreReportsOk: true,
       },
       demo: false,
     });
@@ -329,6 +330,25 @@ describe('runtime proof status', () => {
       data: {
         reason: 'flair_changed',
         triggerCapabilityName: 'postFlairUpdateTrigger',
+        unignoreReportsOk: true,
+      },
+      demo: false,
+    });
+
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-unignore-failed',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_unignore_failed',
+      targetKind: 'post',
+      lockId: 'lock-unignore-failed',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:05:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+        unignoreReportsOk: false,
       },
       demo: false,
     });

@@ -5,6 +5,7 @@ import { renderLockTable } from '../components/LockTable';
 import { renderMetricStrip } from '../components/MetricStrip';
 import { renderLatestReopenEvent, renderReopenQueue } from '../components/ReopenQueue';
 import { renderRuntimeBanner } from '../components/RuntimeBanner';
+import { classifyClientNotice } from '../state/clientNotice';
 import type { ReviewLockStore } from '../state/store';
 
 const text = (value: string | undefined): string =>
@@ -55,16 +56,29 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
   }
 
   if (store.error && !store.overview) {
+    const notice = classifyClientNotice(store.error);
+
     return `
       <main class="shell shell-centered">
         <section class="panel panel-error">
           <h1>ReviewLock</h1>
-          <p>${text(store.error)}</p>
-          <button class="button" data-action="retry-fetch">Retry</button>
+          <strong>${text(notice.title)}</strong>
+          <p>${text(notice.message)}</p>
+          <p class="error-action">${text(notice.action)}</p>
+          <div class="error-actions">
+            <button class="button" data-action="retry-fetch">Retry</button>
+            ${
+              store.demo
+                ? ''
+                : '<button class="button button-secondary" data-action="toggle-mode" data-mode="demo">Demo</button>'
+            }
+          </div>
         </section>
       </main>
     `;
   }
+
+  const inlineNotice = store.error ? classifyClientNotice(store.error) : undefined;
 
   return `
     ${renderDemoBanner(store.demo)}
@@ -86,10 +100,11 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
       </header>
 
       ${
-        store.error
+        inlineNotice
           ? `<section class="panel panel-error-inline" role="alert">
-              <strong>Dashboard refresh failed.</strong>
-              <span>${text(store.error)}</span>
+              <strong>${text(inlineNotice.title)}</strong>
+              <span>${text(inlineNotice.message)}</span>
+              <span class="error-action">${text(inlineNotice.action)}</span>
               <button class="button button-secondary button-compact" data-action="retry-fetch">Retry</button>
             </section>`
           : ''

@@ -256,9 +256,16 @@ a:hover {
   margin: 0 0 12px;
 }
 
+.panel-error strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
 .panel-error p {
   color: var(--muted);
-  margin: 0 0 20px;
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
 }
 
 .panel-error-inline {
@@ -277,6 +284,22 @@ a:hover {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.error-action {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.error-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.panel-error-inline .error-action {
+  flex: 0 1 260px;
 }
 
 .content-grid {
@@ -897,6 +920,10 @@ code {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+
+  .panel-error-inline .error-action {
+    flex-basis: auto;
   }
 
   table {

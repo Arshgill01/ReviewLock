@@ -207,9 +207,11 @@ describe('dashboard aggregation', () => {
     });
 
     expect(data.activeLocks).toHaveLength(MAX_ACTIVE_LOCKS);
+    expect(data.overview.activeLockCount).toBe(lockCount);
     expect(data.reopenQueue).toHaveLength(MAX_REOPEN_EVENTS);
     expect(data.auditEvents).toHaveLength(MAX_AUDIT_EVENTS);
     expect(data.dailyMetrics).toHaveLength(MAX_DAILY_METRICS);
+    expect(data.overview.reportsSuppressed).toBe(dailyCount + 120);
     expect(data.overview.topChurnTargets).toHaveLength(10);
     expect(data.activeLocks[0]?.id).toBe('lock-069');
     expect(data.reopenQueue[0]?.id).toBe('event-064');

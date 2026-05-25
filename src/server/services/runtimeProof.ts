@@ -208,6 +208,10 @@ const capabilityFromUpdateAudit = (event: AuditEvent): RuntimeProofCapability | 
     return undefined;
   }
 
+  if (event.data.unignoreReportsOk !== true) {
+    return undefined;
+  }
+
   return {
     name: capabilityName,
     status: 'verified',
