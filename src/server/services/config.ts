@@ -1,5 +1,5 @@
 import { DEFAULT_LOCK_EXPIRY_DAYS, LOCK_REASON_PRESETS } from '../../shared/constants';
-import type { ReviewLockConfig } from '../../shared/schema';
+import { isReviewLockConfig, type ReviewLockConfig } from '../../shared/schema';
 import type { RedisStore } from '../adapters/redis';
 import { keys } from './keys';
 
@@ -26,13 +26,22 @@ export const defaultConfig = (
   updatedAt: now,
 });
 
-export const loadConfig = async (redis: RedisStore, subreddit: string): Promise<ReviewLockConfig> =>
-  parseJson<ReviewLockConfig>(await redis.get(keys.config(subreddit))) ?? defaultConfig(subreddit);
+export const loadConfig = async (redis: RedisStore, subreddit: string): Promise<ReviewLockConfig> => {
+  const parsed = parseJson<unknown>(await redis.get(keys.config(subreddit)));
+
+  return isReviewLockConfig(parsed) && parsed.subreddit === subreddit
+    ? parsed
+    : defaultConfig(subreddit);
+};
 
 export const saveConfig = async (
   redis: RedisStore,
   config: ReviewLockConfig,
 ): Promise<ReviewLockConfig> => {
+  if (!isReviewLockConfig(config)) {
+    throw new Error('Invalid ReviewLock config.');
+  }
+
   await redis.set(keys.config(config.subreddit), JSON.stringify(config));
   return config;
 };

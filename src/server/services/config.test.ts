@@ -33,4 +33,69 @@ describe('config persistence', () => {
       demoModeEnabled: false,
     });
   });
+
+  it('loads defaults for valid JSON with malformed config shape', async () => {
+    const redis = new InMemoryRedisStore();
+
+    for (const malformed of [
+      {},
+      {
+        subreddit: 'alpha',
+        lockExpiryDays: 'forever',
+        demoModeEnabled: false,
+        reasonPresets: ['reviewed_policy_compliant'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      },
+      {
+        subreddit: 'alpha',
+        lockExpiryDays: 0,
+        demoModeEnabled: false,
+        reasonPresets: ['reviewed_policy_compliant'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      },
+      {
+        subreddit: 'alpha',
+        lockExpiryDays: 30,
+        demoModeEnabled: false,
+        reasonPresets: ['unexpected_reason'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      },
+    ]) {
+      await redis.set(keys.config('alpha'), JSON.stringify(malformed));
+
+      await expect(loadConfig(redis, 'alpha')).resolves.toMatchObject({
+        subreddit: 'alpha',
+        lockExpiryDays: 30,
+        demoModeEnabled: false,
+      });
+    }
+  });
+
+  it('loads defaults when config belongs to another subreddit', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(
+      keys.config('alpha'),
+      JSON.stringify({
+        ...defaultConfig('beta', '2026-05-24T00:00:00.000Z'),
+        demoModeEnabled: true,
+      }),
+    );
+
+    await expect(loadConfig(redis, 'alpha')).resolves.toMatchObject({
+      subreddit: 'alpha',
+      demoModeEnabled: false,
+    });
+  });
+
+  it('rejects invalid config writes', async () => {
+    const redis = new InMemoryRedisStore();
+
+    await expect(
+      saveConfig(redis, {
+        ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
+        lockExpiryDays: 0,
+      }),
+    ).rejects.toThrow('Invalid ReviewLock config.');
+    await expect(redis.get(keys.config('alpha'))).resolves.toBeUndefined();
+  });
 });

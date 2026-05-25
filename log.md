@@ -2128,3 +2128,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:45 IST - Config record validation hardening
+
+- Added shared schema validation for `ReviewLockConfig`.
+- `loadConfig` now rejects malformed config JSON, invalid reason presets,
+  non-positive expiry days, and config records whose embedded subreddit does
+  not match the Redis namespace being loaded.
+- `saveConfig` now rejects invalid config objects instead of writing them to
+  Redis.
+- Focused validation:
+  - `npm run test -- src/server/services/config.test.ts src/shared/schema.test.ts --reporter verbose`
+  - PASS, 2 test files and 11 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 345 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

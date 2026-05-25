@@ -3,6 +3,7 @@ import {
   isAuditEventKind,
   isLockStatus,
   isReopenReason,
+  isReviewLockConfig,
   isTargetKind,
 } from './schema';
 
@@ -29,5 +30,35 @@ describe('domain validators', () => {
     expect(isAuditEventKind('report_suppressed')).toBe(true);
     expect(isAuditEventKind('demo_reset')).toBe(true);
     expect(isAuditEventKind('reporter_saved')).toBe(false);
+  });
+
+  it('validates ReviewLock config shape', () => {
+    expect(
+      isReviewLockConfig({
+        subreddit: 'alpha',
+        lockExpiryDays: 30,
+        demoModeEnabled: false,
+        reasonPresets: ['reviewed_policy_compliant', 'repeat_report_churn'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      }),
+    ).toBe(true);
+    expect(
+      isReviewLockConfig({
+        subreddit: 'alpha',
+        lockExpiryDays: 0,
+        demoModeEnabled: false,
+        reasonPresets: ['reviewed_policy_compliant'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      }),
+    ).toBe(false);
+    expect(
+      isReviewLockConfig({
+        subreddit: 'alpha',
+        lockExpiryDays: 30,
+        demoModeEnabled: false,
+        reasonPresets: ['unexpected_reason'],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      }),
+    ).toBe(false);
   });
 });

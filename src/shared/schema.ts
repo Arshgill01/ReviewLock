@@ -230,6 +230,9 @@ const isNumber = (value: unknown): value is number =>
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(isString);
 
+const isLockReasonPresetArray = (value: unknown): value is LockReasonPreset[] =>
+  Array.isArray(value) && value.every(isLockReasonPreset);
+
 const isAuditData = (
   value: unknown,
 ): value is Record<string, string | number | boolean | null | undefined> =>
@@ -321,3 +324,12 @@ export const isTargetMetrics = (value: unknown): value is TargetMetrics =>
   isNumber(value.locksReopened) &&
   isString(value.lastActivityAt) &&
   isBoolean(value.demo);
+
+export const isReviewLockConfig = (value: unknown): value is ReviewLockConfig =>
+  isRecord(value) &&
+  isString(value.subreddit) &&
+  isNumber(value.lockExpiryDays) &&
+  value.lockExpiryDays > 0 &&
+  isBoolean(value.demoModeEnabled) &&
+  isLockReasonPresetArray(value.reasonPresets) &&
+  isString(value.updatedAt);
