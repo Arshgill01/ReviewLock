@@ -2344,3 +2344,145 @@
 - Why it matters: A moderator can see an item in the reopen queue while ReviewLock still treats the same target as actively locked. Future report triggers can continue to evaluate the stale active lock, and a retry can enqueue another reopen event for the same old lock. That undercuts the clean "lock breaks and returns to review" state model.
 - Suggested fix: Reorder the stale-relock transition so the old active lock cannot remain active after a durable queue write, or compensate by removing the queued reopen event if status/index mutation fails. Add a regression that fails `keys.lock(...)`, `keys.activeLocks(...)`, `keys.activeLocksByTarget(...)`, or `keys.targetLock(...)` during `markLockReopenedAfterQueue()` after `enqueueReopenEvent()` has succeeded, asserting the final state is either active-with-no-queue or reopened-with-queue.
 - Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/reopenQueue.ts`, `src/server/services/locks.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:41 IST - Finding
+
+- Severity: medium
+- Area: Manual unlock can lose the required `lock_unlocked` audit after the lock is already inactive.
+- Evidence:
+  - `unlockReviewedContent()` calls `unignoreReports()`, records runtime proof, then persists the lock as `unlocked` via `updateLockStatus()`: `src/server/services/unlockFlow.ts:82-127`.
+  - Only after the active indexes have been removed does it append the `lock_unlocked` audit event: `src/server/services/unlockFlow.ts:160-172`.
+  - That final audit write is not wrapped in a compensating catch. If `appendAuditEvent()` throws, the service rejects after the lock is no longer active, and a retry returns "No active ReviewLock lock was found" before it can recreate the missing audit: `src/server/services/unlockFlow.ts:64-70`, `src/server/services/unlockFlow.ts:160-180`.
+  - Current unlock tests cover successful unlock, `updateLockStatus()` failure after `unignoreReports()`, stale lock id, subreddit mismatch, and `unignoreReports()` failure, but not a final `lock_unlocked` audit failure after status persistence succeeds: `src/server/services/unlockFlow.test.ts:63-200`.
+- Why it matters: Manual unlock is one of the human-confirmed state transitions required by the product. Losing the audit after Reddit reports have been returned to normal handling and the active lock index has been cleared leaves moderators without a durable ledger entry explaining who unlocked the content.
+- Suggested fix: Catch `lock_unlocked` audit failures after the status transition and write a compensating `runtime_failure` audit if possible, mirroring the reopen audit hardening. Add a regression that fails `keys.auditEvent(...)` or `keys.audit(...)` for the unlock success audit after `updateLockStatus()` succeeds, asserting the final state is inactive and the dashboard/audit trail still exposes the audit persistence failure.
+- Files reviewed: `src/server/services/unlockFlow.ts`, `src/server/services/unlockFlow.test.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:45 IST - Integration Status
+
+- Resolved medium finding added at 00:32: report-trigger rollback now attempts
+  a suppressed-report metric decrement whenever the lock suppression counter
+  moved, including partial metric helper failures before the helper returns.
+  Regression added in `src/server/services/reportTriggers.test.ts` for
+  target-record, daily-index, and target-index metric persistence failures.
+- Resolved medium finding added at 00:33: stale relock now removes the queued
+  reopen event best-effort when a stale-reopen transition fails and the old
+  lock still resolves as the active lock. Regression added in
+  `src/server/services/lockFlow.test.ts`.
+- Resolved medium finding added at 00:41: manual unlock now writes a
+  compensating `runtime_failure` audit when the success `lock_unlocked` audit
+  fails after unlock state is persisted. Regression added in
+  `src/server/services/unlockFlow.test.ts`.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+    PASS, 1 file / 29 tests.
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+    PASS, 1 file / 14 tests.
+  - `npm run test -- src/server/services/unlockFlow.test.ts src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts --reporter verbose`
+    PASS, 3 files / 50 tests.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 304 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+
+## 2026-05-26 00:45 IST - Finding
+
+- Severity: medium
+- Area: Lock creation rollback can leave created-lock metrics behind after removing the lock.
+- Evidence:
+  - The lock success path saves the active lock, records created-lock metrics, then appends the `lock_created` audit event: `src/server/services/lockFlow.ts:402-419`.
+  - Any failure in that block falls into the rollback catch. When `unignoreReports()` succeeds, the catch removes the lock and active indexes, then returns `ok: false`: `src/server/services/lockFlow.ts:427-466`.
+  - The rollback does not undo `recordLockCreatedMetric()` if metrics already returned before a later `lock_created` audit failure. It also cannot undo partial writes inside `recordLockCreatedMetric()` if daily metrics persist but target metrics or an index write fails: `src/server/services/metrics.ts:168-189`.
+  - Current lock-flow regressions fail the first metrics `set`, proving no `lock_created` audit remains and active indexes are removed, but they do not fail the later success audit after metrics have incremented or a later metrics sub-write after the daily record persists: `src/server/services/lockFlow.test.ts:560-598`.
+- Why it matters: ReviewLock can return "not locked", call `unignoreReports()`, remove the local lock, and still show an extra created lock in daily/target metrics. That overstates the core dashboard story and makes "active locks" disagree with "locks created" for failed attempts.
+- Suggested fix: Make created-lock metrics part of the same compensating boundary as lock persistence, or add a decrement/rollback helper for `locksCreated` analogous to suppressed-report rollback. Add regressions that fail the `lock_created` audit after metrics succeed, and fail `keys.metricsTarget(...)`, `keys.metricsDailyIndex(...)`, or `keys.metricsTargetIndex(...)` after daily lock-created metrics have been written.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:47 IST - Integration Status
+
+- Resolved medium finding added at 00:45: lock creation rollback now calls a
+  compensating `decrementLockCreatedMetric()` after a saved lock is removed
+  during successful Reddit rollback.
+- Regression added in `src/server/services/lockFlow.test.ts` for
+  `lock_created` audit failure after created-lock metrics succeeded.
+- Regression added in `src/server/services/lockFlow.test.ts` for partial
+  created-lock metric failures at target-record, daily-index, and target-index
+  write points.
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+    PASS, 1 file / 16 tests.
+- Full validation superseded by the 00:51 integration validation after the
+  metric snapshot/restore changes landed.
+
+## 2026-05-26 00:43 IST - Finding
+
+- Severity: medium
+- Area: Suppression metric rollback can now undercount previously valid suppressions when the metric write fails before incrementing.
+- Evidence:
+  - The current report-trigger catch now calls `decrementSuppressedReportMetric()` whenever the lock counter was incremented, regardless of whether `incrementSuppressedReportMetric()` wrote any daily or target metric data: `src/server/services/reportTriggers.ts:313-348`.
+  - `incrementSuppressedReportMetric()` can fail before changing metrics, for example on the first `saveDailyMetrics()` `set`: `src/server/services/metrics.ts:191-212`, `src/server/services/metrics.ts:94-103`.
+  - `decrementSuppressedReportMetric()` subtracts one from any existing daily and target counters, bounded at zero: `src/server/services/metrics.ts:214-237`.
+  - The existing regression for early daily-metric failure sets `keys.metricsDaily(...)` to throw before any metric write, but it only asserts lock counters and dedupe cleanup; it does not seed prior metrics or assert the daily/target counters remain unchanged: `src/server/services/reportTriggers.test.ts:845-884`.
+- Why it matters: If a subreddit already has valid "Reports suppressed" metrics and a later report trigger hits a Redis failure before writing this delivery's metric increment, ReviewLock will roll back Reddit suppression and lock counters but also decrement an unrelated prior suppression. That makes the dashboard understate the core churn-reduction metric.
+- Suggested fix: Make `incrementSuppressedReportMetric()` internally compensating and report whether it actually wrote an increment, or snapshot the previous daily/target metric values and restore them on failure. Add a regression that seeds `reportsSuppressed: 3`, fails the first daily metric write for the next report, and asserts daily and target counters remain `3` after rollback.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/metrics.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:44 IST - Finding
+
+- Severity: medium
+- Area: Reopen audit hardening still misses metrics failures before the audit write.
+- Evidence:
+  - Update-trigger reopen enqueues the reopen event, marks the lock `reopened`, then calls `incrementReopenedMetric()` before entering the new `lock_reopened` audit `try/catch`: `src/server/services/reopenFlow.ts:184-197`.
+  - Changed-report reopen follows the same ordering: queue event, mark lock reopened, increment reopened metrics, then enter the audit `try/catch`: `src/server/services/reportTriggers.ts:400-414`.
+  - If `incrementReopenedMetric()` throws, both services skip the success-audit catch entirely and fall to their outer catch handlers. The update path returns `runtime_uncertain` without writing any audit event: `src/server/services/reopenFlow.ts:260-280`. The report path clears dedupe and returns `runtime_uncertain`, also without a compensating audit: `src/server/services/reportTriggers.ts:496-520`.
+  - Current regressions cover audit-write failure after reopen state is committed, but not reopen-metric failure after queue/status persistence and before the audit block: `src/server/services/reopenFlow.test.ts:299-340`, `src/server/services/reportTriggers.test.ts:452-486`.
+- Why it matters: Edit-break reopen is the product's core loop and `lock_reopened` is a required audit kind. A metrics outage can leave a visible reopen queue item and inactive lock with no durable audit explaining why the lock broke or whether `unignoreReports()` succeeded.
+- Suggested fix: Treat `incrementReopenedMetric()` as part of the same post-reopen durability boundary as the audit write. Either catch metrics failures and append a `runtime_failure` audit, or move metrics after a durable reopen audit and make metrics best-effort. Add report-trigger and update-trigger regressions that fail `keys.metricsDaily(...)` or `keys.metricsTarget(...)` after queue/status writes, asserting a runtime-failure audit remains visible.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/reopenFlow.test.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/metrics.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:46 IST - Finding
+
+- Severity: medium
+- Area: Created-lock metric rollback can undercount prior successful locks when the failed attempt never incremented metrics.
+- Evidence:
+  - The current lock creation rollback tracks only `lockSaved`, which flips before `recordLockCreatedMetric()` is called: `src/server/services/lockFlow.ts:402-405`.
+  - In the rollback catch, any saved lock with successful `unignoreReports()` calls `decrementLockCreatedMetric()`, regardless of whether `recordLockCreatedMetric()` wrote an increment for this attempt: `src/server/services/lockFlow.ts:427-439`.
+  - `recordLockCreatedMetric()` can fail before changing metrics, for example on the first daily metric `set`: `src/server/services/metrics.ts:168-189`, `src/server/services/metrics.ts:94-103`.
+  - `decrementLockCreatedMetric()` subtracts one from any existing daily and target `locksCreated` counters, bounded at zero: `src/server/services/metrics.ts:191-214`.
+  - Current lock-flow regressions fail metrics with no seeded prior created-lock metrics, so an erroneous decrement is hidden at zero; they do not seed prior `locksCreated` counters and assert they remain unchanged when the failed attempt's metric write never happened: `src/server/services/lockFlow.test.ts:560-598`.
+- Why it matters: A transient Redis failure during one lock attempt can erase evidence of a previous successful lock from the dashboard. That makes ReviewLock understate successful moderation work and creates disagreement between the audit/lock history and aggregate metrics.
+- Suggested fix: Track whether `recordLockCreatedMetric()` actually incremented metrics, or make the metric helper internally compensating/restorative. Add a regression that seeds `locksCreated: 2`, fails the first daily metric write during the next lock attempt, and asserts daily and target `locksCreated` remain `2` after rollback.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/metrics.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:51 IST - Integration Status
+
+- Resolved medium finding added at 00:43: suppression metric rollback no longer
+  decrements previous valid metrics when the next attempt fails before this
+  attempt's metric increment. Regression added in
+  `src/server/services/reportTriggers.test.ts` with seeded prior
+  `reportsSuppressed: 3`.
+- Resolved medium finding added at 00:44: report-trigger and update-trigger
+  reopen paths now treat reopen metrics and success audit as one post-reopen
+  proof boundary, and write a compensating `runtime_failure` audit if either
+  fails after reopen state is visible. Regressions added in
+  `src/server/services/reportTriggers.test.ts` and
+  `src/server/services/reopenFlow.test.ts`.
+- Resolved medium finding added at 00:46: created-lock metric rollback no
+  longer decrements previous valid metrics when the failed lock attempt never
+  incremented. Regression added in `src/server/services/lockFlow.test.ts` with
+  seeded prior `locksCreated: 2`.
+- Metric increment helpers for lock-created, suppression, and reopened metrics
+  now snapshot and restore prior daily/target records on partial write failure.
+- Focused validation:
+  - `npm run test -- src/server/services/metrics.test.ts src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 4 files / 66 tests.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 310 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.

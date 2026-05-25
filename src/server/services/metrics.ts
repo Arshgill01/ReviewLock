@@ -115,6 +115,36 @@ const saveTargetMetrics = async (
   return metrics;
 };
 
+const restoreDailyMetrics = async (
+  redis: RedisStore,
+  subreddit: string,
+  date: string,
+  previous: DailyMetrics | undefined,
+): Promise<void> => {
+  if (previous) {
+    await saveDailyMetrics(redis, previous);
+    return;
+  }
+
+  await redis.del(keys.metricsDaily(subreddit, date));
+  await redis.zRem(keys.metricsDailyIndex(subreddit), date);
+};
+
+const restoreTargetMetrics = async (
+  redis: RedisStore,
+  subreddit: string,
+  targetId: string,
+  previous: TargetMetrics | undefined,
+): Promise<void> => {
+  if (previous) {
+    await saveTargetMetrics(redis, previous);
+    return;
+  }
+
+  await redis.del(keys.metricsTarget(subreddit, targetId));
+  await redis.zRem(keys.metricsTargetIndex(subreddit), targetId);
+};
+
 export const getDailyMetrics = async (
   redis: RedisStore,
   subreddit: string,
@@ -173,19 +203,55 @@ export const recordLockCreatedMetric = async (
 ): Promise<void> =>
   withMetricsMutation(redis, target.subreddit, now, async () => {
     const date = now.slice(0, 10);
-    const daily =
-      (await getDailyMetrics(redis, target.subreddit, date)) ??
-      emptyDailyMetrics(target.subreddit, date, demo);
-    const targetMetrics =
-      (await getTargetMetrics(redis, target.subreddit, target.id)) ??
-      emptyTargetMetrics(target, now, demo);
+    const previousDaily = await getDailyMetrics(redis, target.subreddit, date);
+    const previousTargetMetrics = await getTargetMetrics(redis, target.subreddit, target.id);
+    const daily = previousDaily ?? emptyDailyMetrics(target.subreddit, date, demo);
+    const targetMetrics = previousTargetMetrics ?? emptyTargetMetrics(target, now, demo);
 
-    await saveDailyMetrics(redis, { ...daily, locksCreated: daily.locksCreated + 1 });
-    await saveTargetMetrics(redis, {
-      ...targetMetrics,
-      locksCreated: targetMetrics.locksCreated + 1,
-      lastActivityAt: now,
-    });
+    try {
+      await saveDailyMetrics(redis, { ...daily, locksCreated: daily.locksCreated + 1 });
+      await saveTargetMetrics(redis, {
+        ...targetMetrics,
+        locksCreated: targetMetrics.locksCreated + 1,
+        lastActivityAt: now,
+      });
+    } catch (error) {
+      await restoreDailyMetrics(redis, target.subreddit, date, previousDaily).catch(
+        () => undefined,
+      );
+      await restoreTargetMetrics(
+        redis,
+        target.subreddit,
+        target.id,
+        previousTargetMetrics,
+      ).catch(() => undefined);
+      throw error;
+    }
+  });
+
+export const decrementLockCreatedMetric = async (
+  redis: RedisStore,
+  target: ReviewLockTarget,
+  now: string,
+): Promise<void> =>
+  withMetricsMutation(redis, target.subreddit, now, async () => {
+    const date = now.slice(0, 10);
+    const daily = await getDailyMetrics(redis, target.subreddit, date);
+    const targetMetrics = await getTargetMetrics(redis, target.subreddit, target.id);
+
+    if (daily) {
+      await saveDailyMetrics(redis, {
+        ...daily,
+        locksCreated: Math.max(0, daily.locksCreated - 1),
+      });
+    }
+
+    if (targetMetrics) {
+      await saveTargetMetrics(redis, {
+        ...targetMetrics,
+        locksCreated: Math.max(0, targetMetrics.locksCreated - 1),
+      });
+    }
   });
 
 export const incrementSuppressedReportMetric = async (
@@ -196,19 +262,30 @@ export const incrementSuppressedReportMetric = async (
 ): Promise<void> =>
   withMetricsMutation(redis, target.subreddit, now, async () => {
     const date = now.slice(0, 10);
-    const daily =
-      (await getDailyMetrics(redis, target.subreddit, date)) ??
-      emptyDailyMetrics(target.subreddit, date, demo);
-    const targetMetrics =
-      (await getTargetMetrics(redis, target.subreddit, target.id)) ??
-      emptyTargetMetrics(target, now, demo);
+    const previousDaily = await getDailyMetrics(redis, target.subreddit, date);
+    const previousTargetMetrics = await getTargetMetrics(redis, target.subreddit, target.id);
+    const daily = previousDaily ?? emptyDailyMetrics(target.subreddit, date, demo);
+    const targetMetrics = previousTargetMetrics ?? emptyTargetMetrics(target, now, demo);
 
-    await saveDailyMetrics(redis, { ...daily, reportsSuppressed: daily.reportsSuppressed + 1 });
-    await saveTargetMetrics(redis, {
-      ...targetMetrics,
-      reportsSuppressed: targetMetrics.reportsSuppressed + 1,
-      lastActivityAt: now,
-    });
+    try {
+      await saveDailyMetrics(redis, { ...daily, reportsSuppressed: daily.reportsSuppressed + 1 });
+      await saveTargetMetrics(redis, {
+        ...targetMetrics,
+        reportsSuppressed: targetMetrics.reportsSuppressed + 1,
+        lastActivityAt: now,
+      });
+    } catch (error) {
+      await restoreDailyMetrics(redis, target.subreddit, date, previousDaily).catch(
+        () => undefined,
+      );
+      await restoreTargetMetrics(
+        redis,
+        target.subreddit,
+        target.id,
+        previousTargetMetrics,
+      ).catch(() => undefined);
+      throw error;
+    }
   });
 
 export const decrementSuppressedReportMetric = async (
@@ -244,17 +321,28 @@ export const incrementReopenedMetric = async (
 ): Promise<void> =>
   withMetricsMutation(redis, target.subreddit, now, async () => {
     const date = now.slice(0, 10);
-    const daily =
-      (await getDailyMetrics(redis, target.subreddit, date)) ??
-      emptyDailyMetrics(target.subreddit, date, demo);
-    const targetMetrics =
-      (await getTargetMetrics(redis, target.subreddit, target.id)) ??
-      emptyTargetMetrics(target, now, demo);
+    const previousDaily = await getDailyMetrics(redis, target.subreddit, date);
+    const previousTargetMetrics = await getTargetMetrics(redis, target.subreddit, target.id);
+    const daily = previousDaily ?? emptyDailyMetrics(target.subreddit, date, demo);
+    const targetMetrics = previousTargetMetrics ?? emptyTargetMetrics(target, now, demo);
 
-    await saveDailyMetrics(redis, { ...daily, locksReopened: daily.locksReopened + 1 });
-    await saveTargetMetrics(redis, {
-      ...targetMetrics,
-      locksReopened: targetMetrics.locksReopened + 1,
-      lastActivityAt: now,
-    });
+    try {
+      await saveDailyMetrics(redis, { ...daily, locksReopened: daily.locksReopened + 1 });
+      await saveTargetMetrics(redis, {
+        ...targetMetrics,
+        locksReopened: targetMetrics.locksReopened + 1,
+        lastActivityAt: now,
+      });
+    } catch (error) {
+      await restoreDailyMetrics(redis, target.subreddit, date, previousDaily).catch(
+        () => undefined,
+      );
+      await restoreTargetMetrics(
+        redis,
+        target.subreddit,
+        target.id,
+        previousTargetMetrics,
+      ).catch(() => undefined);
+      throw error;
+    }
   });

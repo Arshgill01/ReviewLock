@@ -1717,3 +1717,79 @@
   - `npm run build`
 - Pass/fail status: PASS for type-check, lint, 40 test files / 301 tests, and
   build.
+
+## 2026-05-26 00:44 IST - Reviewer hardening integration
+
+- Integrated reviewer finding: unchanged-report rollback now compensates
+  partial metric writes even when the metric helper throws before returning.
+  The rollback always attempts a suppressed-report metric decrement after the
+  lock-level counter moves.
+- Integrated reviewer finding: stale relock failures after queueing a reopen
+  event now remove that queued event if the old lock still resolves as active,
+  preserving active-with-no-queue or reopened-with-queue states.
+- Integrated reviewer finding: manual unlock now writes a compensating
+  `runtime_failure` audit if the required `lock_unlocked` audit fails after
+  the lock is already inactive.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+  - PASS, 1 test file and 29 tests.
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 1 test file and 14 tests.
+  - `npm run test -- src/server/services/unlockFlow.test.ts src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 3 test files and 50 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 304 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+
+## 2026-05-26 00:46 IST - Reviewer hardening integration
+
+- Integrated reviewer finding: lock creation rollback now compensates
+  `locksCreated` metrics when a saved lock is rolled back after metric or
+  success-audit persistence fails.
+- Added `decrementLockCreatedMetric()` and lock-flow regressions for success
+  audit failure after metrics succeeded, plus target-record, daily-index, and
+  target-index metric failures after partial created-lock writes.
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 1 test file and 16 tests.
+- Full validation:
+  - Superseded by the 00:50 validation pass after the metric snapshot/restore
+    changes landed.
+
+## 2026-05-26 00:50 IST - Reviewer hardening integration
+
+- Integrated reviewer finding: suppression metric rollback no longer
+  decrements prior valid metrics if the new attempt fails before incrementing.
+  Metric increment helpers now snapshot and restore prior daily/target records
+  on partial failure.
+- Integrated reviewer finding: created-lock metric rollback uses the same
+  snapshot/restore boundary and only decrements after the created-lock metric
+  helper returns successfully.
+- Integrated reviewer finding: report-trigger and update-trigger reopen flows
+  now write compensating `runtime_failure` audits when reopen metric
+  persistence fails after the reopen queue/status transition is already
+  visible.
+- Focused validation:
+  - `npm run test -- src/server/services/metrics.test.ts src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 4 test files and 66 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 310 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

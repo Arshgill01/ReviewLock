@@ -5,7 +5,7 @@ import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
 import { listAuditEvents } from './audit';
 import { getActiveLockByTarget, getLock, saveLock } from './locks';
-import { getDailyMetrics, getTargetMetrics } from './metrics';
+import { getDailyMetrics, getTargetMetrics, incrementSuppressedReportMetric } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { fingerprintTarget } from './fingerprint';
 import { handleReportTrigger } from './reportTriggers';
@@ -625,10 +625,54 @@ describe('handleReportTrigger', () => {
     expect(await listAuditEvents(redis, 'alpha')).toEqual([
       expect.objectContaining({
         kind: 'runtime_failure',
-        message: 'Report trigger reopened the lock, but the reopen audit failed.',
+        message: 'Report trigger reopened the lock, but post-reopen persistence failed.',
         data: expect.objectContaining({
-          operation: 'lockReopenedAudit',
+          operation: 'postReopenPersistence',
           error: 'report reopen audit down',
+        }),
+      }),
+    ]);
+  });
+
+  it('records runtime failure when changed-report reopen metrics fail after state is reopened', async () => {
+    class ReopenMetricsFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('reopen metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenMetricsFailingRedisStore();
+    await saveLock(redis, lock());
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target('Edited body')]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-reopen-metrics-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      message: 'Lock reopened, but ReviewLock could not persist post-reopen proof.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'Report trigger reopened the lock, but post-reopen persistence failed.',
+        data: expect.objectContaining({
+          operation: 'postReopenPersistence',
+          error: 'reopen metrics down',
         }),
       }),
     ]);
@@ -883,6 +927,48 @@ describe('handleReportTrigger', () => {
     expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-metric-fail')).toBe(false);
   });
 
+  it('keeps prior suppression metrics when the next metric write fails before incrementing', async () => {
+    class EarlyMetricWriteFailingRedisStore extends InMemoryRedisStore {
+      failMetricWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failMetricWrites && key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('daily metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new EarlyMetricWriteFailingRedisStore();
+    await saveLock(redis, lock());
+    await incrementSuppressedReportMetric(redis, target(), '2026-05-24T00:10:00.000Z');
+    await incrementSuppressedReportMetric(redis, target(), '2026-05-24T00:11:00.000Z');
+    await incrementSuppressedReportMetric(redis, target(), '2026-05-24T00:12:00.000Z');
+    redis.failMetricWrites = true;
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-metric-early-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 3,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      reportsSuppressed: 3,
+    });
+  });
+
   it('rolls back suppression metrics when the success audit write fails', async () => {
     class FailingSuppressionAuditRedisStore extends InMemoryRedisStore {
       override async set(key: string, value: string): Promise<void> {
@@ -923,6 +1009,76 @@ describe('handleReportTrigger', () => {
       reportsSuppressed: 0,
     });
     expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-audit-fail')).toBe(false);
+  });
+
+  it('rolls back partial suppression metric writes when the metrics helper fails mid-write', async () => {
+    const failurePoints = [
+      'target-record',
+      'daily-index',
+      'target-index',
+    ] as const;
+
+    for (const failurePoint of failurePoints) {
+      class PartialMetricWriteFailingRedisStore extends InMemoryRedisStore {
+        override async set(key: string, value: string): Promise<void> {
+          if (failurePoint === 'target-record' && key === keys.metricsTarget('alpha', 't3_post')) {
+            throw new Error('target metrics down');
+          }
+
+          await super.set(key, value);
+        }
+
+        override async zAdd(key: string, entry: { member: string; score: number }): Promise<void> {
+          if (failurePoint === 'daily-index' && key === keys.metricsDailyIndex('alpha')) {
+            throw new Error('daily metrics index down');
+          }
+
+          if (failurePoint === 'target-index' && key === keys.metricsTargetIndex('alpha')) {
+            throw new Error('target metrics index down');
+          }
+
+          await super.zAdd(key, entry);
+        }
+      }
+
+      const redis = new PartialMetricWriteFailingRedisStore();
+      await saveLock(redis, lock());
+      const reddit = new FakeRedditAdapter([target()]);
+      const result = await handleReportTrigger(
+        {
+          redis,
+          reddit,
+          clock: fixedClock('2026-05-24T01:00:00.000Z'),
+        },
+        { targetId: 't3_post', eventId: `evt-partial-metric-${failurePoint}` },
+      );
+
+      expect(result, failurePoint).toMatchObject({
+        ok: false,
+        action: 'runtime_uncertain',
+        warnings: ['redis_write_failed'],
+      });
+      expect(reddit.calls, failurePoint).toEqual([
+        'ignoreReports:t3_post',
+        'unignoreReports:t3_post',
+      ]);
+      expect(await getLock(redis, 'alpha', 'lock-t3_post'), failurePoint).toMatchObject({
+        suppressedReportCount: 0,
+        lastReportCount: 4,
+      });
+      expect(
+        (await getDailyMetrics(redis, 'alpha', '2026-05-24'))?.reportsSuppressed ?? 0,
+        failurePoint,
+      ).toBe(0);
+      expect(
+        (await getTargetMetrics(redis, 'alpha', 't3_post'))?.reportsSuppressed ?? 0,
+        failurePoint,
+      ).toBe(0);
+      expect(
+        await redis.exists(`reviewlock:alpha:report:dedupe:evt-partial-metric-${failurePoint}`),
+        failurePoint,
+      ).toBe(false);
+    }
   });
 
   it('records failed unignore rollback when Redis fails after report suppression', async () => {

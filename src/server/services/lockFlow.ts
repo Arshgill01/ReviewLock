@@ -13,7 +13,11 @@ import {
   updateLock,
   updateLockStatus,
 } from './locks';
-import { incrementReopenedMetric, recordLockCreatedMetric } from './metrics';
+import {
+  decrementLockCreatedMetric,
+  incrementReopenedMetric,
+  recordLockCreatedMetric,
+} from './metrics';
 import {
   approveForReviewLock,
   ignoreReportsForReviewLock,
@@ -120,6 +124,25 @@ const markLockReopenedAfterQueue = async (
     await removeActiveLockIndexes(redis, lock).catch(() => undefined);
     throw error;
   }
+};
+
+const removeQueuedReopenEventIfLockStillActive = async (
+  redis: RedisStore,
+  lock: ReviewLockRecord,
+  event: ReopenEvent,
+): Promise<void> => {
+  const activeLock = await getActiveLockByTarget(redis, lock.subreddit, lock.targetId).catch(
+    () => undefined,
+  );
+
+  if (activeLock?.id !== lock.id) {
+    return;
+  }
+
+  await Promise.all([
+    redis.del(keys.reopenEvent(event.subreddit, event.id)).catch(() => undefined),
+    redis.zRem(keys.reopenQueue(event.subreddit), event.id).catch(() => undefined),
+  ]);
 };
 
 export const lockReviewedContent = async (
@@ -260,8 +283,10 @@ export const lockReviewedContent = async (
         ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
         runtimeWarnings: staleUnignoreResult.warnings,
       };
+      let reopenEventQueued = false;
       try {
         await enqueueReopenEvent(deps.redis, reopenEvent);
+        reopenEventQueued = true;
         await markLockReopenedAfterQueue(deps.redis, existingLock, {
           reopenedAt: now,
           reopenReason: 'content_changed',
@@ -287,6 +312,14 @@ export const lockReviewedContent = async (
           demo: existingLock.demo,
         });
       } catch (error) {
+        if (reopenEventQueued) {
+          await removeQueuedReopenEventIfLockStillActive(
+            deps.redis,
+            existingLock,
+            reopenEvent,
+          );
+        }
+
         await appendAuditEvent(deps.redis, {
           id: `audit-${existingLock.id}-stale-relock-failed-${Date.parse(now)}`,
           kind: 'runtime_failure',
@@ -370,9 +403,12 @@ export const lockReviewedContent = async (
       warnings,
     );
 
+    let lockCreatedMetricRecorded = false;
+
     try {
       await saveLock(deps.redis, lock);
       await recordLockCreatedMetric(deps.redis, resolution.target, now);
+      lockCreatedMetricRecorded = true;
       await appendAuditEvent(deps.redis, {
         id: `audit-${lock.id}-created`,
         kind: 'lock_created',
@@ -401,6 +437,11 @@ export const lockReviewedContent = async (
 
       if (rollbackResult.ok) {
         await removeLock(deps.redis, lock).catch(() => undefined);
+        if (lockCreatedMetricRecorded) {
+          await decrementLockCreatedMetric(deps.redis, resolution.target, now).catch(
+            () => undefined,
+          );
+        }
       } else {
         const failedLock: ReviewLockRecord = {
           ...lock,

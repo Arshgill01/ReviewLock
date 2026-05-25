@@ -331,10 +331,55 @@ describe('breakLockForChangedContent', () => {
       expect.objectContaining({
         kind: 'runtime_failure',
         message:
-          'Lock reopened after reviewed content changed, but the reopen audit failed.',
+          'Lock reopened after reviewed content changed, but post-reopen persistence failed.',
         data: expect.objectContaining({
-          operation: 'lockReopenedAudit',
+          operation: 'postReopenPersistence',
           error: 'reopen audit down',
+        }),
+      }),
+    ]);
+  });
+
+  it('records runtime failure when update reopen metrics fail after state is reopened', async () => {
+    class ReopenMetricsFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('reopen metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenMetricsFailingRedisStore();
+    await saveLock(redis, lock());
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      message: 'Lock reopened, but ReviewLock could not persist post-reopen proof.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'Lock reopened after reviewed content changed, but post-reopen persistence failed.',
+        data: expect.objectContaining({
+          operation: 'postReopenPersistence',
+          error: 'reopen metrics down',
         }),
       }),
     ]);

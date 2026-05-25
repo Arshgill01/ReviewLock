@@ -157,19 +157,46 @@ export const unlockReviewedContent = async (
     };
   }
 
-  await appendAuditEvent(deps.redis, {
-    id: `audit-${activeLock.id}-unlocked-${Date.parse(now)}`,
-    kind: 'lock_unlocked',
-    subreddit: activeLock.subreddit,
-    targetId: activeLock.targetId,
-    targetKind: activeLock.targetKind,
-    lockId: activeLock.id,
-    actor: input.actor,
-    createdAt: now,
-    message: 'ReviewLock lock manually unlocked.',
-    data: { unignoreReportsOk: unignoreResult.ok },
-    demo: false,
-  });
+  try {
+    await appendAuditEvent(deps.redis, {
+      id: `audit-${activeLock.id}-unlocked-${Date.parse(now)}`,
+      kind: 'lock_unlocked',
+      subreddit: activeLock.subreddit,
+      targetId: activeLock.targetId,
+      targetKind: activeLock.targetKind,
+      lockId: activeLock.id,
+      actor: input.actor,
+      createdAt: now,
+      message: 'ReviewLock lock manually unlocked.',
+      data: { unignoreReportsOk: unignoreResult.ok },
+      demo: false,
+    });
+  } catch (error) {
+    await appendAuditEvent(deps.redis, {
+      id: `audit-${activeLock.id}-unlock-audit-failed-${Date.parse(now)}`,
+      kind: 'runtime_failure',
+      subreddit: activeLock.subreddit,
+      targetId: activeLock.targetId,
+      targetKind: activeLock.targetKind,
+      lockId: activeLock.id,
+      actor: input.actor,
+      createdAt: now,
+      message: 'ReviewLock unlocked the lock, but the unlock audit failed.',
+      data: {
+        operation: 'lockUnlockedAudit',
+        error: error instanceof Error ? error.message : 'unknown error',
+      },
+      demo: activeLock.demo,
+    }).catch(() => undefined);
+
+    return {
+      ok: false,
+      lock: unlocked,
+      message:
+        'ReviewLock lock was removed, but ReviewLock could not persist the required unlock audit.',
+      warnings: [...unignoreResult.warnings, 'redis_write_failed'],
+    };
+  }
 
   return {
     ok: true,

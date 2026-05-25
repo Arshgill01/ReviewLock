@@ -143,3 +143,9 @@
 - [x] Return structured stale-relock failures before replacement lock creation.
 - [x] Record runtime-failure audits when reopen success-audit writes fail after state changes.
 - [x] Record runtime-failure audits when dismiss queue mutation fails after dismissal audit.
+- [x] Roll back partial suppression metric writes when metric persistence fails mid-helper.
+- [x] Remove stale-relock reopen queue entries when the old lock remains active after failure.
+- [x] Record runtime-failure audits when manual unlock success-audit writes fail after state changes.
+- [x] Roll back lock-created metrics when lock creation rolls back after metric/audit failure.
+- [x] Preserve prior valid suppression and lock-created metrics when a failed attempt never increments.
+- [x] Record runtime-failure audits when reopen metrics fail after visible reopen state changes.

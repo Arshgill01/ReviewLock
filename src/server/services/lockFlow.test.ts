@@ -6,7 +6,7 @@ import type { ReviewLockTarget } from '../../shared/schema';
 import { listAuditEvents } from './audit';
 import { getActiveLockByTarget, getLock, listActiveLocks } from './locks';
 import { lockReviewedContent } from './lockFlow';
-import { getDailyMetrics, getTargetMetrics } from './metrics';
+import { getDailyMetrics, getTargetMetrics, recordLockCreatedMetric } from './metrics';
 import { listOpenReopenEvents } from './reopenQueue';
 import { loadRuntimeProofStatus } from './runtimeProof';
 import { keys } from './keys';
@@ -395,6 +395,79 @@ describe('lockReviewedContent', () => {
     ]));
   });
 
+  it('removes queued stale-relock reopen event when the old lock remains active', async () => {
+    class StaleStatusFailingRedisStore extends InMemoryRedisStore {
+      failStaleStatus = false;
+      staleLockId?: string;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (
+          this.failStaleStatus &&
+          this.staleLockId &&
+          key === keys.lock('alpha', this.staleLockId)
+        ) {
+          throw new Error('stale lock status down');
+        }
+
+        await super.set(key, value);
+      }
+
+      override async del(key: string): Promise<void> {
+        if (this.failStaleStatus && key === keys.targetLock('alpha', 't3_post')) {
+          throw new Error('active target index down');
+        }
+
+        await super.del(key);
+      }
+    }
+
+    const reddit = new FakeRedditAdapter([target()]);
+    const redis = new StaleStatusFailingRedisStore();
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis,
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    redis.staleLockId = first.lock?.id;
+    redis.failStaleStatus = true;
+    reddit.setTarget(target({ body: 'Edited body', edited: true, reportCount: 6 }));
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(second).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock reopened the stale lock or attempted to, but could not durably create the replacement lock. Reopen the menu and try again.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      id: first.lock?.id,
+      status: 'active',
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        data: expect.objectContaining({
+          operation: 'staleRelockReopen',
+          error: 'stale lock status down',
+        }),
+      }),
+    ]));
+  });
+
   it('keeps the stale lock active when stale unignore fails before replacement', async () => {
     const reddit = new FakeRedditAdapter([target()]);
     const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
@@ -522,6 +595,163 @@ describe('lockReviewedContent', () => {
         (event) => event.kind === 'lock_created' && event.lockId === result.lock?.id,
       ),
     ).toBe(false);
+  });
+
+  it('rolls back lock-created metrics when the success audit write fails', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    class LockCreatedAuditFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-lock-t3_post-') && key.endsWith('-created')) {
+          throw new Error('lock created audit down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new LockCreatedAuditFailingRedisStore();
+    const result = await lockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T00:00:00.000Z') },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'lock created audit down',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 0,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      locksCreated: 0,
+    });
+    expect(
+      (await listAuditEvents(redis, 'alpha')).some(
+        (event) => event.kind === 'lock_created' && event.lockId === result.lock?.id,
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps prior lock-created metrics when the next metric write fails before incrementing', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    class EarlyCreatedMetricWriteFailingRedisStore extends InMemoryRedisStore {
+      failMetricWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failMetricWrites && key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('daily metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new EarlyCreatedMetricWriteFailingRedisStore();
+    await recordLockCreatedMetric(redis, target(), '2026-05-24T00:10:00.000Z');
+    await recordLockCreatedMetric(redis, target(), '2026-05-24T00:11:00.000Z');
+    redis.failMetricWrites = true;
+    const result = await lockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T00:00:00.000Z') },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 2,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      locksCreated: 2,
+    });
+  });
+
+  it('rolls back partial lock-created metric writes when metrics fail mid-write', async () => {
+    const failurePoints = [
+      'target-record',
+      'daily-index',
+      'target-index',
+    ] as const;
+
+    for (const failurePoint of failurePoints) {
+      const reddit = new FakeRedditAdapter([target()]);
+      class PartialLockMetricWriteFailingRedisStore extends InMemoryRedisStore {
+        override async set(key: string, value: string): Promise<void> {
+          if (failurePoint === 'target-record' && key === keys.metricsTarget('alpha', 't3_post')) {
+            throw new Error('target metrics down');
+          }
+
+          await super.set(key, value);
+        }
+
+        override async zAdd(key: string, entry: { member: string; score: number }): Promise<void> {
+          if (failurePoint === 'daily-index' && key === keys.metricsDailyIndex('alpha')) {
+            throw new Error('daily metrics index down');
+          }
+
+          if (failurePoint === 'target-index' && key === keys.metricsTargetIndex('alpha')) {
+            throw new Error('target metrics index down');
+          }
+
+          await super.zAdd(key, entry);
+        }
+      }
+
+      const redis = new PartialLockMetricWriteFailingRedisStore();
+      const result = await lockReviewedContent(
+        { reddit, redis, clock: fixedClock('2026-05-24T00:00:00.000Z') },
+        {
+          targetId: 't3_post',
+          actor: 'mod',
+          lockReason: 'reviewed_policy_compliant',
+        },
+      );
+
+      expect(result, failurePoint).toMatchObject({
+        ok: false,
+        warnings: ['redis_write_failed'],
+      });
+      expect(reddit.calls, failurePoint).toEqual([
+        'approve:t3_post',
+        'ignoreReports:t3_post',
+        'unignoreReports:t3_post',
+      ]);
+      expect(await getActiveLockByTarget(redis, 'alpha', 't3_post'), failurePoint).toBeUndefined();
+      expect(
+        (await getDailyMetrics(redis, 'alpha', '2026-05-24'))?.locksCreated ?? 0,
+        failurePoint,
+      ).toBe(0);
+      expect(
+        (await getTargetMetrics(redis, 'alpha', 't3_post'))?.locksCreated ?? 0,
+        failurePoint,
+      ).toBe(0);
+      expect(
+        (await listAuditEvents(redis, 'alpha')).some((event) => event.kind === 'lock_created'),
+        failurePoint,
+      ).toBe(false);
+    }
   });
 
   it('keeps a visible failed lock when Redis persistence fails and unignore rollback also fails', async () => {

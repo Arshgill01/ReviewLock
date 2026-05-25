@@ -189,11 +189,11 @@ export const breakLockForChangedContent = async (
         runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
       });
 
-      if (resolution.target) {
-        await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
-      }
-
       try {
+        if (resolution.target) {
+          await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
+        }
+
         await appendAuditEvent(deps.redis, {
           id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
           kind: 'lock_reopened',
@@ -218,9 +218,9 @@ export const breakLockForChangedContent = async (
           actor: 'reviewlock',
           createdAt: now,
           message:
-            'Lock reopened after reviewed content changed, but the reopen audit failed.',
+            'Lock reopened after reviewed content changed, but post-reopen persistence failed.',
           data: {
-            operation: 'lockReopenedAudit',
+            operation: 'postReopenPersistence',
             error: error instanceof Error ? error.message : 'unknown error',
           },
           demo: lock.demo,
@@ -230,7 +230,7 @@ export const breakLockForChangedContent = async (
           ok: false,
           action: 'runtime_uncertain',
           message:
-            'Lock reopened, but ReviewLock could not persist the required reopen audit.',
+            'Lock reopened, but ReviewLock could not persist post-reopen proof.',
           event,
           warnings: [...warnings, 'redis_write_failed'],
         };

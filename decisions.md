@@ -1745,3 +1745,115 @@ Reason:
 - Moderator intent and queue state can diverge during transient Redis failures.
   A compensating runtime-failure audit preserves traceability and avoids a
   silent "dismissed" claim when the queue mutation did not cleanly complete.
+
+### D102 - Suppression rollback compensates partial metric writes
+
+Suppression metric persistence can fail after a daily or target metric record
+was partially written but before the helper returns successfully.
+
+Decision:
+
+- When report-trigger persistence fails after the lock-level suppression
+  counter moves, always best-effort decrement suppressed-report metrics during
+  rollback.
+- Do this even when the metric increment helper threw before returning.
+
+Reason:
+
+- The trigger path clears dedupe and rolls Reddit back with `unignoreReports()`
+  when persistence is uncertain. Dashboard "Reports suppressed" counters must
+  not retain partial writes for a delivery ReviewLock deliberately left
+  retryable.
+
+### D103 - Stale relock queue writes are compensated if the old lock is still active
+
+Manual relock can queue a stale-lock reopen event before the old lock status
+and active indexes are durably updated.
+
+Decision:
+
+- If the stale-reopen transition fails after queueing an event, check whether
+  the old lock is still the active lock for the target.
+- If it is still active, remove the queued reopen event best-effort and return
+  the structured relock failure.
+- If the old lock is no longer active, keep the reopen event visible.
+
+Reason:
+
+- ReviewLock should preserve either active-with-no-queue or reopened-with-queue.
+  Showing a reopen queue item while the same target is still actively locked
+  makes future report-trigger behavior and moderator state hard to trust.
+
+### D104 - Manual unlock audit failures get compensating runtime failure
+
+Manual unlock can return reports to normal handling and clear active lock
+indexes before appending the required `lock_unlocked` audit.
+
+Decision:
+
+- If the success `lock_unlocked` audit fails after unlock state is already
+  visible, append a `runtime_failure` audit best-effort and return a structured
+  failure result.
+
+Reason:
+
+- Human-confirmed moderation transitions need a durable ledger. If the success
+  audit is missing, moderators still need an explicit runtime-failure record
+  explaining that the lock was removed but audit persistence failed.
+
+### D105 - Lock creation rollback compensates created-lock metrics
+
+Lock creation writes the active lock, then dashboard created-lock metrics, then
+the `lock_created` audit.
+
+Decision:
+
+- If the lock creation success block fails after the lock record was saved and
+  Reddit rollback succeeds, remove the local lock and best-effort decrement
+  daily and target `locksCreated` metrics.
+- Apply the decrement even when the metric helper threw before returning.
+
+Reason:
+
+- A failed lock attempt that returns reports to normal handling should not leave
+  dashboard metrics claiming a durable created lock. Metrics, active lock
+  state, and audit evidence should move together or be visibly rolled back.
+
+### D106 - Metric increment helpers restore snapshots on partial failure
+
+Metric decrement rollback is only correct after an increment helper fully
+returns. It is not safe when the helper fails before writing this attempt's
+increment.
+
+Decision:
+
+- Snapshot existing daily and target metrics inside lock-created,
+  suppressed-report, and reopened metric increment helpers.
+- If a helper fails mid-write, restore the previous daily and target records
+  best-effort before rethrowing.
+- Only call decrement helpers from outer rollback code after the matching
+  increment helper returned successfully.
+
+Reason:
+
+- Failed attempts must not overcount partial writes, but they also must not
+  subtract valid metrics from earlier successful moderation actions.
+
+### D107 - Reopen metric failures get compensating runtime failure audits
+
+Reopen flows can queue the reopen event and mark the lock inactive before
+writing reopen metrics.
+
+Decision:
+
+- Treat reopened metrics and the `lock_reopened` audit as one post-reopen proof
+  boundary.
+- If either post-reopen metric or audit persistence fails after the reopen
+  state is visible, write a compensating `runtime_failure` audit best-effort and
+  return `runtime_uncertain`.
+
+Reason:
+
+- Edit-break reopening is ReviewLock's core loop. A visible reopen queue item
+  needs either a success audit or a failure audit explaining why the proof
+  boundary is incomplete.

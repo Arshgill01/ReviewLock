@@ -312,7 +312,6 @@ export const handleReportTrigger = async (
 
         let lockCounterIncremented = false;
         let metricsIncremented = false;
-
         try {
           await incrementLockSuppression(
             deps.redis,
@@ -409,8 +408,8 @@ export const handleReportTrigger = async (
           reopenEventId: reopenEvent.id,
           runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
         });
-        await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
         try {
+          await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
           await appendAuditEvent(deps.redis, {
             id: reportAuditId('audit-report-reopened', input, now, lock.id),
             kind: 'lock_reopened',
@@ -435,9 +434,9 @@ export const handleReportTrigger = async (
             actor: 'reviewlock',
             createdAt: now,
             message:
-              'Report trigger reopened the lock, but the reopen audit failed.',
+              'Report trigger reopened the lock, but post-reopen persistence failed.',
             data: {
-              operation: 'lockReopenedAudit',
+              operation: 'postReopenPersistence',
               error: error instanceof Error ? error.message : 'unknown error',
             },
             demo: lock.demo,
@@ -447,7 +446,7 @@ export const handleReportTrigger = async (
             ok: false,
             action: 'runtime_uncertain',
             message:
-              'Lock reopened, but ReviewLock could not persist the required reopen audit.',
+              'Lock reopened, but ReviewLock could not persist post-reopen proof.',
             reopenEvent,
             warnings: [...warnings, 'redis_write_failed'],
           };

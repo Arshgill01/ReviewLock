@@ -118,6 +118,46 @@ describe('unlockReviewedContent', () => {
     ]);
   });
 
+  it('records runtime failure when unlock audit persistence fails after unlock', async () => {
+    class UnlockAuditFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-lock-1-unlocked-')) {
+          throw new Error('unlock audit down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new UnlockAuditFailingRedisStore();
+    const reddit = new FakeRedditAdapter([target()]);
+    await saveLock(redis, lock());
+
+    const result = await unlockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T01:00:00.000Z') },
+      { targetId: 't3_post', actor: 'mod', lockId: 'lock-1' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock lock was removed, but ReviewLock could not persist the required unlock audit.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'ReviewLock unlocked the lock, but the unlock audit failed.',
+        data: expect.objectContaining({
+          operation: 'lockUnlockedAudit',
+          error: 'unlock audit down',
+        }),
+      }),
+    ]);
+  });
+
   it('rejects stale unlock confirmations before calling Reddit', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter([target()]);
