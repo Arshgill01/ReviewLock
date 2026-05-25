@@ -2521,17 +2521,3 @@
   - `rg -n "TODO" src` returned no source TODOs.
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
-
-## 2026-05-26 00:55 IST - Integration Status
-
-- Resolved medium finding added at 00:53: dashboard mutation APIs now reject
-  `demo=true` requests with `Demo dashboard data is read-only.`
-- Regression added in `src/routes/api.dashboard.test.ts` for demo unlock
-  attempts, asserting no Reddit moderation calls, active demo lock remains, and
-  no audit is written.
-- Regression added in `src/routes/api.dashboard.test.ts` for demo reopen
-  dismiss attempts, asserting the demo reopen event remains queued and no audit
-  is written.
-- Focused validation:
-  - `npm run test -- src/routes/api.dashboard.test.ts --reporter verbose`
-    PASS, 1 file / 13 tests.
