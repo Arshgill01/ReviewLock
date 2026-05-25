@@ -2391,3 +2391,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 02:06 IST - Live WebView runtime proof contract recheck
+
+- Rechecked the live Reddit Devvit WebView in Zen after strict runtime proof
+  status and timestamp validation landed.
+- Existing dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account: `u/BrightyBrainiac`.
+- Playtest version observed in WebView links: `v0.0.2.274`.
+- Live dashboard rendered under `r/reviewlock_dev` without dropping existing
+  persisted data.
+- First viewport still showed 2 active locks, 1 report suppressed, and 2
+  reopened after edit.
+- Latest edit-break event still showed `comment:ontlx1k`, and the audit
+  timeline still showed 9 entries.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status kept expected strict capability states:
+  `approve verified`, `commentReportTrigger unverified`,
+  `commentUpdateTrigger verified`, `ignoreReports verified`,
+  `postFlairUpdateTrigger unverified`, `postNsfwUpdateTrigger unverified`,
+  `postReportTrigger verified`, `postSpoilerUpdateTrigger unverified`,
+  `postUpdateTrigger verified`, `redditContext verified`, `redis verified`,
+  and `unignoreReports verified`.
+- No live report submission, post edit, comment edit, unlock, or dismiss action
+  was performed in this recheck.
