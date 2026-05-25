@@ -157,6 +157,53 @@ describe('ReviewLockApiClient contract handling', () => {
     );
   });
 
+  it('rejects malformed runtime proof status values before rendering', async () => {
+    const api = new ReviewLockApiClient();
+    stubFetch(
+      jsonResponse({
+        ok: true,
+        demo: false,
+        runtime: { ...runtimeStatus, overall: 'maybe' },
+        dailyMetrics: [],
+        topChurnTargets: [],
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        runtime: { ...runtimeStatus, generatedAt: '2026-02-31T00:00:00.000Z' },
+        dailyMetrics: [],
+        topChurnTargets: [],
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        runtime: {
+          ...runtimeStatus,
+          capabilities: [
+            {
+              name: 'redis',
+              status: 'verified',
+              notes: [],
+              checkedAt: '2026-05-24T00:00:00Z',
+            },
+          ],
+        },
+        dailyMetrics: [],
+        topChurnTargets: [],
+      }),
+    );
+
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'runtime object is missing required runtime proof fields',
+    );
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'runtime object is missing required runtime proof fields',
+    );
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'runtime object is missing required runtime proof fields',
+    );
+  });
+
   it('submits dashboard moderation actions through API endpoints', async () => {
     const fetchMock = stubFetch(
       jsonResponse({ ok: true, message: 'ReviewLock unlocked this reviewed content.' }),

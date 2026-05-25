@@ -2177,3 +2177,21 @@ Reason:
   dashboard chronology, or malformed runtime proof context. Strict persisted
   data is safer than trying to render questionable state in a moderator-facing
   audit surface.
+
+### D124 - Runtime proof records use the same strict validation boundary
+
+Runtime proof rows are evidence, not decorative dashboard state.
+
+Decision:
+
+- Runtime proof `overall` and capability statuses must be known status values.
+- Runtime proof `generatedAt` and capability `checkedAt` timestamps must be
+  strict ISO UTC timestamps.
+- The server rejects malformed runtime proof writes before persistence, and the
+  client rejects malformed runtime proof responses before rendering.
+
+Reason:
+
+- A dashboard judge or moderator should not see unknown status strings or
+  malformed evidence timestamps as if they were credible runtime proof. Failing
+  back to explicit contract/runtime errors keeps the proof boundary honest.

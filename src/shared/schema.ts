@@ -222,7 +222,7 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 const isOptionalString = (value: unknown): value is string | undefined =>
   value === undefined || isString(value);
 
-const isIsoTimestamp = (value: unknown): value is string =>
+export const isIsoTimestamp = (value: unknown): value is string =>
   isString(value) &&
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
   Number.isFinite(Date.parse(value)) &&
@@ -231,7 +231,7 @@ const isIsoTimestamp = (value: unknown): value is string =>
 const isOptionalIsoTimestamp = (value: unknown): value is string | undefined =>
   value === undefined || isIsoTimestamp(value);
 
-const isIsoDate = (value: unknown): value is string =>
+export const isIsoDate = (value: unknown): value is string =>
   isString(value) &&
   /^\d{4}-\d{2}-\d{2}$/.test(value) &&
   Number.isFinite(Date.parse(`${value}T00:00:00.000Z`)) &&

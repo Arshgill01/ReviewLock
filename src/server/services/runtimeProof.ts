@@ -1,9 +1,10 @@
 import type { RedisStore } from '../adapters/redis';
-import type {
-  AuditEvent,
-  RuntimeCapabilityStatus,
-  RuntimeProofCapability,
-  RuntimeProofStatus,
+import {
+  isIsoTimestamp,
+  type AuditEvent,
+  type RuntimeCapabilityStatus,
+  type RuntimeProofCapability,
+  type RuntimeProofStatus,
 } from '../../shared/schema';
 import { RUNTIME_CAPABILITY_STATUSES } from '../../shared/constants';
 import type { ModerationOperationResult } from './moderation';
@@ -82,7 +83,7 @@ const isRuntimeProofCapability = (value: unknown): value is RuntimeProofCapabili
     typeof value.name === 'string' &&
     isRuntimeCapabilityStatus(value.status) &&
     isStringArray(value.notes) &&
-    (value.checkedAt === undefined || typeof value.checkedAt === 'string') &&
+    (value.checkedAt === undefined || isIsoTimestamp(value.checkedAt)) &&
     (value.evidence === undefined || typeof value.evidence === 'string')
   );
 };
@@ -94,7 +95,7 @@ const isRuntimeProofStatus = (value: unknown): value is RuntimeProofStatus => {
 
   return (
     isRuntimeCapabilityStatus(value.overall) &&
-    typeof value.generatedAt === 'string' &&
+    isIsoTimestamp(value.generatedAt) &&
     Array.isArray(value.capabilities) &&
     value.capabilities.every(isRuntimeProofCapability) &&
     isStringArray(value.warnings)
@@ -288,6 +289,10 @@ export const saveRuntimeProofStatus = async (
   subreddit: string,
   status: RuntimeProofStatus,
 ): Promise<RuntimeProofStatus> => {
+  if (!isRuntimeProofStatus(status)) {
+    throw new Error('Runtime proof status is malformed.');
+  }
+
   await redis.set(keys.runtime(subreddit), JSON.stringify(status));
   return status;
 };

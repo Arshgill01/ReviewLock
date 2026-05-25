@@ -96,6 +96,25 @@ describe('runtime proof status', () => {
         capabilities: [{ name: 'redis', status: 'surprising', notes: [] }],
         warnings: [],
       },
+      {
+        overall: 'verified',
+        generatedAt: '2026-02-31T00:00:00.000Z',
+        capabilities: [{ name: 'redis', status: 'verified', notes: [] }],
+        warnings: [],
+      },
+      {
+        overall: 'verified',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: [
+          {
+            name: 'redis',
+            status: 'verified',
+            notes: [],
+            checkedAt: '2026-05-24T00:00:00Z',
+          },
+        ],
+        warnings: [],
+      },
     ]) {
       await redis.set(keys.runtime('alpha'), JSON.stringify(malformed));
 
@@ -196,6 +215,24 @@ describe('runtime proof status', () => {
         expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
       ]),
     );
+  });
+
+  it('rejects malformed runtime proof writes before persistence', async () => {
+    const redis = new InMemoryRedisStore();
+
+    await expect(
+      recordCapabilityStatus(
+        redis,
+        'alpha',
+        {
+          name: 'redis',
+          status: 'verified',
+          checkedAt: '2026-05-24T00:00:00Z',
+        },
+        '2026-05-24T01:00:00.000Z',
+      ),
+    ).rejects.toThrow('Runtime proof status is malformed.');
+    await expect(redis.get(keys.runtime('alpha'))).resolves.toBeUndefined();
   });
 
   it('does not reconcile report trigger proof from suppression audits with missing target kind', async () => {

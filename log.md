@@ -2366,3 +2366,28 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 02:05 IST - Runtime proof contract hardening
+
+- Exported and reused strict ISO timestamp validators for runtime proof
+  records.
+- Tightened server runtime proof loading and saving so unknown status values,
+  malformed `generatedAt`, and malformed capability `checkedAt` values are not
+  persisted or treated as proof.
+- Tightened the client API contract validator so malformed runtime proof JSON is
+  rejected before dashboard rendering.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/client/state/api.test.ts src/shared/schema.test.ts --reporter verbose`
+  - PASS, 3 test files and 33 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 353 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

@@ -1,12 +1,15 @@
-import type {
-  DashboardOverview,
-  ReviewLockRecord,
-  ReopenEvent,
-  AuditEvent,
-  DailyMetrics,
-  TargetMetrics,
-  RuntimeProofStatus,
+import {
+  isIsoTimestamp,
+  type RuntimeCapabilityStatus,
+  type RuntimeProofStatus,
+  type DashboardOverview,
+  type ReviewLockRecord,
+  type ReopenEvent,
+  type AuditEvent,
+  type DailyMetrics,
+  type TargetMetrics,
 } from '../../shared/schema';
+import { RUNTIME_CAPABILITY_STATUSES } from '../../shared/constants';
 
 export interface DashboardFullData {
   overview: DashboardOverview;
@@ -48,22 +51,28 @@ const errorText = (data: unknown): string | undefined =>
 const contractError = (endpoint: string, message: string): Error =>
   new Error(`API contract error at ${endpoint}: ${message}`);
 
+const isRuntimeCapabilityStatus = (value: unknown): value is RuntimeCapabilityStatus =>
+  typeof value === 'string' &&
+  RUNTIME_CAPABILITY_STATUSES.includes(value as RuntimeCapabilityStatus);
+
 const isRuntimeProofStatus = (value: unknown): value is RuntimeProofStatus => {
   if (!isObject(value)) {
     return false;
   }
 
   return (
-    typeof value.overall === 'string' &&
-    typeof value.generatedAt === 'string' &&
+    isRuntimeCapabilityStatus(value.overall) &&
+    isIsoTimestamp(value.generatedAt) &&
     Array.isArray(value.capabilities) &&
     value.capabilities.every(
       (capability) =>
         isObject(capability) &&
         typeof capability.name === 'string' &&
-        typeof capability.status === 'string' &&
+        isRuntimeCapabilityStatus(capability.status) &&
         Array.isArray(capability.notes) &&
-        capability.notes.every((note) => typeof note === 'string'),
+        capability.notes.every((note) => typeof note === 'string') &&
+        (capability.checkedAt === undefined || isIsoTimestamp(capability.checkedAt)) &&
+        (capability.evidence === undefined || typeof capability.evidence === 'string'),
     ) &&
     Array.isArray(value.warnings) &&
     value.warnings.every((warning) => typeof warning === 'string')
