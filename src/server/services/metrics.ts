@@ -74,7 +74,15 @@ const withMetricsMutation = async <T>(
 
   for (let attempt = 0; attempt < METRICS_MUTEX_ATTEMPTS; attempt += 1) {
     if (await redis.setIfNotExists(mutexKey, ownerToken)) {
-      await redis.expire(mutexKey, METRICS_MUTEX_SECONDS).catch(() => undefined);
+      try {
+        await redis.expire(mutexKey, METRICS_MUTEX_SECONDS);
+      } catch {
+        if ((await redis.get(mutexKey).catch(() => undefined)) === ownerToken) {
+          await redis.del(mutexKey).catch(() => undefined);
+        }
+
+        throw new Error(`ReviewLock could not set a Redis lease for ${mutexKey}.`);
+      }
 
       try {
         return await mutation();

@@ -164,3 +164,4 @@
 - [x] Validate and clean Redis-backed form bindings before lock/unlock confirmation.
 - [x] Extend Redis runtime smoke to cover sorted-set ordering used by audit and queue ledgers.
 - [x] Keep reopen queue items visible when dismissal queue or record persistence fails.
+- [x] Fail closed when Redis guard TTL leases cannot be set.

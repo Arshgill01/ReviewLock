@@ -168,6 +168,36 @@ describe('handleReportTrigger', () => {
     });
   });
 
+  it('fails closed and clears the report dedupe marker when setting the TTL fails', async () => {
+    class ExpireFailingRedisStore extends InMemoryRedisStore {
+      override async expire(): Promise<void> {
+        throw new Error('expire down');
+      }
+    }
+
+    const redis = new ExpireFailingRedisStore();
+    await saveLock(redis, lock());
+
+    await expect(
+      handleReportTrigger(
+        {
+          redis,
+          reddit: new FakeRedditAdapter([target()]),
+          clock: fixedClock('2026-05-24T01:00:00.000Z'),
+        },
+        { targetId: 't3_post', eventId: 'evt-expire-failed' },
+      ),
+    ).resolves.toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      message:
+        'ReviewLock could not set a Redis lease for reviewlock:alpha:report:dedupe:evt-expire-failed.',
+      warnings: ['redis_write_failed'],
+    });
+
+    expect(await redis.get('reviewlock:alpha:report:dedupe:evt-expire-failed')).toBeUndefined();
+  });
+
   it('does not double-count concurrent duplicate report deliveries', async () => {
     const dependencies = await deps();
     const results = await Promise.all([

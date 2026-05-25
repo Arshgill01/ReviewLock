@@ -2134,3 +2134,25 @@ Reason:
 - A reopened item should never disappear from moderator view unless ReviewLock
   persisted the dismissal state. Partial failures must favor visibility over a
   clean-looking queue.
+
+### D122 - Redis guard leases fail closed
+
+ReviewLock uses short Redis guard keys for trigger serialization, report
+dedupe, metrics mutation, and lock creation.
+
+Decision:
+
+- After creating any guard key that is meant to be temporary, require the Redis
+  TTL write to succeed before continuing.
+- If TTL setup fails, delete the just-created guard when the owner token still
+  matches, return a structured runtime failure, and do not perform moderation or
+  metric side effects.
+- Keep duplicate report dedupe retryable by clearing the dedupe marker when its
+  TTL cannot be set.
+
+Reason:
+
+- A guard without expiry can permanently block lock creation, trigger
+  processing, metrics updates, or report retries if the process exits before the
+  `finally` cleanup runs. For moderator trust, a visible retryable failure is
+  better than a silent stuck state.

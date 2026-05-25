@@ -76,6 +76,24 @@ describe('metrics persistence', () => {
     });
   });
 
+  it('fails closed and releases the metrics mutex when setting the TTL fails', async () => {
+    class ExpireFailingRedisStore extends InMemoryRedisStore {
+      override async expire(): Promise<void> {
+        throw new Error('expire down');
+      }
+    }
+
+    const redis = new ExpireFailingRedisStore();
+
+    await expect(
+      incrementSuppressedReportMetric(redis, target(), '2026-05-24T01:00:00.000Z'),
+    ).rejects.toThrow('ReviewLock could not set a Redis lease for reviewlock:alpha:metrics:mutation.');
+
+    expect(await redis.get(keys.metricsMutation('alpha'))).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toBeUndefined();
+    expect(await getTargetMetrics(redis, 'alpha', 't3_alpha')).toBeUndefined();
+  });
+
   it('orders daily and top target metrics', async () => {
     const redis = new InMemoryRedisStore();
 

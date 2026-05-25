@@ -2253,3 +2253,28 @@
   and `postSpoilerUpdateTrigger`.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 01:56 IST - Redis guard TTL hardening
+
+- Hardened temporary Redis guard handling for trigger mutexes, metrics
+  mutations, lock creation guards, and report trigger dedupe markers.
+- Guard acquisition now fails closed if the TTL lease cannot be set, releases
+  the just-created guard when the owner still matches, and avoids moderation or
+  metric side effects.
+- Report trigger dedupe markers now clear themselves if the seven-day TTL cannot
+  be written, keeping trigger delivery retryable.
+- Focused validation:
+  - `npm run test -- src/server/services/triggerMutex.test.ts src/server/services/metrics.test.ts src/server/services/lockFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - PASS, 4 test files and 59 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 350 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

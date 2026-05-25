@@ -40,7 +40,7 @@ describe('withTriggerMutex', () => {
     ).resolves.toBe('released');
   });
 
-  it('continues and releases the mutex when setting the TTL fails', async () => {
+  it('fails closed and releases the mutex when setting the TTL fails', async () => {
     class ExpireFailingRedisStore extends InMemoryRedisStore {
       override async expire(): Promise<void> {
         throw new Error('expire down');
@@ -49,6 +49,7 @@ describe('withTriggerMutex', () => {
 
     const redis = new ExpireFailingRedisStore();
     const mutexKey = triggerMutexKey('alpha', 't3_post');
+    let operationRan = false;
 
     await expect(
       withTriggerMutex(
@@ -56,9 +57,14 @@ describe('withTriggerMutex', () => {
         'alpha',
         't3_post',
         '2026-05-24T01:00:00.000Z',
-        async () => 'operation-ran',
+        async () => {
+          operationRan = true;
+          return 'operation-ran';
+        },
       ),
-    ).resolves.toBe('operation-ran');
+    ).rejects.toThrow(`ReviewLock could not set a Redis lease for ${mutexKey}.`);
+
+    expect(operationRan).toBe(false);
     expect(await redis.get(mutexKey)).toBeUndefined();
   });
 });

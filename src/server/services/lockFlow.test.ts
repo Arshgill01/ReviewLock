@@ -189,6 +189,39 @@ describe('lockReviewedContent', () => {
     });
   });
 
+  it('fails closed and releases the lock creation guard when setting the TTL fails', async () => {
+    class ExpireFailingRedisStore extends InMemoryRedisStore {
+      override async expire(): Promise<void> {
+        throw new Error('expire down');
+      }
+    }
+
+    const reddit = new FakeRedditAdapter([target()]);
+    const redis = new ExpireFailingRedisStore();
+    const result = await lockReviewedContent(
+      {
+        reddit,
+        redis,
+        clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock could not set a Redis lease for this lock attempt, so reports were not locked.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.get(keys.targetLockCreation('alpha', 't3_post'))).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('does not delete a newer lock creation guard when an older owner finishes', async () => {
     class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
       private firstIgnoreStartedResolver: (() => void) | undefined;

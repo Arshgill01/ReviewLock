@@ -219,7 +219,20 @@ export const lockReviewedContent = async (
     };
   }
 
-  await deps.redis.expire(guardKey, LOCK_CREATION_GUARD_SECONDS).catch(() => undefined);
+  try {
+    await deps.redis.expire(guardKey, LOCK_CREATION_GUARD_SECONDS);
+  } catch {
+    if ((await deps.redis.get(guardKey).catch(() => undefined)) === guardToken) {
+      await deps.redis.del(guardKey).catch(() => undefined);
+    }
+
+    return {
+      ok: false,
+      message:
+        'ReviewLock could not set a Redis lease for this lock attempt, so reports were not locked.',
+      warnings: ['redis_write_failed'],
+    };
+  }
 
   try {
     const existingLock = await getActiveLockByTarget(

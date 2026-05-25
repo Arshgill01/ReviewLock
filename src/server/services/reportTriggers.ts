@@ -122,7 +122,12 @@ const markDedupe = async (
   const created = await redis.setIfNotExists(dedupe, now);
 
   if (created) {
-    await redis.expire(dedupe, REPORT_DEDUPE_TTL_SECONDS);
+    try {
+      await redis.expire(dedupe, REPORT_DEDUPE_TTL_SECONDS);
+    } catch {
+      await redis.del(dedupe).catch(() => undefined);
+      throw new Error(`ReviewLock could not set a Redis lease for ${dedupe}.`);
+    }
   }
 
   return created;
@@ -188,16 +193,16 @@ export const handleReportTrigger = async (
   const subreddit = resolution.target?.subreddit ?? input.subreddit ?? 'unknown';
   const dedupeInput = { ...input, subreddit };
 
-  if (!(await markDedupe(deps.redis, dedupeInput, now))) {
-    return {
-      ok: true,
-      action: 'duplicate',
-      message: 'Duplicate report trigger ignored.',
-      warnings: [],
-    };
-  }
-
   try {
+    if (!(await markDedupe(deps.redis, dedupeInput, now))) {
+      return {
+        ok: true,
+        action: 'duplicate',
+        message: 'Duplicate report trigger ignored.',
+        warnings: [],
+      };
+    }
+
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
       if (!resolution.ok || !resolution.target) {
         if (input.subreddit) {
