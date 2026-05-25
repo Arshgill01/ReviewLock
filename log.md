@@ -2101,3 +2101,30 @@
   and `postSpoilerUpdateTrigger`.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 01:42 IST - Runtime proof capability hardening
+
+- Hardened runtime proof normalization so persisted proof rows are limited to
+  the known ReviewLock capability matrix.
+- Unknown persisted capability rows are dropped before summarizing overall
+  runtime status, preventing malformed stale rows from polluting dashboard
+  proof.
+- `recordCapabilityStatus` now rejects unknown capability names instead of
+  writing them.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 1 test file and 16 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 341 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

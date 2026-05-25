@@ -439,6 +439,61 @@ describe('runtime proof status', () => {
     );
   });
 
+  it('drops unknown persisted capability rows before summarizing runtime proof', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(
+      keys.runtime('alpha'),
+      JSON.stringify({
+        overall: 'failed',
+        generatedAt: '2026-05-24T00:00:00.000Z',
+        capabilities: [
+          { name: 'redis', status: 'verified', notes: [] },
+          {
+            name: 'surpriseCapability',
+            status: 'failed',
+            notes: ['malformed persisted proof row'],
+          },
+        ],
+        warnings: ['Some runtime capabilities are not verified.'],
+      }),
+    );
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T01:00:00.000Z');
+
+    expect(status.capabilities.map((capability) => capability.name)).not.toContain(
+      'surpriseCapability',
+    );
+    expect(status.overall).toBe('unverified');
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'redis', status: 'verified' }),
+        expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
+      ]),
+    );
+  });
+
+  it('rejects attempts to record unknown runtime proof capabilities', async () => {
+    const redis = new InMemoryRedisStore();
+
+    await expect(
+      recordCapabilityStatus(
+        redis,
+        'alpha',
+        {
+          name: 'surpriseCapability',
+          status: 'verified',
+          evidence: 'unexpected proof row',
+        },
+        '2026-05-24T01:00:00.000Z',
+      ),
+    ).rejects.toThrow('Unknown runtime proof capability: surpriseCapability');
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+    expect(status.capabilities.map((capability) => capability.name)).not.toContain(
+      'surpriseCapability',
+    );
+  });
+
   it('preserves explicit demo warnings while normalizing missing capability rows', async () => {
     const redis = new InMemoryRedisStore();
     await redis.set(

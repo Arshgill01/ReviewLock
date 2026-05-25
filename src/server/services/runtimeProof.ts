@@ -25,6 +25,8 @@ const defaultCapabilityNames = [
   'postFlairUpdateTrigger',
 ];
 
+const defaultCapabilityNameSet = new Set<string>(defaultCapabilityNames);
+
 const updateTriggerCapabilityNames = new Set([
   'postUpdateTrigger',
   'commentUpdateTrigger',
@@ -147,7 +149,9 @@ const warningsForCapabilities = (
 };
 
 const normalizeRuntimeProofStatus = (status: RuntimeProofStatus): RuntimeProofStatus => {
-  const withoutLegacy = status.capabilities.filter((entry) => entry.name !== 'triggers');
+  const withoutLegacy = status.capabilities.filter((entry) =>
+    defaultCapabilityNameSet.has(entry.name),
+  );
   const existingNames = new Set(withoutLegacy.map((entry) => entry.name));
   const missingDefaults: RuntimeProofCapability[] = defaultCapabilityNames
     .filter((name) => !existingNames.has(name))
@@ -294,6 +298,10 @@ export const recordCapabilityStatus = async (
   capability: Omit<RuntimeProofCapability, 'notes'> & { notes?: string[] },
   now = new Date().toISOString(),
 ): Promise<RuntimeProofStatus> => {
+  if (!defaultCapabilityNameSet.has(capability.name)) {
+    throw new Error(`Unknown runtime proof capability: ${capability.name}`);
+  }
+
   const current = await loadRuntimeProofStatus(redis, subreddit, now);
   const nextCapability: RuntimeProofCapability = {
     notes: [],
