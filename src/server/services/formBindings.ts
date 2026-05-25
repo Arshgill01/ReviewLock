@@ -20,13 +20,65 @@ export interface ReviewLockFormBinding {
 const formBindingKey = (subreddit: string, token: string): string =>
   key(subreddit, `form:${token}`);
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 const parseBinding = (value: string | undefined): ReviewLockFormBinding | undefined => {
   if (!value) {
     return undefined;
   }
 
   try {
-    return JSON.parse(value) as ReviewLockFormBinding;
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!isRecord(parsed)) {
+      return undefined;
+    }
+
+    if (
+      parsed.action !== 'lock' &&
+      parsed.action !== 'unlock'
+    ) {
+      return undefined;
+    }
+
+    if (
+      typeof parsed.token !== 'string' ||
+      typeof parsed.subreddit !== 'string' ||
+      typeof parsed.targetId !== 'string' ||
+      typeof parsed.createdAt !== 'string'
+    ) {
+      return undefined;
+    }
+
+    if (parsed.lockId !== undefined && typeof parsed.lockId !== 'string') {
+      return undefined;
+    }
+
+    if (
+      parsed.reviewedContentHash !== undefined &&
+      typeof parsed.reviewedContentHash !== 'string'
+    ) {
+      return undefined;
+    }
+
+    if (
+      parsed.reviewedFingerprintVersion !== undefined &&
+      typeof parsed.reviewedFingerprintVersion !== 'string'
+    ) {
+      return undefined;
+    }
+
+    return {
+      token: parsed.token,
+      action: parsed.action,
+      subreddit: parsed.subreddit,
+      targetId: parsed.targetId,
+      lockId: parsed.lockId,
+      reviewedContentHash: parsed.reviewedContentHash,
+      reviewedFingerprintVersion: parsed.reviewedFingerprintVersion,
+      createdAt: parsed.createdAt,
+    };
   } catch {
     return undefined;
   }
@@ -52,8 +104,15 @@ export const createFormBinding = async (
     createdAt,
   };
 
-  await redis.set(formBindingKey(binding.subreddit, binding.token), JSON.stringify(binding));
-  await redis.expire(formBindingKey(binding.subreddit, binding.token), 600);
+  const bindingKey = formBindingKey(binding.subreddit, binding.token);
+  await redis.set(bindingKey, JSON.stringify(binding));
+
+  try {
+    await redis.expire(bindingKey, 600);
+  } catch (error) {
+    await redis.del(bindingKey).catch(() => undefined);
+    throw error;
+  }
 
   return binding;
 };
@@ -63,10 +122,12 @@ export const consumeFormBinding = async (
   subreddit: string,
   token: string,
 ): Promise<ReviewLockFormBinding | undefined> => {
-  const binding = parseBinding(await redis.get(formBindingKey(subreddit, token)));
+  const bindingKey = formBindingKey(subreddit, token);
+  const raw = await redis.get(bindingKey);
+  const binding = parseBinding(raw);
 
-  if (binding) {
-    await redis.del(formBindingKey(subreddit, token));
+  if (raw !== undefined) {
+    await redis.del(bindingKey);
   }
 
   return binding;

@@ -2073,3 +2073,23 @@ Reason:
 - A comment endpoint must not operate on a post lock because a partial payload
   supplied only `targetId: t3_*`. Wrong-kind processing can corrupt runtime
   proof and apply moderation operations to the wrong content class.
+
+### D119 - Form bindings are validated and expiry-safe
+
+Lock and unlock confirmation forms depend on Redis-backed one-time form
+bindings.
+
+Decision:
+
+- Parse form binding JSON through explicit shape validation before returning it
+  to form submit handlers.
+- Delete malformed binding records when a token is consumed, so corrupt tokens
+  do not remain retryable.
+- If creating a binding writes Redis but cannot set the 10-minute expiry,
+  delete the just-written binding and fail the menu action.
+
+Reason:
+
+- Form tokens authorize moderator confirmation flows. A malformed binding must
+  not be treated as trusted state, and a token without TTL is worse than a
+  failed menu response because it can outlive the intended review context.

@@ -1999,3 +1999,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:32 IST - Form binding hardening
+
+- Validated Redis-backed form binding JSON before returning it to lock/unlock
+  submit handlers.
+- Malformed binding records are deleted on consume instead of remaining
+  retryable.
+- Binding creation now rolls back the Redis `set` when the expiry write fails,
+  preventing long-lived form tokens without TTL.
+- Focused validation:
+  - `npm run test -- src/server/services/formBindings.test.ts src/routes/forms.test.ts src/routes/menu.test.ts --reporter verbose`
+  - PASS, 3 test files and 30 tests.
+  - `npm run type-check`
+  - PASS after fixing the explicit parser return shape.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 336 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

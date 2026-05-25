@@ -294,6 +294,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Hardened by rejecting prefixed target ids that contradict the route target
     kind before any target refetch, moderation operation, or runtime proof
     write.
+- Redis-backed form bindings previously trusted parsed JSON shape and could be
+  left without an expiry if the `expire` write failed after `set`.
+  - Hardened by validating binding shape on consume, deleting malformed token
+    records, and rolling back the binding write when expiry cannot be set.
 
 ## Current Claim Boundary
 
