@@ -171,3 +171,4 @@
 - [x] Validate client API list records before dashboard rendering.
 - [x] Validate moderator action request bodies before route side effects.
 - [x] Validate Devvit menu/report/update target ids and report counts before service calls.
+- [x] Validate Devvit Reddit adapter model fields before creating ReviewLock targets.

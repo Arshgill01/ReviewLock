@@ -2261,3 +2261,26 @@ Reason:
 - Cast JSON can turn malformed objects, numbers, or arrays into apparently
   typed route inputs. A malformed platform payload should produce a neutral
   target-id error or safe fallback, not a 500 or misleading persisted proof.
+
+### D128 - Reddit adapter model mapping validates Devvit fields defensively
+
+Devvit Reddit models are external runtime objects, not ReviewLock-owned data.
+
+Decision:
+
+- Treat Reddit model fields as unknown at the adapter boundary.
+- Require target ids to be concrete strings with the expected thing prefix for
+  already-prefixed ids.
+- Normalize optional string metadata into strings or safe absence.
+- Accept report counts only when they are safe non-negative integers.
+- Accept boolean moderation/fingerprint flags only when they are booleans or
+  boolean-returning methods.
+- Let malformed or wrong-kind target ids throw inside the adapter so trigger
+  flows use their existing fail-open target-refetch handling.
+
+Reason:
+
+- A malformed Reddit model should not create an invalid ReviewLock target,
+  corrupt Redis schema, or mark runtime proof against the wrong thing kind.
+  Required id failures are safer as target refetch failures; optional metadata
+  should degrade to safe defaults.

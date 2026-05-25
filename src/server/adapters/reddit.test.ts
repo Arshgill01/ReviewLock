@@ -105,6 +105,49 @@ describe('reddit adapter mapping', () => {
     });
   });
 
+  it('normalizes malformed optional model fields to safe defaults', () => {
+    expect(
+      mapPostModel({
+        id: 'abc',
+        title: 100,
+        body: { text: 'Body' },
+        selftext: 'Self text fallback',
+        subredditName: 42,
+        authorName: null,
+        author: ['u_author'],
+        authorId: 't2_author',
+        permalink: false,
+        numberOfReports: '7',
+        numReports: -1,
+        nsfw: 'true',
+        isSpoiler: () => 'yes',
+        linkFlair: { text: 123, templateId: 'flair-template' },
+        approve: async () => undefined,
+        ignoreReports: async () => undefined,
+        unignoreReports: async () => undefined,
+      }),
+    ).toMatchObject({
+      id: 't3_abc',
+      subreddit: 'unknown',
+      authorName: 't2_author',
+      body: 'Self text fallback',
+      permalink: '',
+      flairTemplateId: 'flair-template',
+      reportCount: 0,
+    });
+  });
+
+  it('throws on malformed or wrong-kind model ids so trigger flows fail open', () => {
+    const base = {
+      approve: async () => undefined,
+      ignoreReports: async () => undefined,
+      unignoreReports: async () => undefined,
+    };
+
+    expect(() => mapPostModel({ ...base, id: 't1_comment' })).toThrow(/wrong thing prefix/);
+    expect(() => mapCommentModel({ ...base, id: { raw: 'comment' } })).toThrow(/malformed/);
+  });
+
   it('records fake moderation calls and structured failures can be triggered', async () => {
     const reddit = new FakeRedditAdapter([target()]);
     await reddit.approveTarget(target());

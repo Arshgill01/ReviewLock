@@ -2562,3 +2562,32 @@
   some platform trigger capabilities are still unverified.
 - No live report submission, post edit, comment edit, unlock, dismiss, or
   destructive moderation action was performed in this recheck.
+
+## 2026-05-26 02:26 IST - Reddit adapter model validation hardening
+
+- Tightened Devvit Reddit adapter model mapping so external model fields are
+  validated before creating `ReviewLockTarget` records.
+- Required target ids must now be concrete strings and wrong-kind prefixed ids
+  throw inside the adapter, which routes trigger flows through existing
+  target-refetch fail-open handling.
+- Optional string metadata now becomes a string or safe absence/default.
+- Report counts now require safe non-negative integers, and NSFW/spoiler flags
+  require booleans or boolean-returning methods.
+- Added adapter regressions for malformed optional fields, malformed model ids,
+  and wrong-kind prefixed ids.
+- Focused validation:
+  - `npm run test -- src/server/adapters/reddit.test.ts --reporter verbose`
+  - PASS, 1 test file and 6 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 367 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

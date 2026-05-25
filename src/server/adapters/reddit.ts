@@ -15,30 +15,30 @@ export interface RedditAdapter {
 }
 
 interface ModeratableModel {
-  id: string;
-  title?: string;
-  body?: string;
-  selftext?: string;
-  url?: string;
-  edited?: boolean;
-  ignoringReports?: boolean;
-  numberOfReports?: number;
-  numReports?: number;
-  userReportReasons?: string[];
-  modReportReasons?: string[];
-  permalink?: string;
-  subredditName?: string;
-  authorName?: string;
-  author?: string;
-  authorId?: string;
-  postId?: string;
-  parentId?: string;
-  flair?: { text?: string; templateId?: string };
-  linkFlair?: { text?: string; templateId?: string };
-  nsfw?: boolean;
-  spoiler?: boolean;
-  isNsfw?: boolean | (() => boolean);
-  isSpoiler?: boolean | (() => boolean);
+  id: unknown;
+  title?: unknown;
+  body?: unknown;
+  selftext?: unknown;
+  url?: unknown;
+  edited?: unknown;
+  ignoringReports?: unknown;
+  numberOfReports?: unknown;
+  numReports?: unknown;
+  userReportReasons?: unknown;
+  modReportReasons?: unknown;
+  permalink?: unknown;
+  subredditName?: unknown;
+  authorName?: unknown;
+  author?: unknown;
+  authorId?: unknown;
+  postId?: unknown;
+  parentId?: unknown;
+  flair?: unknown;
+  linkFlair?: unknown;
+  nsfw?: unknown;
+  spoiler?: unknown;
+  isNsfw?: unknown;
+  isSpoiler?: unknown;
   approve(): Promise<void>;
   ignoreReports(): Promise<void>;
   unignoreReports(): Promise<void>;
@@ -47,9 +47,9 @@ interface ModeratableModel {
 interface DevvitRedditClient {
   getPostById(id: string): Promise<ModeratableModel>;
   getCommentById(id: string): Promise<ModeratableModel>;
-  getCurrentUsername(): Promise<string | undefined>;
-  getCurrentSubredditName?(): Promise<string | undefined>;
-  getCurrentSubreddit?(): Promise<{ name: string }>;
+  getCurrentUsername(): Promise<unknown>;
+  getCurrentSubredditName?(): Promise<unknown>;
+  getCurrentSubreddit?(): Promise<{ name?: unknown } | undefined>;
   submitCustomPost(input: {
     subredditName: string;
     title: string;
@@ -58,8 +58,37 @@ interface DevvitRedditClient {
   }): Promise<{ permalink: string }>;
 }
 
-const normalizeThingId = (kind: 'post' | 'comment', id: string): string => {
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const countValue = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+
+const boolValue = (value: unknown): boolean | undefined =>
+  typeof value === 'boolean' ? value : undefined;
+
+const boolMethodValue = (value: unknown): boolean | undefined =>
+  typeof value === 'function' ? boolValue((value as () => unknown)()) : boolValue(value);
+
+const field = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
+
+const normalizeThingId = (kind: 'post' | 'comment', value: unknown): string => {
+  const id = stringValue(value);
+
+  if (!id) {
+    throw new Error(`Reddit ${kind} id was missing or malformed.`);
+  }
+
   if (id.startsWith('t1_') || id.startsWith('t3_')) {
+    const expectedPrefix = kind === 'post' ? 't3_' : 't1_';
+
+    if (!id.startsWith(expectedPrefix)) {
+      throw new Error(`Reddit ${kind} id had the wrong thing prefix.`);
+    }
+
     return id;
   }
 
@@ -69,30 +98,31 @@ const normalizeThingId = (kind: 'post' | 'comment', id: string): string => {
 export const mapPostModel = (post: ModeratableModel): ReviewLockTarget => ({
   id: normalizeThingId('post', post.id),
   kind: 'post',
-  subreddit: post.subredditName ?? 'unknown',
-  authorName: post.authorName ?? post.author ?? post.authorId ?? 'unknown',
-  permalink: post.permalink ?? '',
-  title: post.title,
-  body: post.body ?? post.selftext,
-  url: post.url,
-  flairText: post.flair?.text ?? post.linkFlair?.text,
-  flairTemplateId: post.flair?.templateId ?? post.linkFlair?.templateId,
-  isNsfw: post.nsfw ?? (typeof post.isNsfw === 'function' ? post.isNsfw() : post.isNsfw),
-  isSpoiler:
-    post.spoiler ?? (typeof post.isSpoiler === 'function' ? post.isSpoiler() : post.isSpoiler),
+  subreddit: stringValue(post.subredditName) ?? 'unknown',
+  authorName:
+    stringValue(post.authorName) ?? stringValue(post.author) ?? stringValue(post.authorId) ?? 'unknown',
+  permalink: stringValue(post.permalink) ?? '',
+  title: stringValue(post.title),
+  body: stringValue(post.body) ?? stringValue(post.selftext),
+  url: stringValue(post.url),
+  flairText: stringValue(field(post.flair, 'text')) ?? stringValue(field(post.linkFlair, 'text')),
+  flairTemplateId:
+    stringValue(field(post.flair, 'templateId')) ?? stringValue(field(post.linkFlair, 'templateId')),
+  isNsfw: boolValue(post.nsfw) ?? boolMethodValue(post.isNsfw),
+  isSpoiler: boolValue(post.spoiler) ?? boolMethodValue(post.isSpoiler),
   edited: post.edited === true,
-  reportCount: post.numberOfReports ?? post.numReports ?? 0,
+  reportCount: countValue(post.numberOfReports) ?? countValue(post.numReports) ?? 0,
 });
 
 export const mapCommentModel = (comment: ModeratableModel): ReviewLockTarget => ({
   id: normalizeThingId('comment', comment.id),
   kind: 'comment',
-  subreddit: comment.subredditName ?? 'unknown',
-  authorName: comment.authorName ?? comment.author ?? 'unknown',
-  permalink: comment.permalink ?? '',
-  body: comment.body,
+  subreddit: stringValue(comment.subredditName) ?? 'unknown',
+  authorName: stringValue(comment.authorName) ?? stringValue(comment.author) ?? 'unknown',
+  permalink: stringValue(comment.permalink) ?? '',
+  body: stringValue(comment.body),
   edited: comment.edited === true,
-  reportCount: comment.numReports ?? comment.numberOfReports ?? 0,
+  reportCount: countValue(comment.numReports) ?? countValue(comment.numberOfReports) ?? 0,
 });
 
 export class DevvitRedditAdapter implements RedditAdapter {
@@ -119,15 +149,15 @@ export class DevvitRedditAdapter implements RedditAdapter {
   }
 
   async getCurrentUsername(): Promise<string | undefined> {
-    return this.client.getCurrentUsername();
+    return stringValue(await this.client.getCurrentUsername());
   }
 
   async getCurrentSubredditName(): Promise<string | undefined> {
     if (this.client.getCurrentSubredditName) {
-      return this.client.getCurrentSubredditName();
+      return stringValue(await this.client.getCurrentSubredditName());
     }
 
-    return (await this.client.getCurrentSubreddit?.())?.name;
+    return stringValue((await this.client.getCurrentSubreddit?.())?.name);
   }
 
   async submitDashboardPost(input: {
