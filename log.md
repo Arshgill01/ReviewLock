@@ -1308,3 +1308,39 @@
     rebuild reaches a ready playtest version.
   - Controlled report/edit trigger events and sanitized `devvit logs` capture
     remain pending.
+
+## 2026-05-25 - Wave 33 S01 active lock live verification
+
+- Started a fresh playtest for `r/reviewlock_dev`; playtest reached
+  `v0.0.2.84`.
+- Verified in Zen on the live dashboard that S01 is active:
+  - target: `post:1tmmeo6`
+  - author: `u/BrightyBrainiac`
+  - reason: `reviewed policy compliant`
+  - suppressed reports before report proof: `0`
+- Verified the dashboard first viewport at that point showed 2 active locks, 0
+  reports suppressed, 0 reopened after edit, and trigger runtime proof still
+  `unverified`.
+- Found that S01 cannot be reported by the currently logged-in account because
+  it is authored by `u/BrightyBrainiac`; Reddit exposes edit/delete/spoiler/NSFW
+  actions instead of `Report`.
+- Prepared a controlled report modal on the already locked dashboard post
+  `t3_1tm8nak`, authored by `u/reviewlock`, with `Spam` selected. Stopped before
+  clicking `Next` pending action-time confirmation because the next step can
+  create a live Reddit report event.
+- The user clicked the first `Next` step. I selected the low-specificity
+  subtype `Other` and advanced to Reddit's final report `Submit` screen with
+  optional additional context left blank. Stopped before final `Submit` because
+  it transmits the live report.
+- Commands run:
+  - `npm run dev -- reviewlock_dev`
+  - Zen browser dashboard inspection on
+    `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+  - Zen browser S01 inspection on
+    `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/?playtest=reviewlock`
+- Pass/fail status: PASS for active-lock verification; BLOCKED at final Reddit
+  report `Submit`.
+- Open risks:
+  - No live trigger delivery has been generated yet in this pass.
+  - The next controlled report target is `t3_1tm8nak`, not S01, because S01 is a
+    self-authored post for the logged-in account.

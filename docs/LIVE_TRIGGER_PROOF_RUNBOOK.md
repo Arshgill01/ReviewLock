@@ -13,10 +13,11 @@ is explicitly selected.
 - S01 has been posted in `r/reviewlock_dev`:
   `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
   (`t3_1tmmeo6`, author `u/BrightyBrainiac`).
-- User reported clicking the S01 `Lock review` action after the form was
-  prepared. Treat S01 as locked pending dashboard/runtime verification in the
-  current playtest.
-- Current playtest reached `v0.0.2.82`.
+- S01 was verified in the live dashboard as an active lock on playtest
+  `v0.0.2.84`, with target `post:1tmmeo6`, author `u/BrightyBrainiac`,
+  reason `reviewed policy compliant`, and `0` reports suppressed before any
+  controlled report event.
+- Current playtest reached `v0.0.2.84`.
 - Trigger routes now emit sanitized payload-shape logs from the live bootstrap
   path. These logs intentionally record only route name, target kind, and
   boolean/object-shape flags, not raw target ids, content text, reporter names,
@@ -24,6 +25,11 @@ is explicitly selected.
 - No live `PostReport`, `CommentReport`, `PostUpdate`, `CommentUpdate`,
   `PostNsfwUpdate`, `PostSpoilerUpdate`, or `PostFlairUpdate` trigger delivery
   has been proven yet.
+- S01 is authored by the currently logged-in dev account, so Reddit does not
+  expose a `Report` action for S01 from this session. The first unchanged-report
+  proof candidate is the already locked dashboard post `t3_1tm8nak`, authored
+  by `u/reviewlock`, because the logged-in dev account can open its Report
+  modal.
 
 ## Terminal Setup
 

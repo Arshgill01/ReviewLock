@@ -22,8 +22,8 @@ and observed in Devvit logs/dashboard output.
 
 Live record:
 
-- Status: posted and user-reported locked through ReviewLock; dashboard/runtime
-  verification still pending in the current playtest pass.
+- Status: posted and verified as an active ReviewLock lock in the live
+  dashboard on playtest `v0.0.2.84`.
 - Permalink:
   `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
 - Thing id: `t3_1tmmeo6`
@@ -91,6 +91,19 @@ Expected result:
 - New fingerprint differs from the stored fingerprint.
 - Lock moves to `reopened`.
 - Reopen event reason is `content_changed`.
+
+## Live Report Candidate - Dashboard Post
+
+Live record:
+
+- Status: posted by `u/reviewlock`, locked through ReviewLock, and report modal
+  reachable from logged-in dev account `u/BrightyBrainiac`.
+- Permalink:
+  `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`
+- Thing id: `t3_1tm8nak`
+
+Use only as a controlled unchanged-report trigger candidate when S01 cannot be
+reported by the logged-in account because S01 was authored by that same account.
 
 ## S03 - Flair Edit Reopen
 
