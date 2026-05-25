@@ -2078,3 +2078,26 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:40 IST - Live WebView Redis smoke recheck
+
+- Rechecked the live Reddit Devvit WebView in Zen after Redis runtime smoke was
+  expanded to include sorted-set newest-first ordering.
+- Existing dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account: `u/BrightyBrainiac`.
+- Playtest version observed in the WebView links: `v0.0.2.234`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- Latest edit-break event showed `comment:ontlx1k`.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status still showed `redis verified`, which means the updated
+  Redis smoke route's string and sorted-set checks passed in the live WebView
+  context.
+- Remaining unverified rows stayed correctly unverified:
+  `commentReportTrigger`, `postFlairUpdateTrigger`, `postNsfwUpdateTrigger`,
+  and `postSpoilerUpdateTrigger`.
+- No live report submission, post edit, comment edit, unlock, or dismiss action
+  was performed in this recheck.

@@ -1,6 +1,6 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-25 01:28 IST.
+Last updated: 2026-05-26 01:40 IST.
 
 ## Scope
 
@@ -29,6 +29,8 @@ This pass does not prove live moderation methods or live report/edit trigger del
 - Latest demo data depth hardening playtest version observed in Zen: `v0.0.2.68`.
 - Latest runtime proof reconciliation hardening playtest version observed in
   Zen: `v0.0.2.185`.
+- Latest Redis sorted-set runtime smoke hardening playtest version observed in
+  Zen: `v0.0.2.234`.
 
 ## Failure Found
 
@@ -207,6 +209,40 @@ After dashboard proof, count, and recovery-state hardening:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Redis Sorted-Set Smoke Recheck
+
+After Redis runtime smoke was expanded to verify namespaced sorted-set
+newest-first ordering:
+
+- Playtest version: `v0.0.2.234`.
+- Existing Zen tab was used on the ReviewLock dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account was `u/BrightyBrainiac`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- Latest edit-break event showed `comment:ontlx1k`.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status rows showed:
+  - `approve verified`
+  - `commentReportTrigger unverified`
+  - `commentUpdateTrigger verified`
+  - `ignoreReports verified`
+  - `postFlairUpdateTrigger unverified`
+  - `postNsfwUpdateTrigger unverified`
+  - `postReportTrigger verified`
+  - `postSpoilerUpdateTrigger unverified`
+  - `postUpdateTrigger verified`
+  - `redditContext verified`
+  - `redis verified`
+  - `unignoreReports verified`
+- This live pass exercises the updated `/api/smoke/redis` route, including the
+  sorted-set ordering check, before the dashboard marks `redis verified`.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -282,6 +318,11 @@ performed in this recheck.
   - Result: PASS, live dashboard rendered on playtest `v0.0.2.211`, `Verify
     runtime` completed, proof rows matched the current claim boundary, and
     remaining unverified rows stayed unverified.
+- Zen browser live WebView Redis sorted-set smoke recheck
+  - Result: PASS, live dashboard rendered on playtest `v0.0.2.234`, `Verify
+    runtime` completed, `redis verified` remained verified after the added
+    sorted-set ordering smoke, and remaining unverified trigger rows stayed
+    unverified.
 - `npm exec devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
   - Result: FAIL, npm passthrough treated `5m` as an unexpected argument.
 - `npm exec devvit logs -- reviewlock_dev reviewlock --connect --since=15m --show-timestamps --log-runtime`
