@@ -1053,3 +1053,23 @@ Reason:
   prefix, rejecting it before refetch would make report/update trigger proof fail
   for a shape the adapter is otherwise prepared to handle. The route is the
   safest place to apply kind-specific normalization.
+
+### D066 - Log trigger payload shape without payload values
+
+Live trigger proof needs evidence of the payload shape Devvit delivers, but
+report and update payloads can carry private moderation or content context.
+
+Decision:
+
+- Log `reviewlock.trigger.payload_shape` from the live trigger route bootstrap.
+- Include route name, target kind, and boolean/object-shape flags only.
+- Exclude raw thing ids, subreddit names, author names, content text, reporter
+  names, and report reason text from the logged structure.
+- Keep payload values available only inside the trigger handler for target
+  resolution and moderation decisions, not in proof logs.
+
+Reason:
+
+- The proof run must compare real runtime payload structure with local route
+  fixtures, but ReviewLock's safety boundary forbids collecting reporter
+  identities or unnecessary content details in logs.

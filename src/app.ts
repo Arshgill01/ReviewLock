@@ -6,6 +6,7 @@ import type { RedditAdapter } from './server/adapters/reddit';
 import { createApiRouter } from './routes/api';
 import { createFormsRouter } from './routes/forms';
 import { createMenuRouter } from './routes/menu';
+import type { TriggerPayloadLogger } from './routes/triggerPayloadLog';
 import { createTriggersRouter } from './routes/triggers';
 
 export interface ReviewLockAppDeps {
@@ -13,6 +14,7 @@ export interface ReviewLockAppDeps {
   redis?: RedisStore;
   clock?: Clock;
   getCurrentSubredditName?: () => string | undefined;
+  logger?: TriggerPayloadLogger;
 }
 
 export const createApp = (deps: ReviewLockAppDeps = {}): Hono => {
@@ -22,6 +24,7 @@ export const createApp = (deps: ReviewLockAppDeps = {}): Hono => {
     clock: deps.clock ?? systemClock,
     reddit: deps.reddit,
     getCurrentSubredditName: deps.getCurrentSubredditName,
+    logger: deps.logger,
   };
 
   app.route('/api', createApiRouter(resolvedDeps));

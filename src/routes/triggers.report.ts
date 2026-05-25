@@ -6,11 +6,13 @@ import type { RedditAdapter } from '../server/adapters/reddit';
 import { handleReportTrigger } from '../server/services/reportTriggers';
 import { normalizeTargetId } from '../server/services/targetResolver';
 import type { TargetKind } from '../shared/schema';
+import { logTriggerPayloadShape, type TriggerPayloadLogger } from './triggerPayloadLog';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
   redis?: RedisStore;
   clock?: Clock;
+  logger?: TriggerPayloadLogger;
 }
 
 interface TriggerBody {
@@ -103,6 +105,12 @@ export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     const body = await readBody(context);
+    logTriggerPayloadShape(
+      deps.logger,
+      kind === 'post' ? 'on-post-report' : 'on-comment-report',
+      kind,
+      body,
+    );
     const id = targetId(body, kind);
 
     if (!id) {

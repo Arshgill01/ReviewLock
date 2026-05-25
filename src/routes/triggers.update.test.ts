@@ -130,6 +130,60 @@ describe('update trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
   });
 
+  it('logs sanitized update payload shape without raw ids or content fields', async () => {
+    const redis = new InMemoryRedisStore();
+    const logs: Record<string, unknown>[] = [];
+    await saveLock(redis, lock());
+    const router = createUpdateTriggersRouter({
+      reddit: new FakeRedditAdapter([target('Edited body')]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      logger: {
+        info: (_message, data) => {
+          logs.push(data);
+        },
+      },
+    });
+    const response = await router.request('/on-post-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-private-update',
+        postUpdate: {
+          post: {
+            id: 't3_post',
+            subredditName: 'alpha',
+            body: 'private edited body',
+          },
+          previousBody: 'private previous body',
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(logs).toEqual([
+      expect.objectContaining({
+        route: 'on-post-update',
+        targetKind: 'post',
+        postUpdate: expect.objectContaining({
+          present: true,
+          post: expect.objectContaining({
+            present: true,
+            id: true,
+            subredditName: true,
+          }),
+          subredditObject: true,
+        }),
+      }),
+    ]);
+    const serialized = JSON.stringify(logs);
+    expect(serialized).not.toContain('evt-private-update');
+    expect(serialized).not.toContain('t3_post');
+    expect(serialized).not.toContain('alpha');
+    expect(serialized).not.toContain('private edited body');
+    expect(serialized).not.toContain('private previous body');
+  });
+
   it('uses Devvit top-level subreddit object for fail-open reopen when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());

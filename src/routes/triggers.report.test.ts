@@ -139,6 +139,63 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
   });
 
+  it('logs sanitized report payload shape without raw ids, content, or report reasons', async () => {
+    const redis = new InMemoryRedisStore();
+    const logs: Record<string, unknown>[] = [];
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      logger: {
+        info: (_message, data) => {
+          logs.push(data);
+        },
+      },
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-private-report',
+        timestamp: '2026-05-24T01:00:00.000Z',
+        postReport: {
+          post: {
+            id: 't3_post',
+            subredditName: 'alpha',
+            numberOfReports: 9,
+            body: 'private reported content',
+          },
+          subreddit: { name: 'alpha' },
+          reason: 'private report reason',
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(logs).toEqual([
+      expect.objectContaining({
+        route: 'on-post-report',
+        targetKind: 'post',
+        postReport: expect.objectContaining({
+          present: true,
+          reason: true,
+          post: expect.objectContaining({
+            present: true,
+            id: true,
+            subredditName: true,
+            numberOfReports: true,
+          }),
+        }),
+      }),
+    ]);
+    const serialized = JSON.stringify(logs);
+    expect(serialized).not.toContain('evt-private-report');
+    expect(serialized).not.toContain('t3_post');
+    expect(serialized).not.toContain('alpha');
+    expect(serialized).not.toContain('private reported content');
+    expect(serialized).not.toContain('private report reason');
+  });
+
   it('uses wrapped report subreddit for fail-open reopen when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());

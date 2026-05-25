@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
+import type { TriggerPayloadLogger } from './triggerPayloadLog';
 import { createReportTriggersRouter } from './triggers.report';
 import { createUpdateTriggersRouter } from './triggers.update';
 
@@ -9,6 +10,7 @@ interface TriggerDeps {
   reddit?: RedditAdapter;
   redis?: RedisStore;
   clock?: Clock;
+  logger?: TriggerPayloadLogger;
 }
 
 export const createTriggersRouter = (deps: TriggerDeps = {}): Hono => {

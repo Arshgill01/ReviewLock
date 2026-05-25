@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 01:39 IST.
+Last updated: 2026-05-25 15:12 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -13,9 +13,14 @@ is explicitly selected.
 - S01 has been posted in `r/reviewlock_dev`:
   `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
   (`t3_1tmmeo6`, author `u/BrightyBrainiac`).
-- Zen is currently on the S01 post page; the lock form must be reopened after
-  action-time confirmation because playtest rebuilds closed the earlier form.
+- User reported clicking the S01 `Lock review` action after the form was
+  prepared. Treat S01 as locked pending dashboard/runtime verification in the
+  current playtest.
 - Current playtest reached `v0.0.2.82`.
+- Trigger routes now emit sanitized payload-shape logs from the live bootstrap
+  path. These logs intentionally record only route name, target kind, and
+  boolean/object-shape flags, not raw target ids, content text, reporter names,
+  or report reason text.
 - No live `PostReport`, `CommentReport`, `PostUpdate`, `CommentUpdate`,
   `PostNsfwUpdate`, `PostSpoilerUpdate`, or `PostFlairUpdate` trigger delivery
   has been proven yet.

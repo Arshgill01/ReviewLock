@@ -1,6 +1,6 @@
 # Live Scenario Content
 
-Last updated: 2026-05-25 01:39 IST.
+Last updated: 2026-05-25 15:12 IST.
 
 This file contains the exact controlled content to create in
 `r/reviewlock_dev` for live ReviewLock proof. These are not demo fixtures and
@@ -22,7 +22,8 @@ and observed in Devvit logs/dashboard output.
 
 Live record:
 
-- Status: posted, not yet locked.
+- Status: posted and user-reported locked through ReviewLock; dashboard/runtime
+  verification still pending in the current playtest pass.
 - Permalink:
   `/r/reviewlock_dev/comments/1tmmeo6/reviewlock_proof_s01_reviewed_unchanged_policy/`
 - Thing id: `t3_1tmmeo6`

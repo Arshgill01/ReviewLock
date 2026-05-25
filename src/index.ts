@@ -10,6 +10,7 @@ const app = createApp({
   redis: createDevvitRedisStore(redis),
   reddit: createRedditAdapterFromContext({ reddit }),
   getCurrentSubredditName: () => context.subredditName,
+  logger: console,
 });
 
 serve({

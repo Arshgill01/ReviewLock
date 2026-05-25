@@ -1281,3 +1281,30 @@
 - Open risks:
   - S01 has not been locked through ReviewLock in the current live pass.
   - No controlled report or edit trigger has been generated yet.
+
+## 2026-05-25 - Wave 33 sanitized trigger payload logging
+
+- Added `reviewlock.trigger.payload_shape` logging for report and update
+  trigger routes from the live Devvit bootstrap path.
+- The logger records only route name, target kind, and payload shape booleans;
+  tests assert raw event ids, thing ids, subreddit names, content text, and
+  report reason text are not logged.
+- Recorded the user's S01 update: the live post was locked through the
+  ReviewLock action, pending dashboard/runtime verification in this playtest
+  pass.
+- Commands run:
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg "TODO" src || true`
+  - `rg "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+- Pass/fail status: PASS for focused trigger-route tests, type-check, lint,
+  full test suite, build, and diff whitespace check.
+- Open risks:
+  - S01 lock still needs dashboard/runtime verification after the current
+    rebuild reaches a ready playtest version.
+  - Controlled report/edit trigger events and sanitized `devvit logs` capture
+    remain pending.

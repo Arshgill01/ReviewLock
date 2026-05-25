@@ -1,6 +1,6 @@
 # Trigger Proof
 
-Last updated: 2026-05-25 01:38 IST.
+Last updated: 2026-05-25 15:12 IST.
 
 This document traces every ReviewLock trigger path from incoming payload to target resolution, lock decision, moderation operation, Redis mutation, metrics, audit, and reopen queue effects.
 
@@ -18,6 +18,14 @@ Local route tests use payload fields accepted by ReviewLock trigger routes:
   kind is known: post routes use `t3_*`; comment routes use `t1_*`.
 
 Live Devvit payload comparison is not available yet. `devvit logs` connectivity was proven in Wave 13, but no live `PostReport`, `CommentReport`, or update payloads have been captured from Reddit runtime. Until those events are generated in `r/reviewlock_dev`, route payloads are representative local fixtures only.
+
+The live bootstrap now passes `console` into the trigger router so playtest logs
+include `reviewlock.trigger.payload_shape` entries for report and update
+callbacks. Those entries record only route names, target kind, and
+boolean/object-shape flags such as whether `post.id`, `comment.id`,
+`subreddit.name`, and report counters were present. They intentionally do not
+record raw thing ids, subreddit names, author names, content/body text, reporter
+names, or report reason text.
 
 ## Report Trigger Paths
 
@@ -69,6 +77,7 @@ Commands:
 - `npm run type-check`
 - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/lockFlow.test.ts src/server/adapters/redis.test.ts src/client/render.test.ts --reporter verbose`
 - `npm run test -- src/server/services/targetResolver.test.ts src/routes/menu.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+- `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
 - `npm run test`
 - `npm run build`
 
@@ -78,8 +87,9 @@ Targeted test result:
 - Report trigger service coverage now includes 20 report-trigger tests, including
   dedupe TTL, retry after runtime-uncertain failures, and rollback failure
   evidence after Redis write failures.
-- Trigger route coverage includes Devvit wrapper payloads and bare post/comment
-  id normalization before target resolution.
+- Trigger route coverage includes Devvit wrapper payloads, bare post/comment id
+  normalization before target resolution, and sanitized payload-shape logging
+  that rejects raw ids, content, subreddit names, and report reason text.
 
 Covered files:
 

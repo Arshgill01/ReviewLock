@@ -6,11 +6,13 @@ import type { RedditAdapter } from '../server/adapters/reddit';
 import { handleUpdateTrigger, type UpdateTriggerKind } from '../server/services/updateTriggers';
 import { normalizeTargetId } from '../server/services/targetResolver';
 import type { TargetKind } from '../shared/schema';
+import { logTriggerPayloadShape, type TriggerPayloadLogger } from './triggerPayloadLog';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
   redis?: RedisStore;
   clock?: Clock;
+  logger?: TriggerPayloadLogger;
 }
 
 interface TriggerBody {
@@ -89,6 +91,7 @@ const registerUpdate = (
     }
 
     const body = await readBody(context);
+    logTriggerPayloadShape(deps.logger, path.slice(1), targetKind, body);
     const id = targetId(body, targetKind);
 
     if (!id) {
