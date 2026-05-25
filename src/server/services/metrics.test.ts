@@ -158,6 +158,17 @@ describe('metrics persistence', () => {
         demo: false,
       }),
     );
+    await redis.set(
+      keys.metricsDaily('alpha', 'bad-date'),
+      JSON.stringify({
+        subreddit: 'alpha',
+        date: '05/27/2026',
+        locksCreated: 0,
+        reportsSuppressed: 0,
+        locksReopened: 0,
+        demo: false,
+      }),
+    );
     await redis.zAdd(keys.metricsDailyIndex('alpha'), {
       member: '2026-05-24',
       score: Date.parse('2026-05-24T00:00:00.000Z'),
@@ -169,6 +180,10 @@ describe('metrics persistence', () => {
     await redis.zAdd(keys.metricsDailyIndex('alpha'), {
       member: '2026-05-26',
       score: Date.parse('2026-05-26T00:00:00.000Z'),
+    });
+    await redis.zAdd(keys.metricsDailyIndex('alpha'), {
+      member: 'bad-date',
+      score: Date.parse('2026-05-27T00:00:00.000Z'),
     });
     await redis.set(keys.metricsTarget('alpha', 't3_bad'), '{');
     await redis.set(
@@ -188,6 +203,19 @@ describe('metrics persistence', () => {
         demo: false,
       }),
     );
+    await redis.set(
+      keys.metricsTarget('alpha', 't3_bad_date'),
+      JSON.stringify({
+        subreddit: 'alpha',
+        targetId: 't3_bad_date',
+        targetKind: 'post',
+        reportsSuppressed: 0,
+        locksCreated: 0,
+        locksReopened: 0,
+        lastActivityAt: '2026-05-24',
+        demo: false,
+      }),
+    );
     await redis.zAdd(keys.metricsTargetIndex('alpha'), {
       member: 't3_bad',
       score: 10,
@@ -200,14 +228,20 @@ describe('metrics persistence', () => {
       member: 't3_negative',
       score: 30,
     });
+    await redis.zAdd(keys.metricsTargetIndex('alpha'), {
+      member: 't3_bad_date',
+      score: 40,
+    });
 
     expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toBeUndefined();
     expect(await getDailyMetrics(redis, 'alpha', '2026-05-25')).toBeUndefined();
     expect(await getDailyMetrics(redis, 'alpha', '2026-05-26')).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', 'bad-date')).toBeUndefined();
     expect(await listDailyMetrics(redis, 'alpha')).toEqual([]);
     expect(await getTargetMetrics(redis, 'alpha', 't3_bad')).toBeUndefined();
     expect(await getTargetMetrics(redis, 'alpha', 't3_wrong_shape')).toBeUndefined();
     expect(await getTargetMetrics(redis, 'alpha', 't3_negative')).toBeUndefined();
+    expect(await getTargetMetrics(redis, 'alpha', 't3_bad_date')).toBeUndefined();
     expect(await listTopTargetMetrics(redis, 'alpha')).toEqual([]);
   });
 });

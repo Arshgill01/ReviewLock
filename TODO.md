@@ -165,3 +165,4 @@
 - [x] Extend Redis runtime smoke to cover sorted-set ordering used by audit and queue ledgers.
 - [x] Keep reopen queue items visible when dismissal queue or record persistence fails.
 - [x] Fail closed when Redis guard TTL leases cannot be set.
+- [x] Reject malformed persisted timestamps before dashboard aggregation.

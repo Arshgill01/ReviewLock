@@ -2156,3 +2156,24 @@ Reason:
   processing, metrics updates, or report retries if the process exits before the
   `finally` cleanup runs. For moderator trust, a visible retryable failure is
   better than a silent stuck state.
+
+### D123 - Persisted timestamps must be strict ISO UTC
+
+ReviewLock sorts and displays persisted locks, reopen events, audit events,
+metrics, and config records by timestamp fields.
+
+Decision:
+
+- Treat persisted timestamps as valid only when they are strict
+  `YYYY-MM-DDTHH:mm:ss.sssZ` UTC strings that round-trip through `Date`.
+- Treat daily metrics dates as valid only when they are real `YYYY-MM-DD`
+  dates.
+- Skip malformed persisted records during Redis reads instead of accepting
+  locale dates, impossible dates, or partially-formatted timestamps.
+
+Reason:
+
+- Bad persisted dates can produce `NaN` scores, unstable ordering, misleading
+  dashboard chronology, or malformed runtime proof context. Strict persisted
+  data is safer than trying to render questionable state in a moderator-facing
+  audit surface.

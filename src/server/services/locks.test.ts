@@ -83,9 +83,14 @@ describe('lock persistence', () => {
       keys.lock('alpha', 'lock-negative-count'),
       JSON.stringify(lock({ id: 'lock-negative-count', suppressedReportCount: -1 })),
     );
+    await redis.set(
+      keys.lock('alpha', 'lock-bad-date'),
+      JSON.stringify(lock({ id: 'lock-bad-date', targetId: 't3_bad_date', lockedAt: 'yesterday' })),
+    );
     await redis.set(keys.targetLock('alpha', 't3_bad'), 'lock-bad');
     await redis.set(keys.targetLock('alpha', 't3_wrong_shape'), 'lock-wrong-shape');
     await redis.set(keys.targetLock('alpha', 't3_negative_count'), 'lock-negative-count');
+    await redis.set(keys.targetLock('alpha', 't3_bad_date'), 'lock-bad-date');
     await redis.zAdd(keys.activeLocks('alpha'), {
       member: 'lock-bad',
       score: Date.parse('2026-05-24T00:00:00.000Z'),
@@ -98,18 +103,25 @@ describe('lock persistence', () => {
       member: 'lock-negative-count',
       score: Date.parse('2026-05-24T02:00:00.000Z'),
     });
+    await redis.zAdd(keys.activeLocks('alpha'), {
+      member: 'lock-bad-date',
+      score: Date.parse('2026-05-24T03:00:00.000Z'),
+    });
 
     expect(await getLock(redis, 'alpha', 'lock-bad')).toBeUndefined();
     expect(await getLock(redis, 'alpha', 'lock-wrong-shape')).toBeUndefined();
     expect(await getLock(redis, 'alpha', 'lock-negative-count')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-bad-date')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_bad')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_wrong_shape')).toBeUndefined();
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_negative_count')).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_bad_date')).toBeUndefined();
     expect(await listActiveLocks(redis, 'alpha')).toEqual([]);
     expect(await updateLockStatus(redis, 'alpha', 'lock-bad', 'reopened')).toBeUndefined();
     expect(await updateLockStatus(redis, 'alpha', 'lock-wrong-shape', 'reopened')).toBeUndefined();
     expect(
       await updateLockStatus(redis, 'alpha', 'lock-negative-count', 'reopened'),
     ).toBeUndefined();
+    expect(await updateLockStatus(redis, 'alpha', 'lock-bad-date', 'reopened')).toBeUndefined();
   });
 });

@@ -40,6 +40,10 @@ describe('audit log', () => {
       keys.auditEvent('alpha', 'wrong-shape'),
       JSON.stringify({ kind: 'lock_created' }),
     );
+    await redis.set(
+      keys.auditEvent('alpha', 'bad-date'),
+      JSON.stringify(event({ id: 'bad-date', createdAt: '2026-05-24T00:00:00Z' })),
+    );
     await redis.zAdd(keys.audit('alpha'), {
       member: 'bad',
       score: Date.parse('2026-05-24T01:00:00.000Z'),
@@ -48,9 +52,14 @@ describe('audit log', () => {
       member: 'wrong-shape',
       score: Date.parse('2026-05-24T02:00:00.000Z'),
     });
+    await redis.zAdd(keys.audit('alpha'), {
+      member: 'bad-date',
+      score: Date.parse('2026-05-24T03:00:00.000Z'),
+    });
 
     expect(await getAuditEvent(redis, 'alpha', 'bad')).toBeUndefined();
     expect(await getAuditEvent(redis, 'alpha', 'wrong-shape')).toBeUndefined();
+    expect(await getAuditEvent(redis, 'alpha', 'bad-date')).toBeUndefined();
     expect((await listAuditEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
   });
 });

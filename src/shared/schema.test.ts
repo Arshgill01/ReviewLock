@@ -6,8 +6,10 @@ import {
   isReopenReason,
   isReviewLockRecord,
   isReviewLockConfig,
+  isReopenEvent,
   isTargetMetrics,
   isTargetKind,
+  isAuditEvent,
 } from './schema';
 
 describe('domain validators', () => {
@@ -107,6 +109,90 @@ describe('domain validators', () => {
         lastReportCount: -1,
         suppressedReportCount: 0,
         runtimeWarnings: [],
+        demo: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects malformed persisted dates and timestamps', () => {
+    expect(
+      isReviewLockConfig({
+        subreddit: 'alpha',
+        lockExpiryDays: 30,
+        demoModeEnabled: false,
+        reasonPresets: ['reviewed_policy_compliant'],
+        updatedAt: 'not-a-date',
+      }),
+    ).toBe(false);
+    expect(
+      isDailyMetrics({
+        subreddit: 'alpha',
+        date: '2026-02-31',
+        locksCreated: 0,
+        reportsSuppressed: 0,
+        locksReopened: 0,
+        demo: false,
+      }),
+    ).toBe(false);
+    expect(
+      isTargetMetrics({
+        subreddit: 'alpha',
+        targetId: 't3_post',
+        targetKind: 'post',
+        reportsSuppressed: 0,
+        locksCreated: 0,
+        locksReopened: 0,
+        lastActivityAt: '2026-05-24',
+        demo: false,
+      }),
+    ).toBe(false);
+    expect(
+      isReviewLockRecord({
+        id: 'lock-1',
+        subreddit: 'alpha',
+        targetId: 't3_post',
+        targetKind: 'post',
+        targetAuthor: 'u_author',
+        permalink: '/r/alpha/comments/post',
+        contentPreview: 'reviewed',
+        contentHash: 'hash',
+        fingerprintVersion: 'content-v1',
+        lockedBy: 'mod',
+        lockedAt: 'yesterday',
+        lockReason: 'reviewed_policy_compliant',
+        status: 'active',
+        lastKnownEdited: false,
+        lastReportCount: 0,
+        suppressedReportCount: 0,
+        runtimeWarnings: [],
+        demo: false,
+      }),
+    ).toBe(false);
+    expect(
+      isReopenEvent({
+        id: 'event-1',
+        lockId: 'lock-1',
+        subreddit: 'alpha',
+        targetId: 't3_post',
+        targetKind: 'post',
+        oldContentHash: 'old',
+        newContentHash: 'new',
+        reason: 'content_changed',
+        createdAt: '2026-02-31T00:00:00.000Z',
+        summary: 'Content changed.',
+        runtimeWarnings: [],
+        demo: false,
+      }),
+    ).toBe(false);
+    expect(
+      isAuditEvent({
+        id: 'audit-1',
+        kind: 'lock_created',
+        subreddit: 'alpha',
+        actor: 'mod',
+        createdAt: '2026-05-24T00:00:00Z',
+        message: 'Locked.',
+        data: {},
         demo: false,
       }),
     ).toBe(false);

@@ -222,6 +222,21 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 const isOptionalString = (value: unknown): value is string | undefined =>
   value === undefined || isString(value);
 
+const isIsoTimestamp = (value: unknown): value is string =>
+  isString(value) &&
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) &&
+  Number.isFinite(Date.parse(value)) &&
+  new Date(value).toISOString() === value;
+
+const isOptionalIsoTimestamp = (value: unknown): value is string | undefined =>
+  value === undefined || isIsoTimestamp(value);
+
+const isIsoDate = (value: unknown): value is string =>
+  isString(value) &&
+  /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  Number.isFinite(Date.parse(`${value}T00:00:00.000Z`)) &&
+  new Date(`${value}T00:00:00.000Z`).toISOString().startsWith(`${value}T`);
+
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
 
 const isNumber = (value: unknown): value is number =>
@@ -265,16 +280,16 @@ export const isReviewLockRecord = (value: unknown): value is ReviewLockRecord =>
   isString(value.contentHash) &&
   isString(value.fingerprintVersion) &&
   isString(value.lockedBy) &&
-  isString(value.lockedAt) &&
+  isIsoTimestamp(value.lockedAt) &&
   isLockReasonPreset(value.lockReason) &&
   isOptionalString(value.customNote) &&
-  isOptionalString(value.expiresAt) &&
+  isOptionalIsoTimestamp(value.expiresAt) &&
   isLockStatus(value.status) &&
   isBoolean(value.lastKnownEdited) &&
   isNonNegativeInteger(value.lastReportCount) &&
   isNonNegativeInteger(value.suppressedReportCount) &&
-  isOptionalString(value.lastSuppressedAt) &&
-  isOptionalString(value.reopenedAt) &&
+  isOptionalIsoTimestamp(value.lastSuppressedAt) &&
+  isOptionalIsoTimestamp(value.reopenedAt) &&
   (value.reopenReason === undefined || isReopenReason(value.reopenReason)) &&
   isOptionalString(value.reopenEventId) &&
   isStringArray(value.runtimeWarnings) &&
@@ -290,8 +305,8 @@ export const isReopenEvent = (value: unknown): value is ReopenEvent =>
   isString(value.oldContentHash) &&
   isString(value.newContentHash) &&
   isReopenReason(value.reason) &&
-  isString(value.createdAt) &&
-  isOptionalString(value.dismissedAt) &&
+  isIsoTimestamp(value.createdAt) &&
+  isOptionalIsoTimestamp(value.dismissedAt) &&
   isOptionalString(value.dismissedBy) &&
   isString(value.summary) &&
   isStringArray(value.runtimeWarnings) &&
@@ -306,7 +321,7 @@ export const isAuditEvent = (value: unknown): value is AuditEvent =>
   (value.targetKind === undefined || isTargetKind(value.targetKind)) &&
   isOptionalString(value.lockId) &&
   isString(value.actor) &&
-  isString(value.createdAt) &&
+  isIsoTimestamp(value.createdAt) &&
   isString(value.message) &&
   isAuditData(value.data) &&
   isBoolean(value.demo);
@@ -314,7 +329,7 @@ export const isAuditEvent = (value: unknown): value is AuditEvent =>
 export const isDailyMetrics = (value: unknown): value is DailyMetrics =>
   isRecord(value) &&
   isString(value.subreddit) &&
-  isString(value.date) &&
+  isIsoDate(value.date) &&
   isNonNegativeInteger(value.locksCreated) &&
   isNonNegativeInteger(value.reportsSuppressed) &&
   isNonNegativeInteger(value.locksReopened) &&
@@ -328,7 +343,7 @@ export const isTargetMetrics = (value: unknown): value is TargetMetrics =>
   isNonNegativeInteger(value.reportsSuppressed) &&
   isNonNegativeInteger(value.locksCreated) &&
   isNonNegativeInteger(value.locksReopened) &&
-  isString(value.lastActivityAt) &&
+  isIsoTimestamp(value.lastActivityAt) &&
   isBoolean(value.demo);
 
 export const isReviewLockConfig = (value: unknown): value is ReviewLockConfig =>
@@ -337,4 +352,4 @@ export const isReviewLockConfig = (value: unknown): value is ReviewLockConfig =>
   isPositiveInteger(value.lockExpiryDays) &&
   isBoolean(value.demoModeEnabled) &&
   isLockReasonPresetArray(value.reasonPresets) &&
-  isString(value.updatedAt);
+  isIsoTimestamp(value.updatedAt);

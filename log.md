@@ -2300,3 +2300,26 @@
   and `postSpoilerUpdateTrigger`.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 02:00 IST - Persisted timestamp validation hardening
+
+- Tightened shared schema validation so persisted locks, reopen events, audit
+  events, target metrics, and config records require strict ISO UTC timestamps.
+- Tightened daily metrics validation to require real `YYYY-MM-DD` dates.
+- Added regressions proving malformed or impossible dates are skipped from
+  active locks, audit logs, reopen queues, and metrics aggregation.
+- Focused validation:
+  - `npm run test -- src/shared/schema.test.ts src/server/services/locks.test.ts src/server/services/audit.test.ts src/server/services/reopenQueue.test.ts src/server/services/metrics.test.ts src/server/services/config.test.ts --reporter verbose`
+  - PASS, 6 test files and 31 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 351 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
