@@ -4,7 +4,7 @@ import type { UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
-import type { LockReasonPreset } from '../shared/schema';
+import { isIsoTimestamp, type LockReasonPreset } from '../shared/schema';
 import { LOCK_REASON_PRESETS } from '../shared/constants';
 import { appendAuditEvent } from '../server/services/audit';
 import { consumeFormBinding } from '../server/services/formBindings';
@@ -20,28 +20,28 @@ interface RouteDeps {
 }
 
 interface LockSubmitBody {
-  targetId?: string;
-  subreddit?: string;
-  formToken?: string;
-  actor?: string;
-  lockReason?: LockReasonPreset | LockReasonPreset[];
-  customNote?: string;
-  expiresAt?: string;
+  targetId?: unknown;
+  subreddit?: unknown;
+  formToken?: unknown;
+  actor?: unknown;
+  lockReason?: unknown;
+  customNote?: unknown;
+  expiresAt?: unknown;
 }
 
 interface UnlockSubmitBody {
-  targetId?: string;
-  subreddit?: string;
-  formToken?: string;
-  lockId?: string;
-  actor?: string;
+  targetId?: unknown;
+  subreddit?: unknown;
+  formToken?: unknown;
+  lockId?: unknown;
+  actor?: unknown;
 }
 
 interface ReopenActionBody {
-  eventId?: string;
-  action?: 'dismiss';
-  actor?: string;
-  subreddit?: string;
+  eventId?: unknown;
+  action?: unknown;
+  actor?: unknown;
+  subreddit?: unknown;
 }
 
 const readJson = async <T>(context: Context): Promise<T> => {
@@ -56,8 +56,11 @@ const uiToast = (text: string, appearance: 'neutral' | 'success' = 'neutral'): U
   showToast: { text, appearance },
 });
 
-const actorFromReddit = async (reddit: RedditAdapter, fallback?: string): Promise<string> => {
-  const fallbackActor = fallback?.trim() || 'unknown_moderator';
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+const actorFromReddit = async (reddit: RedditAdapter, fallback?: unknown): Promise<string> => {
+  const fallbackActor = stringValue(fallback)?.trim() || 'unknown_moderator';
 
   try {
     return (await reddit.getCurrentUsername()) || fallbackActor;
@@ -66,8 +69,10 @@ const actorFromReddit = async (reddit: RedditAdapter, fallback?: string): Promis
   }
 };
 
-const selectedLockReason = (value: LockSubmitBody['lockReason']): LockReasonPreset | undefined =>
-  Array.isArray(value) ? value[0] : value;
+const selectedLockReason = (value: unknown): LockReasonPreset | undefined => {
+  const selected = Array.isArray(value) ? value[0] : value;
+  return typeof selected === 'string' ? (selected as LockReasonPreset) : undefined;
+};
 
 const validLockReason = (value: string | undefined): value is LockReasonPreset =>
   LOCK_REASON_PRESETS.includes(value as LockReasonPreset);
@@ -112,10 +117,14 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     const flowDeps = { reddit: deps.reddit, redis: deps.redis, clock: deps.clock };
 
     const body = await readJson<LockSubmitBody>(context);
-
+    const targetId = stringValue(body.targetId);
+    const subredditInput = stringValue(body.subreddit);
+    const formToken = stringValue(body.formToken);
+    const customNote = stringValue(body.customNote);
+    const expiresAt = stringValue(body.expiresAt);
     const lockReason = selectedLockReason(body.lockReason);
 
-    if (!body.formToken || !body.subreddit || !lockReason) {
+    if (!formToken || !subredditInput || !lockReason) {
       return context.json<UiResponse>(uiToast('ReviewLock form token and reason are required.'));
     }
 
@@ -123,7 +132,11 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       return context.json<UiResponse>(uiToast('ReviewLock lock reason is not valid.'));
     }
 
-    const subreddit = await scopedFormSubreddit(deps.reddit, body.subreddit);
+    if (expiresAt && !isIsoTimestamp(expiresAt)) {
+      return context.json<UiResponse>(uiToast('ReviewLock lock expiry is not valid.'));
+    }
+
+    const subreddit = await scopedFormSubreddit(deps.reddit, subredditInput);
 
     if (!subreddit) {
       return context.json<UiResponse>(
@@ -131,7 +144,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const binding = await consumeFormBinding(deps.redis, subreddit, body.formToken);
+    const binding = await consumeFormBinding(deps.redis, subreddit, formToken);
 
     if (!binding || binding.action !== 'lock') {
       return context.json<UiResponse>(
@@ -139,7 +152,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    if (body.targetId && body.targetId !== binding.targetId) {
+    if (targetId && targetId !== binding.targetId) {
       return context.json<UiResponse>(
         uiToast('ReviewLock form target changed. Reopen the menu and try again.'),
       );
@@ -155,8 +168,8 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       targetId: binding.targetId,
       actor: await actorFromReddit(deps.reddit, body.actor),
       lockReason,
-      customNote: body.customNote,
-      expiresAt: body.expiresAt,
+      customNote,
+      expiresAt,
       expectedContentHash: binding.reviewedContentHash,
       expectedFingerprintVersion: binding.reviewedFingerprintVersion,
     });
@@ -175,12 +188,16 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     const flowDeps = { reddit: deps.reddit, redis: deps.redis, clock: deps.clock };
 
     const body = await readJson<UnlockSubmitBody>(context);
+    const targetId = stringValue(body.targetId);
+    const lockId = stringValue(body.lockId);
+    const subredditInput = stringValue(body.subreddit);
+    const formToken = stringValue(body.formToken);
 
-    if (!body.formToken || !body.subreddit) {
+    if (!formToken || !subredditInput) {
       return context.json<UiResponse>(uiToast('ReviewLock form token and lock are required.'));
     }
 
-    const subreddit = await scopedFormSubreddit(deps.reddit, body.subreddit);
+    const subreddit = await scopedFormSubreddit(deps.reddit, subredditInput);
 
     if (!subreddit) {
       return context.json<UiResponse>(
@@ -188,7 +205,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const binding = await consumeFormBinding(deps.redis, subreddit, body.formToken);
+    const binding = await consumeFormBinding(deps.redis, subreddit, formToken);
 
     if (!binding || binding.action !== 'unlock' || !binding.lockId) {
       return context.json<UiResponse>(
@@ -197,8 +214,8 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     if (
-      (body.targetId && body.targetId !== binding.targetId) ||
-      (body.lockId && body.lockId !== binding.lockId)
+      (targetId && targetId !== binding.targetId) ||
+      (lockId && lockId !== binding.lockId)
     ) {
       return context.json<UiResponse>(
         uiToast('ReviewLock form target changed. Reopen the menu and try again.'),
@@ -264,12 +281,15 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     const body = await readJson<ReopenActionBody>(context);
+    const eventId = stringValue(body.eventId);
+    const action = stringValue(body.action);
+    const subredditInput = stringValue(body.subreddit);
 
-    if (!body.eventId || body.action !== 'dismiss' || !body.subreddit) {
+    if (!eventId || action !== 'dismiss' || !subredditInput) {
       return context.json<UiResponse>(uiToast('Reopen event, action, and subreddit are required.'));
     }
 
-    const subreddit = await scopedFormSubreddit(deps.reddit, body.subreddit);
+    const subreddit = await scopedFormSubreddit(deps.reddit, subredditInput);
 
     if (!subreddit) {
       return context.json<UiResponse>(
@@ -279,7 +299,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
 
     const actor = await actorFromReddit(deps.reddit, body.actor);
     const dismissedAt = deps.clock.now();
-    const event = await getReopenEvent(deps.redis, subreddit, body.eventId);
+    const event = await getReopenEvent(deps.redis, subreddit, eventId);
 
     if (!event) {
       return context.json<UiResponse>(uiToast('Reopen event was not found.'));
@@ -305,7 +325,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
     try {
-      await dismissReopenEvent(deps.redis, subreddit, body.eventId, dismissedAt, actor);
+      await dismissReopenEvent(deps.redis, subreddit, eventId, dismissedAt, actor);
     } catch (error) {
       await appendAuditEvent(deps.redis, {
         id: `audit-reopen-dismiss-failed-${Date.parse(dismissedAt)}-${event.id}`,

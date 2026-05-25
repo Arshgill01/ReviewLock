@@ -2465,3 +2465,35 @@
   `Runtime proof refreshed.`
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 02:15 IST - Moderator action body validation hardening
+
+- Tightened dashboard unlock and reopen-dismiss API body handling so required
+  ids must be strings before moderation, audit, or queue side effects.
+- Tightened Devvit form submissions so form token, subreddit, target, lock, and
+  reopen action fields are normalized before use.
+- Malformed actor fallback values are now ignored instead of throwing before
+  Reddit username lookup.
+- Malformed optional lock notes are ignored, and malformed string expiry values
+  are rejected before lock form tokens are consumed.
+- Cross-checked the sibling ModMirror workspace at
+  `/Users/arshdeepsingh/Developer/ModMirror`; its routes commonly cast parsed
+  bodies after `req.json().catch`, so ReviewLock intentionally uses a stricter
+  local boundary for moderator actions.
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts src/routes/forms.test.ts --reporter verbose`
+  - PASS, 2 test files and 35 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 360 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

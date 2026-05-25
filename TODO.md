@@ -169,3 +169,4 @@
 - [x] Add `noopener` protection to dashboard target links.
 - [x] Validate runtime proof timestamps and statuses before render/persist.
 - [x] Validate client API list records before dashboard rendering.
+- [x] Validate moderator action request bodies before route side effects.

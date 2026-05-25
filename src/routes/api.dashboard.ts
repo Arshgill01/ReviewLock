@@ -25,15 +25,15 @@ interface RouteDeps {
 }
 
 interface UnlockBody {
-  targetId?: string;
-  lockId?: string;
-  actor?: string;
+  targetId?: unknown;
+  lockId?: unknown;
+  actor?: unknown;
 }
 
 interface DismissReopenBody {
-  eventId?: string;
-  actor?: string;
-  subreddit?: string;
+  eventId?: unknown;
+  actor?: unknown;
+  subreddit?: unknown;
 }
 
 const requestedSubredditFrom = (context: Context, override?: string): string | undefined =>
@@ -53,11 +53,14 @@ const readJson = async <T>(context: Context): Promise<T> => {
   }
 };
 
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
 const actorFromReddit = async (
   reddit: RedditAdapter | undefined,
-  fallback?: string,
+  fallback?: unknown,
 ): Promise<string> => {
-  const fallbackActor = fallback?.trim() || 'unknown_moderator';
+  const fallbackActor = stringValue(fallback)?.trim() || 'unknown_moderator';
 
   try {
     return (await reddit?.getCurrentUsername()) || fallbackActor;
@@ -351,7 +354,10 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
 
       const body = await readJson<UnlockBody>(context);
 
-      if (!body.targetId || !body.lockId) {
+      const targetId = stringValue(body.targetId);
+      const lockId = stringValue(body.lockId);
+
+      if (!targetId || !lockId) {
         return context.json({
           ok: false,
           message: 'Target and lock are required.',
@@ -372,8 +378,8 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
       const result = await unlockReviewedContent(
         { reddit: deps.reddit, redis: deps.redis, clock: deps.clock },
         {
-          targetId: body.targetId,
-          lockId: body.lockId,
+          targetId,
+          lockId,
           expectedSubreddit: scope.subreddit,
           actor: await actorFromReddit(deps.reddit, body.actor),
         },
@@ -404,7 +410,9 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
       }
 
       const body = await readJson<DismissReopenBody>(context);
-      const scope = await resolveScopedSubreddit(context, deps, body.subreddit);
+      const eventId = stringValue(body.eventId);
+      const requestedSubreddit = stringValue(body.subreddit);
+      const scope = await resolveScopedSubreddit(context, deps, requestedSubreddit);
 
       if (!scope.ok) {
         return scope.response;
@@ -416,7 +424,7 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
 
       const dismissedAt = generatedAt(deps);
 
-      if (!body.eventId) {
+      if (!eventId) {
         return context.json({
           ok: false,
           message: 'Reopen event is required.',
@@ -425,7 +433,7 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
       }
 
       const actor = await actorFromReddit(deps.reddit, body.actor);
-      const event = await getReopenEvent(deps.redis, scope.subreddit, body.eventId);
+      const event = await getReopenEvent(deps.redis, scope.subreddit, eventId);
 
       if (!event) {
         return context.json({ ok: false, message: 'Reopen event was not found.' });
@@ -445,7 +453,7 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
         demo: event.demo,
       });
       try {
-        await dismissReopenEvent(deps.redis, scope.subreddit, body.eventId, dismissedAt, actor);
+        await dismissReopenEvent(deps.redis, scope.subreddit, eventId, dismissedAt, actor);
       } catch (error) {
         await appendAuditEvent(deps.redis, {
           id: `audit-reopen-dismiss-failed-${Date.parse(dismissedAt)}-${event.id}`,

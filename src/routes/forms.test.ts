@@ -90,6 +90,69 @@ describe('form routes', () => {
     });
   });
 
+  it('ignores malformed optional lock form strings before persisting the lock', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()], 'mod_test'),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        actor: { name: 'bad' },
+        lockReason: 'reviewed_policy_compliant',
+        customNote: { text: 'bad' },
+        expiresAt: { date: 'bad' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock locked this reviewed content until it changes.',
+        appearance: 'success',
+      },
+    });
+    const savedLock = await getActiveLockByTarget(redis, 'alpha', 't3_post');
+    expect(savedLock?.lockedBy).toBe('mod_test');
+    expect(savedLock?.customNote).toBeUndefined();
+    expect(savedLock?.expiresAt).toBeUndefined();
+  });
+
+  it('rejects malformed lock expiry strings before consuming the form token', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+        expiresAt: 'tomorrow',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock lock expiry is not valid.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('rejects stale lock forms when content changed after review summary render', async () => {
     const redis = new InMemoryRedisStore();
     const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
@@ -495,7 +558,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         eventId: 'reopen-1',
         action: 'dismiss',
-        actor: 'client_supplied_actor',
+        actor: { name: 'bad' },
         subreddit: 'alpha',
       }),
     });

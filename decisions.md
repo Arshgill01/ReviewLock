@@ -2217,3 +2217,25 @@ Reason:
   but the browser should remain defensive against bad API responses, stale
   deployments, or accidental schema drift. A hard dashboard error is safer than
   showing moderators misleading locks, metrics, or audit history.
+
+### D126 - Moderator action routes normalize body fields before side effects
+
+Dashboard actions and Devvit form submissions are moderation-control surfaces.
+
+Decision:
+
+- Treat incoming JSON body fields as unknown until validated.
+- Require dashboard unlock and dismiss identifiers to be strings before any
+  moderation, audit, or queue mutation.
+- Ignore malformed optional actor fallback values and prefer the current Reddit
+  username when available.
+- Ignore malformed optional lock notes, and reject malformed string expiry
+  timestamps before consuming a lock form token.
+
+Reason:
+
+- Browser or platform-provided bodies can be malformed. Passing non-strings
+  into action services can cause avoidable 500s or persist locks that fail the
+  domain schema on the next read. Moderator action routes should either reject
+  malformed required inputs before side effects or normalize optional inputs
+  into safe absence.

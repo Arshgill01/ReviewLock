@@ -180,6 +180,55 @@ describe('dashboard API routes', () => {
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_alpha')).toMatchObject({ id: 'lock-1' });
   });
 
+  it('rejects malformed dashboard unlock body fields before moderation', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target()], 'dash_mod');
+    await saveLock(redis, lock());
+    const router = createDashboardApiRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/locks/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetId: { id: 't3_alpha' }, lockId: 'lock-1' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message: 'Target and lock are required.',
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_alpha')).toMatchObject({ id: 'lock-1' });
+  });
+
+  it('ignores malformed dashboard actor fallbacks without failing actions', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target()], 'dash_mod');
+    await saveLock(redis, lock());
+    const router = createDashboardApiRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/locks/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetId: 't3_alpha', lockId: 'lock-1', actor: { name: 'bad' } }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'lock_unlocked',
+        actor: 'dash_mod',
+      }),
+    ]);
+  });
+
   it('rejects demo dashboard unlock mutations before changing state', async () => {
     const demoTarget: ReviewLockTarget = {
       ...target(),
@@ -338,6 +387,31 @@ describe('dashboard API routes', () => {
       expect.objectContaining({ id: 'reopen-demo' }),
     ]);
     expect(await listAuditEvents(redis, DEMO_SUBREDDIT)).toEqual([]);
+  });
+
+  it('rejects malformed dashboard dismiss body fields before audit writes', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    const router = createDashboardApiRouter({
+      reddit: new FakeRedditAdapter([target()], 'dash_mod'),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-queue/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: { id: 'reopen-1' }, subreddit: 'alpha' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message: 'Reopen event is required.',
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([]);
   });
 
   it('keeps reopened items visible when dashboard dismiss audit write fails', async () => {
