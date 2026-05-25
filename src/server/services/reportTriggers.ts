@@ -14,7 +14,7 @@ import {
 import { incrementReopenedMetric, incrementSuppressedReportMetric } from './metrics';
 import { ignoreReportsForReviewLock, unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
-import { recordModerationOperationStatus } from './runtimeProof';
+import { recordCapabilityStatus, recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 import { isTriggerConcurrencyError, withTriggerMutex } from './triggerMutex';
 import { decideReportTriggerAction, type ReportTriggerDecision } from './triggerDecisions';
@@ -150,6 +150,27 @@ const recordRuntimeProof = async (
   await recordModerationOperationStatus(deps.redis, subreddit, result, now).catch(() => undefined);
 };
 
+const recordReportTriggerDelivery = async (
+  deps: ReportTriggerDependencies,
+  subreddit: string,
+  targetKind: ReviewLockTarget['kind'],
+  targetId: string,
+  now: string,
+): Promise<void> => {
+  await recordCapabilityStatus(
+    deps.redis,
+    subreddit,
+    {
+      name: targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger',
+      status: 'verified',
+      checkedAt: now,
+      evidence: `${targetKind} report trigger on ${targetId}`,
+      notes: [`${targetKind} report trigger delivered for ${targetId}.`],
+    },
+    now,
+  ).catch(() => undefined);
+};
+
 export const handleReportTrigger = async (
   deps: ReportTriggerDependencies,
   input: ReportTriggerInput,
@@ -157,7 +178,12 @@ export const handleReportTrigger = async (
   const now = input.reportedAt ?? deps.clock.now();
   const resolution = await resolveTargetById(deps.reddit, input.targetId);
   const subreddit = resolution.target?.subreddit ?? input.subreddit ?? 'unknown';
+  const targetKind =
+    resolution.target?.kind ?? (input.targetId.startsWith('t1_') ? 'comment' : 'post');
   const dedupeInput = { ...input, subreddit };
+  if (subreddit !== 'unknown') {
+    await recordReportTriggerDelivery(deps, subreddit, targetKind, input.targetId, now);
+  }
 
   try {
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {

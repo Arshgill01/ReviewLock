@@ -1,6 +1,6 @@
 # Trigger Proof
 
-Last updated: 2026-05-25 15:12 IST.
+Last updated: 2026-05-25 15:35 IST.
 
 This document traces every ReviewLock trigger path from incoming payload to target resolution, lock decision, moderation operation, Redis mutation, metrics, audit, and reopen queue effects.
 
@@ -17,7 +17,10 @@ Local route tests use payload fields accepted by ReviewLock trigger routes:
 - Bare Devvit ids are normalized at route boundaries when the endpoint target
   kind is known: post routes use `t3_*`; comment routes use `t1_*`.
 
-Live Devvit payload comparison is not available yet. `devvit logs` connectivity was proven in Wave 13, but no live `PostReport`, `CommentReport`, or update payloads have been captured from Reddit runtime. Until those events are generated in `r/reviewlock_dev`, route payloads are representative local fixtures only.
+Live `PostReport` payload comparison is now available for a controlled
+unchanged locked post in `r/reviewlock_dev`. Comment report and update payloads
+have not been captured from Reddit runtime yet, so those route payloads remain
+representative local fixtures only.
 
 The live bootstrap now passes `console` into the trigger router so playtest logs
 include `reviewlock.trigger.payload_shape` entries for report and update
@@ -40,6 +43,24 @@ names, or report reason text.
 | Target cannot be loaded, no subreddit scope   | Payload identifies a target absent from Reddit adapter and no subreddit scope | `runtime_uncertain`                                    | None                            | Any active lock remains retryable because no namespace can be proven                           | No suppression metric                                       | `runtime_failure`                                                | No event                                      |
 | Target cannot be loaded, known active lock    | Payload identifies a target absent from Reddit adapter with subreddit scope    | `runtime_uncertain`                                    | None                            | Known lock becomes `reopened`; active target index removed; `reopenReason: runtime_uncertain`  | No suppression metric                                       | `lock_reopened` with `unignoreReportsOk: false`                  | Event with `reason: runtime_uncertain`       |
 | `ignoreReports()` fails                       | Active unchanged lock but moderation operation throws                         | `runtime_uncertain`                                    | Failed `ignoreReports` call     | Lock remains `active`; no suppression mutation                                                 | No suppression metric                                       | `runtime_failure`                                                | No event                                      |
+
+### Controlled Live PostReport Evidence
+
+Verified on 2026-05-25 in `r/reviewlock_dev` against locked dashboard post
+`t3_1tm8nak` on playtest `v0.0.2.87`.
+
+- Browser action: Reddit report flow submitted from `u/BrightyBrainiac` with
+  category `Spam`, subtype `Other`, and blank optional additional context.
+- Log command:
+  `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`.
+- Sanitized log event: `reviewlock.trigger.payload_shape` for
+  `route: 'on-post-report'`, `targetKind: 'post'`.
+- Observed shape: direct top-level target/event ids absent; nested `post`
+  object present with `post.id`, `post.subredditId`, and `post.numReports`.
+- Dashboard after refresh: `Reports suppressed = 1`, active row
+  `post:1tm8nak` suppressed count `1`, report churn `post:1tm8nak` count `1`,
+  and audit `Report Suppressed 5/25/2026, 3:29:43 PM`.
+- Reddit native status: `Reports ignored 1`.
 
 ## Update Trigger Paths
 

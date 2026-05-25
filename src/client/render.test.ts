@@ -120,6 +120,16 @@ describe('client render helpers', () => {
     expectSafeCopy(html);
   });
 
+  it('renders item-level runtime warnings on active locks', () => {
+    const html = renderLockTable([
+      lock({ runtimeWarnings: ['unignoreReports failed for t3_reviewed'] }),
+    ]);
+
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('unignoreReports failed for t3_reviewed');
+    expectSafeCopy(html);
+  });
+
   it('renders in-dashboard confirmations for destructive dashboard actions', () => {
     const lockHtml = renderLockTable([lock()], {
       action: 'unlock',
@@ -180,6 +190,15 @@ describe('client render helpers', () => {
     expect(renderReopenQueue([])).toContain('No reopened items are waiting.');
     expect(renderLatestReopenEvent(reopen())).toContain('Latest edit-break event');
     expect(renderLatestReopenEvent(undefined)).toContain('No reopened item is waiting.');
+  });
+
+  it('renders item-level runtime warnings on reopened items', () => {
+    const event = reopen({ runtimeWarnings: ['unignoreReports failed for t3_reviewed'] });
+    const html = renderReopenQueue([event]) + renderLatestReopenEvent(event);
+
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('unignoreReports failed for t3_reviewed');
+    expectSafeCopy(html);
   });
 
   it('renders demo and runtime status plainly', () => {

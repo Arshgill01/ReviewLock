@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-25 00:11 IST.
+Last updated: 2026-05-25 15:35 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -26,6 +26,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Latest observed hot reload in the controlled moderation method pass: `v0.0.2.39`.
   - Latest observed hot reload in the post-hardening live WebView smoke pass: `v0.0.2.62`.
   - Latest observed hot reload in the trigger-wrapper hardening recheck: `v0.0.2.64`.
+  - Latest observed hot reload in the controlled `PostReport` proof pass:
+    `v0.0.2.87`.
+  - Observed hot reload after update-trigger runtime-proof hardening:
+    `v0.0.2.89`; subsequent doc-only validation reloads continued after that.
 - Zen browser embedded WebView smoke
   - Result: PASS, the ReviewLock dashboard rendered inside Reddit at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
   - Result: PASS, the header showed `r/reviewlock_dev` after the WebView context fix.
@@ -40,6 +44,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - Zen browser lock form proof
   - Result: PASS, the `Lock review` form opened and showed target id, content summary, report count, edit state, permalink, and reason picker for `t3_1tm8nak`.
   - Result: PASS, submitting the form created an active lock, wrote audit, and runtime status showed `approve verified` and `ignoreReports verified`.
+- Zen browser controlled post report proof
+  - Result: PASS, submitted one controlled Reddit report against unchanged locked post `t3_1tm8nak`.
+  - Result: PASS, Devvit emitted sanitized `reviewlock.trigger.payload_shape` for `on-post-report`.
+  - Result: PASS, Reddit showed native `Reports ignored 1`; ReviewLock dashboard showed `Reports suppressed = 1`, active row `post:1tm8nak` suppressed count `1`, report churn `post:1tm8nak` count `1`, and audit `Report Suppressed 5/25/2026, 3:29:43 PM`.
 - `npm run type-check`
   - Result: PASS after runtime hardening patches.
 - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
@@ -80,9 +88,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | `approve()` live behavior                    | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock, wrote audit, and runtime status showed `approve verified`.                                          | Verified for a controlled post target; comment target remains unverified.                                        |
 | `ignoreReports()` live behavior              | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock and runtime status showed `ignoreReports verified`.                                                  | Verified for a controlled post target; comment target remains unverified.                                        |
 | `unignoreReports()` live behavior            | verified   | Dashboard `Unlock` on controlled target `t3_1tm8nak` removed the lock, wrote audit, and runtime status showed `unignoreReports verified`.                                        | Verified through ReviewLock dashboard API and Reddit adapter path.                                               |
-| Report trigger delivery                      | unverified | `devvit.json` registers `onPostReport` and `onCommentReport`; routes and services are locally tested.                                                                            | Need live or controlled trigger proof in a dedicated playtest pass.                                              |
+| Post report trigger delivery                 | verified   | Controlled report against unchanged locked post `t3_1tm8nak` emitted sanitized `on-post-report` payload-shape logs, kept the lock active, incremented suppressed metrics, and wrote `report_suppressed` audit. | Verified for a controlled post target. Comment report trigger remains unverified.                                |
+| Comment report trigger delivery              | unverified | `devvit.json` registers `onCommentReport`; routes and services are locally tested.                                                                                               | Need live or controlled comment report proof.                                                                    |
 | Update trigger delivery                      | unverified | `devvit.json` registers post/comment update, NSFW, spoiler, and flair update triggers; routes and services are locally tested.                                                   | Need live or controlled trigger proof in a dedicated playtest pass.                                              |
-| Devvit logs                                  | verified   | After stopping playtest, `devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime` connected for `reviewlock` on `r/reviewlock_dev`.                   | No trigger payload logs captured yet.                                                                            |
+| Devvit logs                                  | verified   | `devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime` captured sanitized `on-post-report` payload-shape evidence during controlled report proof. | Update trigger payload logs remain uncaptured.                                                                   |
 
 ## Runtime Failures Found And Hardened
 
@@ -212,6 +221,24 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   for subreddit scope.
   - Hardened by sending the current dashboard subreddit with unlock requests so
     the server can reject mismatches explicitly.
+- Update-trigger reopen flows previously did not record their
+  `unignoreReports()` moderation operation result in the runtime proof ledger.
+  - Hardened by recording update-trigger `unignoreReports()` success/failure in
+    the same runtime proof surface used by lock, unlock, and report-trigger
+    paths.
+- Active locks with runtime warnings previously looked like ordinary active
+  locks in the dashboard.
+  - Hardened by rendering a row-level `Needs attention` marker and escaped
+    warning text next to the affected active lock.
+- Reopen queue and latest reopen cards previously hid runtime warnings attached
+  to reopened items.
+  - Hardened by rendering a row-level `Needs attention` marker and escaped
+    warning text on reopened items.
+- Trigger delivery proof previously existed only in docs/logs, while the
+  runtime proof ledger kept the broad `triggers` capability unverified.
+  - Hardened by recording granular capabilities such as `postReportTrigger`,
+    `commentReportTrigger`, and individual update-trigger capabilities when
+    those specific routes process accepted payloads.
 
 ## Current Claim Boundary
 
@@ -224,12 +251,18 @@ Allowed claims:
 - The dashboard live WebView renders under `r/reviewlock_dev` in Zen and its runtime smoke verifies Redis plus Reddit context.
 - Dashboard unlock has live-verified `unignoreReports()` on controlled target `t3_1tm8nak`.
 - Dashboard lock review has live-verified `approve()` and `ignoreReports()` on controlled target `t3_1tm8nak`.
-- A controlled live scenario matrix exists for the next report/edit trigger
-  proof pass in `docs/LIVE_SCENARIO_MATRIX.md`.
+- Controlled post report suppression is live-verified for unchanged locked
+  target `t3_1tm8nak`, including sanitized trigger payload-shape log, native
+  Reddit `Reports ignored 1`, dashboard suppressed count, report churn, and
+  audit evidence.
+- Future trigger deliveries now write granular runtime proof capabilities
+  without marking unrelated comment or update trigger paths verified.
+- A controlled live scenario matrix exists for the remaining edit/comment
+  trigger proof pass in `docs/LIVE_SCENARIO_MATRIX.md`.
 
 Not allowed yet:
 
-- Do not claim live report suppression is verified.
+- Do not claim live comment report suppression is verified.
 - Do not claim live edit-trigger reopening is verified.
 - Do not claim comment-target `approve()`, `ignoreReports()`, or `unignoreReports()` are verified in production-like Devvit runtime.
-- Do not claim `devvit logs` has been captured for trigger payloads.
+- Do not claim update-trigger payload logs have been captured.

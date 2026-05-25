@@ -44,12 +44,12 @@ Dev account: `u/BrightyBrainiac`.
 ## Report trigger flow
 
 - [x] Define a controlled live scenario matrix before generating real report events.
-- [ ] Generate or simulate a repeated post report against an unchanged locked post.
-- [ ] Confirm `PostReport` reaches `/internal/triggers/on-post-report`.
-- [ ] Confirm active lock is loaded.
-- [ ] Confirm current fingerprint matches the lock fingerprint.
-- [ ] Confirm `ignoreReports()` is called.
-- [ ] Confirm suppressed counters and audit event are written.
+- [x] Generate or simulate a repeated post report against an unchanged locked post.
+- [x] Confirm `PostReport` reaches `/internal/triggers/on-post-report`.
+- [x] Confirm active lock is loaded.
+- [x] Confirm current fingerprint matches the lock fingerprint.
+- [x] Confirm `ignoreReports()` is called.
+- [x] Confirm suppressed counters and audit event are written.
 - [ ] Generate or simulate a repeated comment report against an unchanged locked comment.
 - [ ] Confirm the same path for `/internal/triggers/on-comment-report`.
 

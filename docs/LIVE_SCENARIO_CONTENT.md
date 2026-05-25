@@ -1,6 +1,6 @@
 # Live Scenario Content
 
-Last updated: 2026-05-25 15:25 IST.
+Last updated: 2026-05-25 15:35 IST.
 
 This file contains the exact controlled content to create in
 `r/reviewlock_dev` for live ReviewLock proof. These are not demo fixtures and
@@ -84,6 +84,20 @@ Expected result:
 - Report is suppressed.
 - Suppressed count and audit event increase.
 
+Observed result:
+
+- Verified on playtest `v0.0.2.87`.
+- Reddit report flow submitted from `u/BrightyBrainiac` with report category
+  `Spam` and subtype `Other`, optional additional context blank.
+- Devvit emitted sanitized `reviewlock.trigger.payload_shape` for
+  `on-post-report`; the payload had a nested `post` object with `post.id`,
+  `post.subredditId`, and `post.numReports` present.
+- Reddit showed native status `Reports ignored 1`.
+- ReviewLock dashboard showed `Reports suppressed` increased to `1`, active
+  lock row `post:1tm8nak` suppressed count `1`, report churn row
+  `post:1tm8nak` count `1`, and audit `Report Suppressed 5/25/2026,
+  3:29:43 PM`.
+
 ## S02 - Body Edit Reopen
 
 Title:
@@ -114,19 +128,6 @@ Expected result:
 - New fingerprint differs from the stored fingerprint.
 - Lock moves to `reopened`.
 - Reopen event reason is `content_changed`.
-
-## Live Report Candidate - Dashboard Post
-
-Live record:
-
-- Status: posted by `u/reviewlock`, locked through ReviewLock, and report modal
-  reachable from logged-in dev account `u/BrightyBrainiac`.
-- Permalink:
-  `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`
-- Thing id: `t3_1tm8nak`
-
-Use only as a controlled unchanged-report trigger candidate when S01 cannot be
-reported by the logged-in account because S01 was authored by that same account.
 
 ## S03 - Flair Edit Reopen
 

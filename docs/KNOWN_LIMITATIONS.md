@@ -1,14 +1,17 @@
 # Known Limitations
 
-Last updated: 2026-05-24 22:41 IST.
+Last updated: 2026-05-25 15:41 IST.
 
 ## Runtime proof gaps
 
 - `approve()` and `ignoreReports()` are live-verified for controlled post target `t3_1tm8nak` through ReviewLock `Lock review`, but still need repeat proof on a controlled comment target.
 - `unignoreReports()` is live-verified on controlled post target `t3_1tm8nak` through the dashboard unlock flow, but still needs repeat proof on a controlled comment target.
-- `PostReport` and `CommentReport` trigger delivery is implemented and locally tested, but live payload shape and delivery timing are unverified.
+- `PostReport` trigger delivery is live-verified for unchanged controlled post
+  target `t3_1tm8nak`; `CommentReport` trigger delivery is implemented and
+  locally tested but still needs live payload proof.
 - `PostUpdate`, `CommentUpdate`, `PostNsfwUpdate`, `PostSpoilerUpdate`, and `PostFlairUpdate` are implemented and locally tested, but live payload shape and delivery timing are unverified.
-- `devvit logs` can stream after stopping playtest, but trigger payload logs have not yet been captured.
+- `devvit logs` captured sanitized `on-post-report` payload-shape evidence;
+  update trigger payload logs have not yet been captured.
 
 ## Browser proof gaps
 
@@ -27,5 +30,8 @@ Last updated: 2026-05-24 22:41 IST.
 
 - ReviewLock must not be described as making content unreportable.
 - ReviewLock must not claim to disable user reporting.
-- ReviewLock must not claim live report suppression or edit reopening until controlled playtest demonstrates those paths.
+- ReviewLock may claim controlled live post-report suppression on unchanged
+  locked post target `t3_1tm8nak`; it must not claim live comment-report
+  suppression or edit reopening until controlled playtest demonstrates those
+  paths.
 - ReviewLock may claim live moderation-method proof only for the controlled post-target paths documented in `docs/MODERATION_METHOD_PROOF.md`.

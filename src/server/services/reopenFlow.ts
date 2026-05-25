@@ -13,6 +13,7 @@ import { getActiveLockByTarget, removeActiveLockIndexes, updateLockStatus } from
 import { incrementReopenedMetric } from './metrics';
 import { unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
+import { recordCapabilityStatus, recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
 import { isTriggerConcurrencyError, withTriggerMutex } from './triggerMutex';
 
@@ -26,6 +27,7 @@ export interface BreakLockInput {
   targetId: string;
   subreddit?: string;
   reasonHint?: ReopenReason;
+  triggerCapabilityName?: string;
 }
 
 export interface BreakLockResult {
@@ -104,6 +106,21 @@ export const breakLockForChangedContent = async (
     };
   }
 
+  if (input.triggerCapabilityName) {
+    await recordCapabilityStatus(
+      deps.redis,
+      subreddit,
+      {
+        name: input.triggerCapabilityName,
+        status: 'verified',
+        checkedAt: now,
+        evidence: `${input.triggerCapabilityName} on ${input.targetId}`,
+        notes: [`${input.triggerCapabilityName} delivered for ${input.targetId}.`],
+      },
+      now,
+    ).catch(() => undefined);
+  }
+
   try {
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
       const lock = await getActiveLockByTarget(deps.redis, subreddit, input.targetId);
@@ -134,8 +151,16 @@ export const breakLockForChangedContent = async (
         comparison === 'uncertain' ? 'runtime_uncertain' : (input.reasonHint ?? 'content_changed');
       const unignoreResult = resolution.target
         ? await unignoreReportsForReviewLock(deps.reddit, resolution.target)
-        : { ok: false, warnings: ['target_resolution_failed'] };
-      const warnings = unignoreResult.warnings;
+        : undefined;
+      if (unignoreResult) {
+        await recordModerationOperationStatus(
+          deps.redis,
+          lock.subreddit,
+          unignoreResult,
+          now,
+        ).catch(() => undefined);
+      }
+      const warnings = unignoreResult?.warnings ?? ['target_resolution_failed'];
       const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
 
       await enqueueReopenEvent(deps.redis, event);
@@ -160,7 +185,7 @@ export const breakLockForChangedContent = async (
         actor: 'reviewlock',
         createdAt: now,
         message: 'Lock reopened after reviewed content changed or became uncertain.',
-        data: { reason, unignoreReportsOk: unignoreResult.ok },
+        data: { reason, unignoreReportsOk: unignoreResult?.ok ?? false },
         demo: lock.demo,
       });
 

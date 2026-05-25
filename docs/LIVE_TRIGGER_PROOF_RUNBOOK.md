@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 15:25 IST.
+Last updated: 2026-05-25 15:35 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -17,14 +17,16 @@ is explicitly selected.
   `v0.0.2.84`, with target `post:1tmmeo6`, author `u/BrightyBrainiac`,
   reason `reviewed policy compliant`, and `0` reports suppressed before any
   controlled report event.
-- Current playtest reached `v0.0.2.85` after stale-relock hardening.
+- The current playtest continued hot reloading after update-trigger
+  runtime-proof and dashboard warning hardening; the code hardening was first
+  observed at `v0.0.2.89`.
 - Trigger routes now emit sanitized payload-shape logs from the live bootstrap
   path. These logs intentionally record only route name, target kind, and
   boolean/object-shape flags, not raw target ids, content text, reporter names,
   or report reason text.
-- No live `PostReport`, `CommentReport`, `PostUpdate`, `CommentUpdate`,
-  `PostNsfwUpdate`, `PostSpoilerUpdate`, or `PostFlairUpdate` trigger delivery
-  has been proven yet.
+- Controlled live `PostReport` delivery is verified for unchanged locked post
+  `t3_1tm8nak` on playtest `v0.0.2.87`. Comment report and update trigger
+  deliveries remain unverified.
 - S01 is authored by the currently logged-in dev account, so Reddit does not
   expose a `Report` action for S01 from this session. The first unchanged-report
   proof candidate is the already locked dashboard post `t3_1tm8nak`, authored
@@ -109,6 +111,21 @@ Expected proof:
 - Dashboard `Reports suppressed` increments.
 - Audit timeline receives `report_suppressed`.
 - Reopen queue remains unchanged.
+
+Observed proof on 2026-05-25:
+
+- Reddit report flow submitted against `t3_1tm8nak` from `u/BrightyBrainiac`
+  using category `Spam`, subtype `Other`, and blank optional additional
+  context.
+- `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`
+  emitted sanitized payload-shape evidence for `on-post-report`.
+- Payload shape proved a nested `post` object with `post.id`,
+  `post.subredditId`, and `post.numReports`; direct top-level `targetId`,
+  `postId`, and `eventId` were absent.
+- Reddit native post status showed `Reports ignored 1`.
+- ReviewLock dashboard showed `Reports suppressed = 1`, active lock row
+  `post:1tm8nak` suppressed count `1`, report churn `post:1tm8nak` count `1`,
+  and audit `Report Suppressed 5/25/2026, 3:29:43 PM`.
 
 ## S02 Proof Sequence
 

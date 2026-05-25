@@ -9,6 +9,7 @@ import { getDailyMetrics, getTargetMetrics } from './metrics';
 import { handleReportTrigger } from './reportTriggers';
 import { breakLockForChangedContent } from './reopenFlow';
 import { listOpenReopenEvents } from './reopenQueue';
+import { loadRuntimeProofStatus } from './runtimeProof';
 import { keys } from './keys';
 
 const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
@@ -80,6 +81,15 @@ describe('breakLockForChangedContent', () => {
     expect(result.event).toMatchObject({ reason: 'content_changed' });
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
     expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await loadRuntimeProofStatus(dependencies.redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'unignoreReports',
+          status: 'verified',
+          evidence: 'unignoreReports on t3_post',
+        }),
+      ]),
+    });
   });
 
   it('records unignore failure but still shows reopened item', async () => {
@@ -90,6 +100,15 @@ describe('breakLockForChangedContent', () => {
     expect(result.action).toBe('reopened');
     expect(result.warnings).toContain('unignoreReports failed for t3_post');
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+    expect(await loadRuntimeProofStatus(dependencies.redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'unignoreReports',
+          status: 'failed',
+          evidence: 'unignoreReports on t3_post',
+        }),
+      ]),
+    });
   });
 
   it('fails open to runtime uncertain when target cannot be refetched', async () => {

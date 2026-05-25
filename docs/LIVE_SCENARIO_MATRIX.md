@@ -95,7 +95,8 @@ that exact action in the current live pass.
 
 ## Current Blockers
 
-- Live `PostReport` and `CommentReport` trigger delivery is not yet proven.
+- Live `PostReport` trigger delivery is proven for unchanged controlled post
+  target `t3_1tm8nak`; `CommentReport` trigger delivery is not yet proven.
 - Live post/comment update trigger delivery is not yet proven.
 - Comment menu proof is still pending because comment menu availability needs a
   controlled browser pass.

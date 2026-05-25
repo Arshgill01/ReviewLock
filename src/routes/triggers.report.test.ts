@@ -6,6 +6,7 @@ import type { ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
 import { fingerprintTarget } from '../server/services/fingerprint';
 import { saveLock } from '../server/services/locks';
 import { listOpenReopenEvents } from '../server/services/reopenQueue';
+import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { createReportTriggersRouter } from './triggers.report';
 
 const target = (): ReviewLockTarget => ({
@@ -72,6 +73,20 @@ describe('report trigger routes', () => {
     });
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postReportTrigger',
+          status: 'verified',
+          evidence: 'post report trigger on t3_post',
+        }),
+      ]),
+    });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).not.toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'verified' }),
+      ]),
+    });
   });
 
   it('accepts Devvit nested post report payloads', async () => {
@@ -249,6 +264,15 @@ describe('report trigger routes', () => {
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
     expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'commentReportTrigger',
+          status: 'verified',
+          evidence: 'comment report trigger on t1_comment',
+        }),
+      ]),
+    });
   });
 
   it('accepts comment report payloads and suppresses unchanged comments', async () => {

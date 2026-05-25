@@ -522,3 +522,92 @@
 - Why it matters: The live proof pass depends on following exact scenario instructions and recording evidence against the right target. Duplicating the same candidate in two places is easy to read as two separate proof items or as a stale copy of the current candidate, which can muddy the evidence log for the next report-trigger run.
 - Suggested fix: Keep one dashboard-post candidate section near the S01 blocker note and remove or merge the later duplicate so the scenario sequence has a single source of truth for `t3_1tm8nak`.
 - Files reviewed: `docs/LIVE_SCENARIO_CONTENT.md`, `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`, `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-25 15:28 IST - Finding
+
+- Severity: medium
+- Area: Stale active locks with runtime warnings are not surfaced in the dashboard lock table
+- Evidence: The current stale-relock hardening keeps the existing lock active when `unignoreReports()` fails, updates `lastKnownEdited`, `lastReportCount`, and appends `staleUnignoreResult.warnings` to `runtimeWarnings` (`src/server/services/lockFlow.ts:167-199`). Dashboard data returns those active locks unchanged (`src/server/services/dashboard.ts:66-87`), but `renderLockTable()` filters to `status === 'active'` and renders target, author, content, reason, suppressed count, locked date, and unlock action only (`src/client/components/LockTable.ts:47-120`). It never renders `lock.runtimeWarnings`, `lastKnownEdited`, or any failed/needs-retry marker. The audit timeline renders the failure message but not the target id (`src/client/components/AuditTimeline.ts:6-33`), and the runtime banner is global rather than item-specific.
+- Why it matters: After a stale `unignoreReports()` failure, ReviewLock intentionally leaves the old lock active as a retry surface. In the main moderator dashboard that retry surface looks like an ordinary active reviewed-content lock, even though current content changed and reports may still be ignored. That can hide the exact item needing attention and weakens the fail-open story for the edit-break loop.
+- Suggested fix: Render item-level runtime warnings or a distinct needs-attention state in the active locks table when `lock.runtimeWarnings.length > 0` or when `lastKnownEdited` changed during a failed stale relock. Add a client render regression covering an active lock with `runtimeWarnings: ['unignoreReports failed for t3_post']` so the warning is visible next to that target.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/dashboard.ts`, `src/client/components/LockTable.ts`, `src/client/components/AuditTimeline.ts`, `src/client/components/RuntimeBanner.ts`, `src/server/services/lockFlow.test.ts`
+
+## 2026-05-25 15:30 IST - Finding
+
+- Severity: medium
+- Area: Update-trigger `unignoreReports()` results are not recorded in runtime proof
+- Evidence: `breakLockForChangedContent()` calls `unignoreReportsForReviewLock()` for changed update-trigger targets and carries its warnings into the reopen event and audit data (`src/server/services/reopenFlow.ts:133-165`), but `reopenFlow.ts` does not import or call `recordModerationOperationStatus()`. By contrast, lock/relock/unlock and report-trigger moderation paths record moderation operation results into runtime proof (`src/server/services/lockFlow.ts`, `src/server/services/unlockFlow.ts`, `src/server/services/reportTriggers.ts:144-151`, `src/server/services/reportTriggers.ts:349-350`). Existing update-trigger tests assert the Reddit call, reopen state, metrics, and audit, but do not assert runtime proof changes (`src/server/services/updateTriggers.test.ts:126-162`, `src/server/services/reopenFlow.test.ts:75-93`).
+- Why it matters: Wave 33 is specifically trying to prove live edit/update-trigger behavior. If an update trigger successfully or unsuccessfully calls `unignoreReports()`, the moderator-facing runtime proof ledger can remain stale, showing only earlier dashboard unlock proof or no trigger-time failure. That weakens the claim boundary and makes it harder to distinguish "edit trigger reopened locally" from "edit trigger performed and recorded the live moderation operation."
+- Suggested fix: Record update-trigger `unignoreReports()` results through the same runtime proof helper used by report and lock flows, swallowing proof-write failures if needed. Add a regression where a changed update trigger records `unignoreReports verified`, and a failing `unignoreReports()` records `failed` while preserving the reopen warning.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/updateTriggers.ts`, `src/server/services/updateTriggers.test.ts`, `src/server/services/reopenFlow.test.ts`, `src/server/services/runtimeProof.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/lockFlow.ts`, `src/server/services/unlockFlow.ts`
+
+## 2026-05-25 15:35 IST - Recheck
+
+- Area: Live scenario duplicate dashboard-post candidate
+- Result: Resolved in the current worktree.
+- Evidence: `docs/LIVE_SCENARIO_CONTENT.md` now has a single
+  `Live Report Candidate - Dashboard Post` section, with observed live proof
+  recorded under that section.
+
+## 2026-05-25 15:35 IST - Recheck
+
+- Area: Stale active locks with runtime warnings surfaced in dashboard
+- Result: Resolved in the current worktree.
+- Evidence: `renderLockTable()` now renders a row-level `Needs attention`
+  marker and escaped runtime warning text for active locks with
+  `runtimeWarnings`; `src/client/render.test.ts` covers the visible warning.
+
+## 2026-05-25 15:35 IST - Recheck
+
+- Area: Update-trigger `unignoreReports()` runtime proof recording
+- Result: Resolved in the current worktree.
+- Evidence: `breakLockForChangedContent()` now records the
+  `unignoreReports()` operation result through `recordModerationOperationStatus`
+  and swallows proof-write failures; `src/server/services/reopenFlow.test.ts`
+  covers both verified and failed runtime proof statuses.
+
+## 2026-05-25 15:31 IST - Finding
+
+- Severity: medium
+- Area: Reopen queue hides runtime warnings attached to reopened items
+- Evidence: Reopen events include `runtimeWarnings` in the shared schema and trigger services populate them for risky paths such as changed-content `unignoreReports()` warnings and target-resolution uncertainty (`src/server/services/reopenFlow.ts:51-75`, `src/server/services/reportTriggers.ts:88-106`, `src/server/services/reportTriggers.ts:348-359`). The client renderers for the latest reopen event and reopen queue render target, reason, created date, summary, fingerprint transition, and dismiss action, but never render `event.runtimeWarnings` (`src/client/components/ReopenQueue.ts:59-103`, `src/client/components/ReopenQueue.ts:106-145`). The existing reopen-flow test explicitly accepts an `unignoreReports failed for t3_post` warning while still queueing a reopened item (`src/server/services/reopenFlow.test.ts:85-93`), so this hidden-warning state is reachable by design.
+- Why it matters: Reopen is the main moderator attention surface for edited or uncertain content. If ReviewLock reopened an item but failed to unignore reports, or reopened because target integrity was uncertain, moderators can dismiss the reopen item without seeing the operational warning that reports may still be ignored or proof is incomplete. That weakens the fail-open/recovery story during the exact edit-break loop the product must demonstrate.
+- Suggested fix: Render `event.runtimeWarnings` in both latest reopen and queue rows with a distinct needs-attention treatment, and consider disabling or adding stronger confirmation for dismissing reopen events with unresolved runtime warnings. Add a render regression with a reopen event containing `runtimeWarnings: ['unignoreReports failed for t3_post']`.
+- Files reviewed: `src/client/components/ReopenQueue.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.test.ts`, `src/shared/schema.ts`
+
+## 2026-05-25 15:36 IST - Finding
+
+- Severity: medium
+- Area: Live trigger delivery is not written to the runtime proof ledger
+- Evidence: The default runtime proof matrix includes a `triggers` capability (`src/server/services/runtimeProof.ts:11`, `src/server/services/runtimeProof.test.ts:63-96`), but the only direct `recordCapabilityStatus()` call sites are the Redis and Reddit smoke endpoints (`src/routes/api.ts:143`, `src/routes/api.ts:206`). Report and update trigger routes log sanitized payload shape and call the trigger services (`src/routes/triggers.report.ts:107-131`, `src/routes/triggers.update.ts:93-106`), while the services record moderation operations such as `ignoreReports` and `unignoreReports` but never record that `onPostReport`, `onCommentReport`, or update-trigger delivery itself was observed (`src/server/services/reportTriggers.ts:144-151`, `src/server/services/reopenFlow.ts:136-141`). Existing trigger/runtime tests assert moderation-operation proof, not trigger-capability proof (`src/server/services/reportTriggers.test.ts:595-600`, `src/server/services/reopenFlow.test.ts:84-103`). Current docs now mark controlled post report delivery verified in `docs/RUNTIME_PROOF.md:91` and `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md:114-127`, while older proof surfaces still say trigger delivery remains unverified (`docs/KNOWN_LIMITATIONS.md:9-11`, `docs/CLAIM_COPY_AUDIT.md:21`, `docs/LIVE_SCENARIO_MATRIX.md:98-99`).
+- Why it matters: Wave 33's core evidence is live trigger delivery. After a real `PostReport` is observed, the moderator-facing runtime panel can still show the `triggers` capability as unverified because no trigger path updates that ledger. That creates a split-brain proof boundary: docs may claim controlled post report delivery is verified, while the app's own runtime status remains stale or only proves the downstream `ignoreReports()` call.
+- Suggested fix: Record trigger delivery through `recordCapabilityStatus()` when a trigger route accepts and processes a live payload, ideally with more specific capability names such as `postReportTrigger`, `commentReportTrigger`, and `updateTriggers` rather than one ambiguous `triggers` bucket. Add route/service regressions proving a successful `on-post-report` updates runtime proof without marking comment/update triggers verified, then reconcile the stale claim-boundary docs to the same post-only status.
+- Files reviewed: `src/server/services/runtimeProof.ts`, `src/routes/api.ts`, `src/routes/triggers.report.ts`, `src/routes/triggers.update.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.test.ts`, `docs/RUNTIME_PROOF.md`, `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/CLAIM_COPY_AUDIT.md`, `docs/LIVE_SCENARIO_MATRIX.md`
+
+## 2026-05-25 15:41 IST - Recheck
+
+- Area: Reopen queue hides runtime warnings attached to reopened items
+- Result: Resolved in the current worktree.
+- Evidence: `renderLatestReopenEvent()` and `renderReopenQueue()` now render
+  `event.runtimeWarnings` with a `Needs attention` marker; `src/client/render.test.ts`
+  covers reopened items with `unignoreReports failed for t3_reviewed`.
+
+## 2026-05-25 15:41 IST - Recheck
+
+- Area: Live trigger delivery runtime proof ledger
+- Result: Resolved in the current worktree for future trigger deliveries.
+- Evidence: `handleReportTrigger()` records `postReportTrigger` or
+  `commentReportTrigger` through `recordCapabilityStatus()`, and
+  `handleUpdateTrigger()` passes specific update-trigger capability names into
+  `breakLockForChangedContent()`. Route tests prove `postReportTrigger` is
+  recorded without marking `commentReportTrigger` verified, and update route
+  tests prove `postUpdateTrigger` is recorded.
+
+## 2026-05-25 15:39 IST - Finding
+
+- Severity: high
+- Area: Comment update trigger target extraction can choose the parent post id
+- Evidence: Installed Devvit typings define `CommentUpdate` with both `comment?: CommentV2` and `post?: PostV2` (`node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts:89-94`). `CommentV2` carries the edited comment id at `comment.id` and the parent post id separately at `comment.postId` (`node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts:7-26`). The update trigger route uses one target extractor for both post and comment routes and searches `payload.targetId`, `payload.postId`, `payload.commentId`, `payload.post?.id`, then `payload.comment?.id` before applying kind-specific normalization (`src/routes/triggers.update.ts:58-70`). On `/on-comment-update`, a live-shaped payload containing both `post` and `comment` will therefore pick `post.id`, normalize it as a comment id, and call `breakLockForChangedContent()` with the wrong `t1_*` target. Existing comment-update route tests cover `{ comment: { id: 't1_comment' } }` and wrapped `{ commentUpdate: { comment: { id: 't1_comment' } } }`, but they do not include the installed `post` sibling (`src/routes/triggers.update.test.ts:243-323`).
+- Why it matters: Comment edit reopen is a must-ship part of the "locked until edited" loop. If Devvit sends the typed `post` field alongside the edited `comment`, ReviewLock will fail to resolve the active comment lock and can leave edited reviewed comments locked until a later report happens to force a refetch path.
+- Suggested fix: Make target id extraction kind-aware. For comment routes, prefer `commentId` and `comment?.id` before any post fields; for post routes, prefer `postId` and `post?.id`. Add route regressions for raw and `TriggerEvent`-wrapped `CommentUpdate` payloads that include both `post` and `comment`, asserting the resolved action reopens the `t1_*` lock and calls `unignoreReports:t1_comment`.
+- Files reviewed: `src/routes/triggers.update.ts`, `src/routes/triggers.update.test.ts`, `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts`, `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts`, `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts`

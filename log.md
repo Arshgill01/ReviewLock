@@ -1375,3 +1375,46 @@
 - Open risks:
   - Forbidden-copy scan matched only guardrail tests and documentation references.
   - Controlled live report and edit trigger events remain pending.
+
+## 2026-05-25 - Wave 33 controlled post report proof and reviewer hardening
+
+- Submitted one controlled Reddit report against unchanged locked dashboard post
+  `t3_1tm8nak` in `r/reviewlock_dev`.
+- Verified live `PostReport` delivery and suppression evidence:
+  - Devvit emitted sanitized `reviewlock.trigger.payload_shape` for
+    `on-post-report`.
+  - Reddit native status showed `Reports ignored 1`.
+  - ReviewLock dashboard showed `Reports suppressed = 1`, active row
+    `post:1tm8nak` suppressed count `1`, report churn `post:1tm8nak` count `1`,
+    and audit `Report Suppressed 5/25/2026, 3:29:43 PM`.
+- Integrated reviewer findings:
+  - update-trigger `unignoreReports()` success/failure is now recorded in
+    runtime proof;
+  - active locks with runtime warnings now render a row-level `Needs attention`
+    marker;
+  - reopened queue/latest items with runtime warnings now render a row-level
+    `Needs attention` marker;
+  - accepted report/update trigger routes now record granular runtime proof
+    capabilities such as `postReportTrigger` without marking unrelated trigger
+    paths verified;
+  - duplicate dashboard-post candidate text was removed from the live scenario
+    content.
+- Commands run:
+  - `npm run test -- src/server/services/reopenFlow.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg "TODO" src || true`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+  - `npm run dev -- reviewlock_dev`
+  - `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`
+  - Zen browser report flow and dashboard inspection on
+    `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`
+- Pass/fail status: PASS for controlled post report proof and focused
+  regression tests.
+- Open risks:
+  - Comment report triggers remain unverified.
+  - Update/edit trigger delivery remains unverified.

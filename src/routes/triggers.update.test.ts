@@ -6,6 +6,7 @@ import type { ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
 import { fingerprintTarget } from '../server/services/fingerprint';
 import { saveLock } from '../server/services/locks';
 import { listOpenReopenEvents } from '../server/services/reopenQueue';
+import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { createUpdateTriggersRouter } from './triggers.update';
 
 const target = (body = 'Reviewed body'): ReviewLockTarget => ({
@@ -72,6 +73,15 @@ describe('update trigger routes', () => {
     });
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postUpdateTrigger',
+          status: 'verified',
+          evidence: 'postUpdateTrigger on t3_post',
+        }),
+      ]),
+    });
   });
 
   it('accepts Devvit nested post update payloads', async () => {

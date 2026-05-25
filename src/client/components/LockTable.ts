@@ -9,6 +9,19 @@ const attr = (value: string | undefined): string =>
 
 const reason = (value: string): string => value.replace(/_/g, ' ');
 
+const renderRuntimeWarnings = (warnings: string[]): string => {
+  if (warnings.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="lock-warning" role="status">
+      <span class="status status-failed">Needs attention</span>
+      <span>${text(warnings.join('; '))}</span>
+    </div>
+  `;
+};
+
 const renderUnlockAction = (
   lock: ReviewLockRecord,
   confirmation: DashboardConfirmation | null,
@@ -69,6 +82,7 @@ export const renderLockTable = (
               <span class="content-preview" title="${attr(lock.contentPreview)}">
                 ${text(lock.contentPreview)}
               </span>
+              ${renderRuntimeWarnings(lock.runtimeWarnings)}
             </div>
           </td>
           <td>

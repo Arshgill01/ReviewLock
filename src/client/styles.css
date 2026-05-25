@@ -586,6 +586,25 @@ td strong {
   white-space: nowrap;
 }
 
+.lock-warning,
+.runtime-item-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 360px;
+  margin-top: 6px;
+  color: var(--red);
+}
+
+.lock-warning span:last-child,
+.runtime-item-warning span:last-child {
+  overflow: hidden;
+  color: var(--red);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .number-cell {
   font-variant-numeric: tabular-nums;
   font-weight: 600;

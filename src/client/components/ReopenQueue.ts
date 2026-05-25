@@ -22,6 +22,19 @@ const renderHashTransition = (event: ReopenEvent): string => `
   </div>
 `;
 
+const renderRuntimeWarnings = (warnings: string[]): string => {
+  if (warnings.length === 0) {
+    return '';
+  }
+
+  return `
+    <div class="runtime-item-warning" role="status">
+      <span class="status status-failed">Needs attention</span>
+      <span>${text(warnings.join('; '))}</span>
+    </div>
+  `;
+};
+
 const renderDismissAction = (
   event: ReopenEvent,
   confirmation: DashboardConfirmation | null,
@@ -93,6 +106,7 @@ export const renderLatestReopenEvent = (
         </div>
       </div>
       <p>${text(event.summary)}</p>
+      ${renderRuntimeWarnings(event.runtimeWarnings)}
       <div class="hash-transition-wrap">
         ${renderHashTransition(event)}
       </div>
@@ -119,6 +133,7 @@ export const renderReopenQueue = (
               <span class="date-cell">${date(event.createdAt)}</span>
             </div>
             <p>${text(event.summary)}</p>
+            ${renderRuntimeWarnings(event.runtimeWarnings)}
             ${renderHashTransition(event)}
           </div>
           <div class="queue-row-action">

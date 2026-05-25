@@ -31,6 +31,18 @@ export const reasonForUpdateTrigger = (triggerKind: UpdateTriggerKind): ReopenRe
   return 'content_changed';
 };
 
+const capabilityForUpdateTrigger = (triggerKind: UpdateTriggerKind): string => {
+  const capabilityNames: Record<UpdateTriggerKind, string> = {
+    post_update: 'postUpdateTrigger',
+    comment_update: 'commentUpdateTrigger',
+    post_nsfw_update: 'postNsfwUpdateTrigger',
+    post_spoiler_update: 'postSpoilerUpdateTrigger',
+    post_flair_update: 'postFlairUpdateTrigger',
+  };
+
+  return capabilityNames[triggerKind];
+};
+
 export const handleUpdateTrigger = (
   deps: ReopenFlowDependencies,
   input: UpdateTriggerInput,
@@ -39,4 +51,5 @@ export const handleUpdateTrigger = (
     targetId: input.targetId,
     subreddit: input.subreddit,
     reasonHint: reasonForUpdateTrigger(input.triggerKind),
+    triggerCapabilityName: capabilityForUpdateTrigger(input.triggerKind),
   });

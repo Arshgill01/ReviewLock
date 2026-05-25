@@ -1095,3 +1095,65 @@ Reason:
   still ignoring reports with no ReviewLock retry surface. Keeping the active
   lock visible is the stronger moderator-useful state because later report,
   update, unlock, or relock attempts can retry the fail-open transition.
+
+### D068 - Treat controlled PostReport proof as post-only runtime evidence
+
+The first live report trigger proof used the already locked dashboard post
+`t3_1tm8nak`, because S01 was authored by the logged-in account and could not be
+reported from that same session.
+
+Decision:
+
+- Mark controlled unchanged post report suppression as verified for post targets.
+- Keep comment report triggers and all update triggers unverified until their
+  own controlled events produce logs and dashboard/audit evidence.
+- Record the exact observed payload shape as sanitized shape evidence, not raw
+  report details.
+
+Reason:
+
+- The proof shows the real post-report route, target refetch, unchanged
+  fingerprint decision, report suppression, Redis metrics, and audit path. It
+  does not prove comment payload shape or edit-trigger delivery.
+
+### D069 - Show retryable runtime-warning locks in the main dashboard table
+
+Reviewer feedback identified that active locks carrying runtime warnings could
+look identical to healthy active locks after fail-open hardening.
+
+Decision:
+
+- Render a row-level `Needs attention` marker with escaped warning text for
+  active locks with `runtimeWarnings`.
+- Keep the lock active and retryable; do not add automatic destructive actions.
+- Record update-trigger `unignoreReports()` results in runtime proof so the
+  runtime banner and row warning can tell the same operational story.
+
+Reason:
+
+- If Reddit moderation operations fail during stale relock or update-trigger
+  reopen, moderators need the affected item surfaced where they already scan
+  active locks, not only in a global runtime warning or audit history.
+
+### D070 - Record trigger proof as granular runtime capabilities
+
+The runtime proof ledger originally had one broad `triggers` capability. A
+single live `PostReport` proves post-report delivery only; it does not prove
+comment reports or update triggers.
+
+Decision:
+
+- Record specific capabilities such as `postReportTrigger`,
+  `commentReportTrigger`, `postUpdateTrigger`, `commentUpdateTrigger`,
+  `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`, and
+  `postFlairUpdateTrigger` when those route handlers process accepted payloads.
+- Keep unrelated trigger capabilities unverified until their own controlled
+  events run.
+- Render runtime warnings on reopened items, not only active locks, because
+  reopened items are the main edit-break attention surface.
+
+Reason:
+
+- This avoids converting one successful report event into an inflated "all
+  triggers verified" claim while still allowing the app's own runtime ledger to
+  reflect exact proof as it accumulates.
