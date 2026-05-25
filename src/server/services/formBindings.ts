@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { RedisStore } from '../adapters/redis';
 import type { ReviewLockTarget } from '../../shared/schema';
+import { fingerprintTarget } from './fingerprint';
 import { key } from './keys';
 
 export type FormBindingAction = 'lock' | 'unlock';
@@ -11,6 +12,8 @@ export interface ReviewLockFormBinding {
   subreddit: string;
   targetId: string;
   lockId?: string;
+  reviewedContentHash?: string;
+  reviewedFingerprintVersion?: string;
   createdAt: string;
 }
 
@@ -36,12 +39,16 @@ export const createFormBinding = async (
   createdAt: string,
   lockId?: string,
 ): Promise<ReviewLockFormBinding> => {
+  const reviewedFingerprint =
+    action === 'lock' ? fingerprintTarget(target, createdAt) : undefined;
   const binding: ReviewLockFormBinding = {
     token: `form-${action}-${randomUUID()}`,
     action,
     subreddit: target.subreddit,
     targetId: target.id,
     lockId,
+    reviewedContentHash: reviewedFingerprint?.hash,
+    reviewedFingerprintVersion: reviewedFingerprint?.version,
     createdAt,
   };
 

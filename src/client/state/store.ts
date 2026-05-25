@@ -183,6 +183,14 @@ export class ReviewLockStore {
       this.topChurnTargets = runtimeData.topChurnTargets;
       this.runtimeVerificationMessage = 'Runtime proof refreshed.';
     } catch (err) {
+      try {
+        const runtimeData = await this.api.fetchRuntimeStatus(this.subreddit, false);
+        this.runtimeStatus = runtimeData.runtime;
+        this.dailyMetrics = runtimeData.dailyMetrics;
+        this.topChurnTargets = runtimeData.topChurnTargets;
+      } catch {
+        // Keep the original smoke failure visible; the next full refresh can retry status loading.
+      }
       this.error = err instanceof Error ? err.message : 'Runtime verification failed';
     } finally {
       this.isVerifyingRuntime = false;

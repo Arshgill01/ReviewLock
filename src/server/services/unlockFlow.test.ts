@@ -5,6 +5,7 @@ import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
 import { listAuditEvents } from './audit';
 import { getActiveLockByTarget, saveLock } from './locks';
+import { keys } from './keys';
 import { loadRuntimeProofStatus } from './runtimeProof';
 import { unlockReviewedContent } from './unlockFlow';
 
@@ -77,6 +78,44 @@ describe('unlockReviewedContent', () => {
         expect.objectContaining({ name: 'unignoreReports', status: 'verified' }),
       ]),
     });
+  });
+
+  it('clears active indexes when unlock status persistence fails after unignoreReports', async () => {
+    class UnlockStatusFailingRedisStore extends InMemoryRedisStore {
+      failUnlockStatusWrite = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failUnlockStatusWrite && key === keys.lock('alpha', 'lock-1')) {
+          throw new Error('lock status down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new UnlockStatusFailingRedisStore();
+    const reddit = new FakeRedditAdapter([target()]);
+    await saveLock(redis, lock());
+    redis.failUnlockStatusWrite = true;
+
+    const result = await unlockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T01:00:00.000Z') },
+      { targetId: 't3_post', actor: 'mod', lockId: 'lock-1' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'ReviewLock returned reports to normal handling but could not persist the manual unlock.',
+      }),
+    ]);
   });
 
   it('rejects stale unlock confirmations before calling Reddit', async () => {

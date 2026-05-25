@@ -182,6 +182,27 @@ describe('ReviewLockStore', () => {
     expect(store.isVerifyingRuntime).toBe(false);
   });
 
+  it('refreshes persisted runtime failure status when smoke verification fails', async () => {
+    vi.mocked(apiClient.runRuntimeSmoke).mockRejectedValue(new Error('Redis smoke failed'));
+    vi.mocked(apiClient.fetchRuntimeStatus).mockResolvedValue({
+      runtime: {
+        overall: 'failed',
+        generatedAt: '2026-05-24T00:01:00.000Z',
+        capabilities: [{ name: 'redis', status: 'failed', notes: ['redis unavailable'] }],
+        warnings: ['Some runtime capabilities are not verified.'],
+      },
+      dailyMetrics: [],
+      topChurnTargets: [],
+    });
+
+    await store.verifyRuntime();
+
+    expect(apiClient.fetchRuntimeStatus).toHaveBeenCalledWith('test_subreddit', false);
+    expect(store.runtimeStatus?.overall).toBe('failed');
+    expect(store.error).toBe('Redis smoke failed');
+    expect(store.isVerifyingRuntime).toBe(false);
+  });
+
   it('does not run runtime verification in demo mode', async () => {
     await store.setDemo(true);
     vi.mocked(apiClient.runRuntimeSmoke).mockClear();

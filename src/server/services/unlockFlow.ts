@@ -3,7 +3,12 @@ import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
-import { getActiveLockByTarget, updateLock, updateLockStatus } from './locks';
+import {
+  getActiveLockByTarget,
+  removeActiveLockIndexes,
+  updateLock,
+  updateLockStatus,
+} from './locks';
 import { unignoreReportsForReviewLock } from './moderation';
 import { recordModerationOperationStatus } from './runtimeProof';
 import { resolveTargetById } from './targetResolver';
@@ -112,17 +117,45 @@ export const unlockReviewedContent = async (
     };
   }
 
-  const unlocked = await updateLockStatus(
-    deps.redis,
-    activeLock.subreddit,
-    activeLock.id,
-    'unlocked',
-    {
+  let unlocked: ReviewLockRecord | undefined;
+
+  try {
+    unlocked = await updateLockStatus(deps.redis, activeLock.subreddit, activeLock.id, 'unlocked', {
       reopenedAt: now,
       reopenReason: 'manual_unlock',
       runtimeWarnings: [...activeLock.runtimeWarnings, ...unignoreResult.warnings],
-    },
-  );
+    });
+  } catch (error) {
+    await removeActiveLockIndexes(deps.redis, activeLock).catch(() => undefined);
+    await appendAuditEvent(deps.redis, {
+      id: `audit-${activeLock.id}-unlock-status-failed-${Date.parse(now)}`,
+      kind: 'runtime_failure',
+      subreddit: activeLock.subreddit,
+      targetId: activeLock.targetId,
+      targetKind: activeLock.targetKind,
+      lockId: activeLock.id,
+      actor: input.actor,
+      createdAt: now,
+      message:
+        'ReviewLock returned reports to normal handling but could not persist the manual unlock.',
+      data: {
+        operation: 'unlockStatusWrite',
+        error: error instanceof Error ? error.message : 'unknown error',
+      },
+      demo: activeLock.demo,
+    }).catch(() => undefined);
+
+    return {
+      ok: false,
+      lock: {
+        ...activeLock,
+        runtimeWarnings: [...activeLock.runtimeWarnings, 'redis_write_failed'],
+      },
+      message:
+        'Reports were returned to normal handling, but ReviewLock could not persist the unlock. The active index was cleared to avoid resuppressing future reports.',
+      warnings: ['redis_write_failed'],
+    };
+  }
 
   await appendAuditEvent(deps.redis, {
     id: `audit-${activeLock.id}-unlocked-${Date.parse(now)}`,

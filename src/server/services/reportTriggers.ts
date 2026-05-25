@@ -9,6 +9,7 @@ import {
   getActiveLockByTarget,
   incrementLockSuppression,
   removeActiveLockIndexes,
+  updateLock,
   updateLockStatus,
 } from './locks';
 import { incrementReopenedMetric, incrementSuppressedReportMetric } from './metrics';
@@ -153,7 +154,7 @@ const recordRuntimeProof = async (
   await recordModerationOperationStatus(deps.redis, subreddit, result, now).catch(() => undefined);
 };
 
-const recordReportTriggerDelivery = async (
+const recordReportTriggerProcessed = async (
   deps: ReportTriggerDependencies,
   subreddit: string,
   targetKind: ReviewLockTarget['kind'],
@@ -167,8 +168,8 @@ const recordReportTriggerDelivery = async (
       name: targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger',
       status: 'verified',
       checkedAt: now,
-      evidence: `${targetKind} report trigger on ${targetId}`,
-      notes: [`${targetKind} report trigger delivered for ${targetId}.`],
+      evidence: `${targetKind} report trigger processed for ${targetId}`,
+      notes: [`${targetKind} report trigger resolved and processed for ${targetId}.`],
     },
     now,
   ).catch(() => undefined);
@@ -181,12 +182,7 @@ export const handleReportTrigger = async (
   const now = input.reportedAt ?? deps.clock.now();
   const resolution = await resolveTargetById(deps.reddit, input.targetId);
   const subreddit = resolution.target?.subreddit ?? input.subreddit ?? 'unknown';
-  const targetKind =
-    resolution.target?.kind ?? (input.targetId.startsWith('t1_') ? 'comment' : 'post');
   const dedupeInput = { ...input, subreddit };
-  if (subreddit !== 'unknown') {
-    await recordReportTriggerDelivery(deps, subreddit, targetKind, input.targetId, now);
-  }
 
   if (!(await markDedupe(deps.redis, dedupeInput, now))) {
     return {
@@ -274,6 +270,14 @@ export const handleReportTrigger = async (
       const decision = decideReportTriggerAction(lock, resolution.target);
 
       if (!lock || decision.action === 'no_lock') {
+        await recordReportTriggerProcessed(
+          deps,
+          resolution.target.subreddit,
+          resolution.target.kind,
+          resolution.target.id,
+          now,
+        );
+
         return {
           ok: true,
           action: 'no_lock',
@@ -310,6 +314,8 @@ export const handleReportTrigger = async (
           };
         }
 
+        let lockCounterIncremented = false;
+
         try {
           await incrementLockSuppression(
             deps.redis,
@@ -317,6 +323,7 @@ export const handleReportTrigger = async (
             now,
             input.reportCount ?? resolution.target.reportCount,
           );
+          lockCounterIncremented = true;
           await incrementSuppressedReportMetric(deps.redis, resolution.target, now, lock.demo);
           await appendAuditEvent(deps.redis, {
             id: reportAuditId('audit-report-suppressed', input, now, lock.id),
@@ -334,6 +341,10 @@ export const handleReportTrigger = async (
         } catch (error) {
           const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
           await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
+
+          if (lockCounterIncremented) {
+            await updateLock(deps.redis, lock).catch(() => undefined);
+          }
 
           if (!rollbackResult.ok) {
             await appendAuditEvent(deps.redis, {
@@ -365,6 +376,14 @@ export const handleReportTrigger = async (
             warnings: ['redis_write_failed', ...rollbackResult.warnings],
           };
         }
+
+        await recordReportTriggerProcessed(
+          deps,
+          lock.subreddit,
+          lock.targetKind,
+          lock.targetId,
+          now,
+        );
 
         return {
           ok: true,
@@ -400,6 +419,14 @@ export const handleReportTrigger = async (
           data: { unignoreReportsOk: unignoreResult.ok },
           demo: lock.demo,
         });
+
+        await recordReportTriggerProcessed(
+          deps,
+          lock.subreddit,
+          lock.targetKind,
+          lock.targetId,
+          now,
+        );
 
         return {
           ok: true,

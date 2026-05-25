@@ -99,7 +99,7 @@ const scopedFormSubreddit = async (
     return undefined;
   }
 
-  return runtimeSubreddit ?? requestedSubreddit;
+  return runtimeSubreddit;
 };
 
 export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
@@ -145,12 +145,20 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
+    if (!binding.reviewedContentHash || !binding.reviewedFingerprintVersion) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not verify the reviewed snapshot. Reopen the menu and try again.'),
+      );
+    }
+
     const result = await lockReviewedContent(flowDeps, {
       targetId: binding.targetId,
       actor: await actorFromReddit(deps.reddit, body.actor),
       lockReason,
       customNote: body.customNote,
       expiresAt: body.expiresAt,
+      expectedContentHash: binding.reviewedContentHash,
+      expectedFingerprintVersion: binding.reviewedFingerprintVersion,
     });
 
     return context.json<UiResponse>(

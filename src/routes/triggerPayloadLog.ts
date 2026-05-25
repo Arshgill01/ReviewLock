@@ -73,6 +73,8 @@ export const logTriggerPayloadShape = (
     postUpdate: wrapperShape(body.postUpdate),
     commentUpdate: wrapperShape(body.commentUpdate),
     postFlairUpdate: wrapperShape(body.postFlairUpdate),
+    postNsfwUpdate: wrapperShape(body.postNsfwUpdate),
+    postSpoilerUpdate: wrapperShape(body.postSpoilerUpdate),
     nsfwPostUpdate: wrapperShape(body.nsfwPostUpdate),
     spoilerPostUpdate: wrapperShape(body.spoilerPostUpdate),
   });

@@ -31,6 +31,8 @@ interface TriggerBody {
   postUpdate?: TriggerBody;
   commentUpdate?: TriggerBody;
   postFlairUpdate?: TriggerBody;
+  postNsfwUpdate?: TriggerBody;
+  postSpoilerUpdate?: TriggerBody;
   nsfwPostUpdate?: TriggerBody;
   spoilerPostUpdate?: TriggerBody;
 }
@@ -48,6 +50,8 @@ const payloads = (body: TriggerBody): TriggerBody[] => [
   ...(body.postUpdate ? [body.postUpdate] : []),
   ...(body.commentUpdate ? [body.commentUpdate] : []),
   ...(body.postFlairUpdate ? [body.postFlairUpdate] : []),
+  ...(body.postNsfwUpdate ? [body.postNsfwUpdate] : []),
+  ...(body.postSpoilerUpdate ? [body.postSpoilerUpdate] : []),
   ...(body.nsfwPostUpdate ? [body.nsfwPostUpdate] : []),
   ...(body.spoilerPostUpdate ? [body.spoilerPostUpdate] : []),
 ];

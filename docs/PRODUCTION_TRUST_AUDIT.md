@@ -10,6 +10,11 @@ The weakest area is not local correctness. The lock, reopen, dashboard, demo, na
 - Controlled live `PostReport` suppression, `PostUpdate` body-edit reopening,
   and `CommentUpdate` body-edit reopening are verified. `CommentReport`,
   post NSFW, post spoiler, and post flair trigger variants remain unverified.
+- Reviewer hardening on 2026-05-26 tightened stale lock forms, Redis NX guard
+  semantics, trigger proof status boundaries, manual unlock fail-open behavior,
+  failed runtime-smoke UI refresh, flag-wrapper parsing, and suppression
+  rollback counters; these are locally verified but do not replace the remaining
+  live trigger captures.
 - The app can upload, install, and reach playtest, but a public publish must not happen until the claim boundary is resolved.
 - `package.json` still exposed an `npm run launch` script that executed `npm run deploy && devvit publish`.
 

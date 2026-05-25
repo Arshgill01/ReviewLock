@@ -90,6 +90,38 @@ describe('form routes', () => {
     });
   });
 
+  it('rejects stale lock forms when content changed after review summary render', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([
+      { ...target(), body: 'Edited after form opened', edited: true },
+    ]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:01:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text:
+          'Reviewed content changed after the form opened. Reopen ReviewLock and review the updated content before locking.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('validates required lock form token and reason fields', async () => {
     const router = createFormsRouter({
       reddit: new FakeRedditAdapter([target()]),
@@ -162,6 +194,40 @@ describe('form routes', () => {
     const redis = new InMemoryRedisStore();
     const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
     const reddit = new FakeRedditAdapter([target()], 'mod_test', 'beta');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form subreddit does not match the current Devvit context.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
+  });
+
+  it('rejects lock form submissions when runtime subreddit context is missing', async () => {
+    class MissingSubredditRedditAdapter extends FakeRedditAdapter {
+      override async getCurrentSubredditName(): Promise<string | undefined> {
+        return undefined;
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new MissingSubredditRedditAdapter([target()]);
     const router = createFormsRouter({
       reddit,
       redis,
@@ -310,6 +376,49 @@ describe('form routes', () => {
       'lock-1',
     );
     const reddit = new FakeRedditAdapter([target()], 'mod_test', 'beta');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockId: 'lock-1',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock form subreddit does not match the current Devvit context.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({ id: 'lock-1' });
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
+  });
+
+  it('rejects unlock form submissions when runtime subreddit lookup throws', async () => {
+    class ThrowingSubredditRedditAdapter extends FakeRedditAdapter {
+      override async getCurrentSubredditName(): Promise<string | undefined> {
+        throw new Error('context unavailable');
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+    const reddit = new ThrowingSubredditRedditAdapter([target()]);
     const router = createFormsRouter({
       reddit,
       redis,

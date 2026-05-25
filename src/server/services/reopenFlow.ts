@@ -89,6 +89,31 @@ const markLockReopenedAfterQueue = async (
   }
 };
 
+const recordUpdateTriggerProcessed = async (
+  deps: ReopenFlowDependencies,
+  subreddit: string,
+  capabilityName: string | undefined,
+  targetId: string,
+  now: string,
+): Promise<void> => {
+  if (!capabilityName) {
+    return;
+  }
+
+  await recordCapabilityStatus(
+    deps.redis,
+    subreddit,
+    {
+      name: capabilityName,
+      status: 'verified',
+      checkedAt: now,
+      evidence: `${capabilityName} processed for ${targetId}`,
+      notes: [`${capabilityName} resolved and processed for ${targetId}.`],
+    },
+    now,
+  ).catch(() => undefined);
+};
+
 export const breakLockForChangedContent = async (
   deps: ReopenFlowDependencies,
   input: BreakLockInput,
@@ -106,26 +131,21 @@ export const breakLockForChangedContent = async (
     };
   }
 
-  if (input.triggerCapabilityName) {
-    await recordCapabilityStatus(
-      deps.redis,
-      subreddit,
-      {
-        name: input.triggerCapabilityName,
-        status: 'verified',
-        checkedAt: now,
-        evidence: `${input.triggerCapabilityName} on ${input.targetId}`,
-        notes: [`${input.triggerCapabilityName} delivered for ${input.targetId}.`],
-      },
-      now,
-    ).catch(() => undefined);
-  }
-
   try {
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
       const lock = await getActiveLockByTarget(deps.redis, subreddit, input.targetId);
 
       if (!lock) {
+        if (resolution.target) {
+          await recordUpdateTriggerProcessed(
+            deps,
+            subreddit,
+            input.triggerCapabilityName,
+            input.targetId,
+            now,
+          );
+        }
+
         return {
           ok: true,
           action: 'no_lock',
@@ -139,6 +159,14 @@ export const breakLockForChangedContent = async (
         : 'uncertain';
 
       if (comparison === 'unchanged') {
+        await recordUpdateTriggerProcessed(
+          deps,
+          lock.subreddit,
+          input.triggerCapabilityName,
+          lock.targetId,
+          now,
+        );
+
         return {
           ok: true,
           action: 'unchanged',
@@ -188,6 +216,16 @@ export const breakLockForChangedContent = async (
         data: { reason, unignoreReportsOk: unignoreResult?.ok ?? false },
         demo: lock.demo,
       });
+
+      if (resolution.target) {
+        await recordUpdateTriggerProcessed(
+          deps,
+          lock.subreddit,
+          input.triggerCapabilityName,
+          lock.targetId,
+          now,
+        );
+      }
 
       return {
         ok: true,

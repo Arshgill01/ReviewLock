@@ -152,7 +152,7 @@ export const createDevvitRedisStore = (client: DevvitRedisClient): RedisStore =>
   },
   async setIfNotExists(key, value) {
     const result = await client.set(key, value, { nx: true });
-    return result !== undefined && result !== null && result !== false;
+    return result === 'OK' || result === true;
   },
   async del(key) {
     await client.del(key);

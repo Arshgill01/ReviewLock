@@ -300,6 +300,11 @@ describe('handleReportTrigger', () => {
         runtimeWarnings: ['target_resolution_failed'],
       }),
     ]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
+      ]),
+    });
   });
 
   it('uses report count to avoid undercounting distinct no-id report deliveries', async () => {
@@ -787,6 +792,47 @@ describe('handleReportTrigger', () => {
       warnings: ['redis_write_failed'],
     });
     expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+  });
+
+  it('restores lock suppression counters when a later metric write fails', async () => {
+    class FailingMetricWriteRedisStore extends InMemoryRedisStore {
+      failMetricWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failMetricWrites && key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('daily metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new FailingMetricWriteRedisStore();
+    await saveLock(redis, lock());
+    redis.failMetricWrites = true;
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-metric-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+    const restoredLock = await getLock(redis, 'alpha', 'lock-t3_post');
+    expect(restoredLock).toMatchObject({
+      suppressedReportCount: 0,
+      lastReportCount: 4,
+    });
+    expect(restoredLock?.lastSuppressedAt).toBeUndefined();
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-metric-fail')).toBe(false);
   });
 
   it('records failed unignore rollback when Redis fails after report suppression', async () => {

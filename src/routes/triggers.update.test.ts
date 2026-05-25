@@ -79,7 +79,7 @@ describe('update trigger routes', () => {
         expect.objectContaining({
           name: 'postUpdateTrigger',
           status: 'verified',
-          evidence: 'postUpdateTrigger on t3_post',
+          evidence: 'postUpdateTrigger processed for t3_post',
         }),
       ]),
     });
@@ -281,7 +281,7 @@ describe('update trigger routes', () => {
         expect.objectContaining({
           name: 'commentUpdateTrigger',
           status: 'verified',
-          evidence: 'commentUpdateTrigger on t1_comment',
+          evidence: 'commentUpdateTrigger processed for t1_comment',
         }),
         expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
       ]),
@@ -441,7 +441,7 @@ describe('update trigger routes', () => {
         expect.objectContaining({
           name: 'postFlairUpdateTrigger',
           status: 'verified',
-          evidence: 'postFlairUpdateTrigger on t3_post',
+          evidence: 'postFlairUpdateTrigger processed for t3_post',
         }),
         expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
         expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
@@ -473,7 +473,7 @@ describe('update trigger routes', () => {
         expect.objectContaining({
           name: 'postNsfwUpdateTrigger',
           status: 'verified',
-          evidence: 'postNsfwUpdateTrigger on t3_post',
+          evidence: 'postNsfwUpdateTrigger processed for t3_post',
         }),
         expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
         expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
@@ -505,11 +505,65 @@ describe('update trigger routes', () => {
         expect.objectContaining({
           name: 'postSpoilerUpdateTrigger',
           status: 'verified',
-          evidence: 'postSpoilerUpdateTrigger on t3_post',
+          evidence: 'postSpoilerUpdateTrigger processed for t3_post',
         }),
         expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
         expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
       ]),
+    });
+  });
+
+  it('accepts method-named wrapped NSFW update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isNsfw: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isNsfw: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-nsfw-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-nsfw',
+        postNsfwUpdate: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'nsfw_changed' },
+    });
+  });
+
+  it('accepts method-named wrapped spoiler update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isSpoiler: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isSpoiler: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-spoiler-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-spoiler',
+        postSpoilerUpdate: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'spoiler_changed' },
     });
   });
 

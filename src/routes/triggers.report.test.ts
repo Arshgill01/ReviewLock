@@ -79,7 +79,7 @@ describe('report trigger routes', () => {
         expect.objectContaining({
           name: 'postReportTrigger',
           status: 'verified',
-          evidence: 'post report trigger on t3_post',
+          evidence: 'post report trigger processed for t3_post',
         }),
       ]),
     });
@@ -270,7 +270,7 @@ describe('report trigger routes', () => {
         expect.objectContaining({
           name: 'commentReportTrigger',
           status: 'verified',
-          evidence: 'comment report trigger on t1_comment',
+          evidence: 'comment report trigger processed for t1_comment',
         }),
       ]),
     });

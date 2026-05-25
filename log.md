@@ -1638,3 +1638,50 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 00:24 IST - Reviewer hardening integration
+
+- Integrated reviewer finding: lock form bindings now store the reviewed
+  content hash and fingerprint version. Lock submit refetches and rejects stale
+  forms before `approve()` or `ignoreReports()` if content changed after the
+  moderator opened the review summary.
+- Integrated reviewer finding: Devvit Redis `setIfNotExists()` now treats the
+  installed runtime's empty-string NX response as failed acquisition, preserving
+  lock creation guards, report dedupe, and trigger mutex semantics.
+- Integrated reviewer finding: report and update trigger runtime proof rows are
+  marked `verified` only after target resolution and successful processing, not
+  merely after a payload with subreddit scope is delivered.
+- Integrated reviewer finding: manual unlock now fails open if Reddit
+  `unignoreReports()` succeeds but the lock status write fails; active indexes
+  are cleared best-effort and a runtime-failure audit is attempted.
+- Integrated reviewer finding: dashboard runtime verification now refreshes the
+  persisted runtime proof ledger even when the smoke endpoint rejects after
+  writing a failed capability row.
+- Integrated reviewer finding: NSFW and spoiler update routes accept both
+  `postNsfwUpdate`/`postSpoilerUpdate` and
+  `nsfwPostUpdate`/`spoilerPostUpdate` wrapper spellings, and sanitized payload
+  logging records both shapes.
+- Integrated reviewer finding: unchanged-report rollback now restores the
+  original lock record if later metric/audit persistence fails after the
+  lock-level suppressed counter was incremented.
+- Integrated reviewer finding: lock/unlock form submissions now require trusted
+  runtime subreddit context; missing or throwing context leaves bindings
+  unconsumed and prevents moderation calls.
+- Focused validation:
+  - `npm run test -- src/server/adapters/redis.test.ts src/routes/forms.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/server/services/unlockFlow.test.ts --reporter verbose`
+  - PASS, 5 test files and 60 tests.
+  - `npm run test -- src/routes/triggers.update.test.ts src/routes/triggers.report.test.ts src/client/state/store.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 5 test files and 85 tests.
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/routes/triggers.update.test.ts src/client/state/store.test.ts --reporter verbose`
+  - Initial FAIL on one overly strict `lastSuppressedAt: undefined`
+    `toMatchObject` assertion; corrected to assert the property separately.
+  - Re-run PASS, 3 test files and 61 tests.
+  - `npm run test -- src/routes/forms.test.ts --reporter verbose`
+  - PASS, 1 test file and 15 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 293 tests, and
+  build.

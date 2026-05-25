@@ -168,6 +168,7 @@ describe('breakLockForChangedContent', () => {
       {
         targetId: 't3_post',
         subreddit: 'alpha',
+        triggerCapabilityName: 'postUpdateTrigger',
       },
     );
 
@@ -183,6 +184,11 @@ describe('breakLockForChangedContent', () => {
         runtimeWarnings: ['target_resolution_failed'],
       }),
     ]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
   });
 
   it('does not enqueue duplicates after lock is no longer active', async () => {

@@ -67,4 +67,33 @@ describe('InMemoryRedisStore', () => {
       { key: 'set', start: 0, stop: 10, options: { by: 'rank' } },
     ]);
   });
+
+  it('treats Devvit empty-string NX results as lock acquisition failures', async () => {
+    const setCalls: unknown[] = [];
+    const store = createDevvitRedisStore({
+      get: async () => undefined,
+      set: async (key: string, value: string, options?: { nx?: boolean }) => {
+        setCalls.push({ key, value, options });
+        return setCalls.length === 1 ? 'OK' : '';
+      },
+      del: async () => undefined,
+      exists: async () => false,
+      expire: async () => undefined,
+      hGetAll: async () => ({}),
+      hSet: async () => undefined,
+      hDel: async () => undefined,
+      hIncrBy: async () => 0,
+      zAdd: async () => undefined,
+      zRange: async (): Promise<SortedSetEntry[]> => [],
+      zRem: async () => undefined,
+      zIncrBy: async () => 0,
+    });
+
+    await expect(store.setIfNotExists('guard', 'first')).resolves.toBe(true);
+    await expect(store.setIfNotExists('guard', 'second')).resolves.toBe(false);
+    expect(setCalls).toEqual([
+      { key: 'guard', value: 'first', options: { nx: true } },
+      { key: 'guard', value: 'second', options: { nx: true } },
+    ]);
+  });
 });

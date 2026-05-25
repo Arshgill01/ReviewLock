@@ -1528,3 +1528,126 @@ Reason:
 - The edit-aware reopen loop is the core product guarantee. If a concurrent
   report path is only suppressing unchanged content, the update delivery may be
   the signal that should break the lock and must remain retryable.
+
+### D090 - Lock confirmation binds to the reviewed fingerprint
+
+A moderator can open a lock form, review the content summary, and then submit
+after the target changed.
+
+Decision:
+
+- Store the menu-time content hash and fingerprint version in lock form
+  bindings.
+- On lock submit, refetch and fingerprint the current target before moderation
+  side effects.
+- If the fingerprint differs from the reviewed binding, reject the submit and
+  require the moderator to reopen the form.
+
+Reason:
+
+- Human confirmation applies to the content the moderator actually reviewed.
+  Silently locking a newer fingerprint would recreate the edit-abuse gap that
+  ReviewLock exists to close.
+
+### D091 - Devvit Redis NX success must be explicit
+
+Installed Devvit Redis can return an empty string for a failed `SET ... NX`.
+
+Decision:
+
+- Treat only `OK` or boolean `true` as successful Devvit Redis
+  `setIfNotExists()` acquisition.
+- Treat empty strings as a failed lease/dedupe/mutex acquisition.
+
+Reason:
+
+- Lock creation guards, report dedupe, and trigger mutexes depend on NX
+  semantics. A false acquisition can duplicate locks or let report/update races
+  enter critical sections concurrently.
+
+### D092 - Trigger proof is verified only after successful processing
+
+Trigger delivery alone does not prove ReviewLock processed the moderation loop.
+
+Decision:
+
+- Record report and update trigger runtime capabilities as `verified` only
+  after the target resolves and the route reaches a successful no-lock,
+  unchanged, suppression, or reopen outcome.
+- Do not mark unresolved fail-open deliveries as verified runtime proof.
+- Runtime proof evidence now says `processed for` rather than only delivered.
+
+Reason:
+
+- Runtime proof must not overclaim. A payload with a subreddit and target id can
+  still fail target refetch or fingerprint processing, and that must remain
+  visible as unverified or runtime-uncertain.
+
+### D093 - Manual unlock fails open after Reddit unignore succeeds
+
+Manual unlock can succeed against Reddit and then fail while persisting the
+ReviewLock status transition.
+
+Decision:
+
+- If `unignoreReports()` succeeds but the lock status write fails, best-effort
+  clear active lock indexes and write a runtime-failure audit.
+- Return a visible `redis_write_failed` result instead of throwing a generic
+  route error.
+
+Reason:
+
+- A moderator-confirmed unlock must not be silently undone by the next report
+  trigger. Clearing active indexes prevents ReviewLock from resuppressing
+  reports for content the moderator explicitly unlocked.
+
+### D094 - Accept both Devvit post flag wrapper spellings
+
+Devvit naming around NSFW and spoiler update payload wrappers may use either
+method-style or route-style names.
+
+Decision:
+
+- Accept both `postNsfwUpdate` and `nsfwPostUpdate`.
+- Accept both `postSpoilerUpdate` and `spoilerPostUpdate`.
+- Log both wrapper shapes in sanitized payload-shape evidence.
+
+Reason:
+
+- The remaining live flag-trigger proof should not fail because local fixtures
+  used one plausible wrapper spelling while installed Devvit emits another.
+
+### D095 - Restore lock counters when suppression ledger persistence rolls back
+
+The unchanged-report path can write the lock-level suppression count before a
+later metric or audit write fails.
+
+Decision:
+
+- If a later success-path write fails after `incrementLockSuppression()`,
+  best-effort restore the original lock record before clearing report dedupe.
+
+Reason:
+
+- The flow returns `runtime_uncertain` and rolls Reddit back with
+  `unignoreReports()`. The active lock should not retain an extra suppressed
+  count for a report delivery that ReviewLock intentionally left retryable.
+
+### D096 - Form moderation actions require trusted runtime subreddit context
+
+Devvit form submissions include client-supplied subreddit fields, but the
+runtime subreddit is the trusted scope boundary.
+
+Decision:
+
+- Lock, unlock, and reopen-dismiss form actions require
+  `reddit.getCurrentSubredditName()` to return a subreddit that matches the
+  submitted form namespace.
+- If runtime context is missing or throws, keep the form binding unconsumed and
+  do not call moderation methods.
+
+Reason:
+
+- Internal form callbacks can approve, ignore, unignore, or dismiss moderation
+  workflow state. During Devvit context outages, ReviewLock should fail closed
+  instead of trusting a client-provided subreddit string.

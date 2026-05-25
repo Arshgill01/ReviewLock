@@ -1,6 +1,6 @@
 # Known Limitations
 
-Last updated: 2026-05-25 23:07 IST.
+Last updated: 2026-05-26 00:24 IST.
 
 ## Runtime proof gaps
 
@@ -17,6 +17,12 @@ Last updated: 2026-05-25 23:07 IST.
 - `devvit logs` captured sanitized `on-post-report`, `on-post-update`, and
   `on-comment-update` payload-shape evidence; remaining trigger variants have
   not yet been captured.
+- Trigger runtime proof rows now require successful target resolution and route
+  processing before they become `verified`; failed refetch deliveries remain
+  unverified or runtime-uncertain instead of being treated as proof.
+- NSFW and spoiler update routes accept both local route wrapper names and the
+  installed Devvit method-style wrapper names, but live payload capture is still
+  required before those trigger variants can be claimed.
 
 ## Browser proof gaps
 
@@ -29,6 +35,9 @@ Last updated: 2026-05-25 23:07 IST.
 - Dashboard unlock and dismiss actions now use dedicated `/api/locks/unlock` and `/api/reopen-queue/dismiss` routes instead of internal Devvit form endpoints.
 - Dashboard destructive actions now use inline confirmation controls because `window.confirm()` was unreliable inside the Devvit WebView.
 - Dashboard and runtime smoke routes reject client-supplied subreddit namespaces that do not match the Devvit runtime subreddit; demo endpoints remain explicitly isolated under the demo namespace.
+- Lock, unlock, and reopen-dismiss form submissions also require trusted
+  Devvit runtime subreddit context. If context is missing, the action fails
+  closed and the moderator must reopen the menu when context is available.
 - Unlock requests require the exact active `lockId` that the moderator confirmed. Stale confirmation surfaces must refresh before they can unlock.
 
 ## Product claim limits

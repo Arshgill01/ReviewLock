@@ -1914,3 +1914,358 @@
 - Focused validation:
   - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
   - PASS, 1 test file and 12 tests.
+
+## 2026-05-25 23:58 IST - Finding
+
+- Severity: high
+- Area: Lock form submit can lock content that changed after the moderator saw
+  the review summary
+- Evidence: The lock menu resolves the target, renders a `Reviewed content`
+  summary in the form, and creates a form binding (`src/routes/menu.ts:201-224`).
+  The binding stores only action, subreddit, target id, lock id, and creation
+  time (`src/server/services/formBindings.ts:8-15`,
+  `src/server/services/formBindings.ts:39-46`); it does not store the content
+  hash or any fingerprint of the target state the moderator reviewed. On
+  submit, the form route validates only token, subreddit, target id, and reason
+  before calling `lockReviewedContent()` (`src/routes/forms.ts:114-154`).
+  `lockReviewedContent()` then refetches the current target, fingerprints that
+  current content, and approves/ignores it as the new lock
+  (`src/server/services/lockFlow.ts:127-146`,
+  `src/server/services/lockFlow.ts:274-345`). Existing form tests cover token,
+  target-id, reason, and subreddit mismatches, but not a target whose body,
+  title, flair, nsfw, or spoiler state changed between menu render and submit
+  (`src/routes/forms.test.ts:65-180`).
+- Why it matters: Human confirmation is required for locking, and the product
+  promise is that reviewed content stays reviewed only until it changes. In the
+  first-lock path, a moderator can confirm a stale form summary while ReviewLock
+  silently locks a different current fingerprint that the moderator did not see.
+  That is the same edit-abuse gap ReviewLock is meant to close, just inside the
+  lock creation flow instead of after a lock already exists.
+- Suggested fix: Store the menu-time fingerprint in the form binding, or store
+  enough reviewed target data to recompute it. On lock submit, compare the
+  current refetched fingerprint to the bound fingerprint before calling
+  `approve()` or `ignoreReports()`. If it differs or is uncertain, reject the
+  submit with a stale-review message and force the moderator to reopen the lock
+  form with the updated summary. Add a regression where the menu binding is
+  created for `Reviewed body`, the submit refetch sees `Edited body`, and no
+  `approve()` / `ignoreReports()` call or active lock is written.
+- Files reviewed: `src/routes/menu.ts`, `src/routes/forms.ts`,
+  `src/server/services/formBindings.ts`, `src/server/services/lockFlow.ts`,
+  `src/routes/forms.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-25 23:59 IST - Finding
+
+- Severity: high
+- Area: Devvit Redis NX failures are treated as successful lock acquisition
+- Evidence: The Devvit Redis adapter implements `setIfNotExists()` as
+  `client.set(key, value, { nx: true })` and returns true for any result that is
+  not `undefined`, `null`, or boolean `false`
+  (`src/server/adapters/redis.ts:153-155`). Installed Devvit typings show
+  `RedisClient.set()` returns `Promise<string>`
+  (`node_modules/@devvit/public-api/types/redis.d.ts:859`,
+  `node_modules/@devvit/public-api/types/redis.d.ts:1620-1626`), and the
+  installed Devvit Redis implementation returns `response.value`
+  (`node_modules/@devvit/public-api/apis/redis/RedisClient.js:366-382`). Its
+  Redis mock maps a failed `SET ... NX` result to an empty string
+  (`node_modules/@devvit/redis/test/mocks/RedisMock.js:96-105`), so the adapter
+  currently treats a pre-existing key as successful acquisition. The app relies
+  on `setIfNotExists()` for the lock creation guard
+  (`src/server/services/lockFlow.ts:148-180`), report dedupe
+  (`src/server/services/reportTriggers.ts:111-123`), and trigger mutex
+  (`src/server/services/triggerMutex.ts:24-33`). Existing adapter coverage uses
+  only `InMemoryRedisStore`, whose `setIfNotExists()` correctly returns false on
+  duplicates (`src/server/adapters/redis.test.ts:31-32`), so the live Devvit
+  behavior is not covered.
+- Why it matters: In live Devvit, duplicate lock submissions, duplicate report
+  deliveries, and concurrent report/update triggers can all enter critical
+  sections that were designed to be mutually exclusive. That can recreate the
+  duplicate lock race, double-count report suppressions, and let an edit-break
+  update run concurrently with unchanged-report suppression despite the
+  protection added in earlier fixes.
+- Suggested fix: Treat only the Devvit success string as acquired, for example
+  `result === 'OK'`, and treat `''` as false. Add an adapter-level regression
+  using a fake Devvit Redis client whose second `{ nx: true }` set returns `''`,
+  then assert `createDevvitRedisStore(...).setIfNotExists()` returns false and
+  does not let `withTriggerMutex()` or the lock-creation guard proceed twice.
+- Files reviewed: `src/server/adapters/redis.ts`,
+  `src/server/adapters/redis.test.ts`, `src/server/services/lockFlow.ts`,
+  `src/server/services/reportTriggers.ts`,
+  `src/server/services/triggerMutex.ts`,
+  `node_modules/@devvit/public-api/types/redis.d.ts`,
+  `node_modules/@devvit/public-api/apis/redis/RedisClient.js`,
+  `node_modules/@devvit/redis/test/mocks/RedisMock.js`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:02 IST - Finding
+
+- Severity: high
+- Area: Runtime proof marks failed trigger deliveries as verified
+- Evidence: `handleReportTrigger()` resolves the target, derives subreddit and
+  target kind, then records `postReportTrigger` or `commentReportTrigger` as
+  `verified` as soon as `subreddit !== 'unknown'`
+  (`src/server/services/reportTriggers.ts:177-189`). The actual fail-open path
+  for `!resolution.ok || !resolution.target` runs later and can return
+  `runtime_uncertain`, either reopening a known active lock without a target or
+  writing a runtime failure when no lock can be found
+  (`src/server/services/reportTriggers.ts:200-267`). Update triggers have the
+  same ordering: `breakLockForChangedContent()` records the provided trigger
+  capability as `verified` before entering the mutex, before loading the active
+  lock, and before deciding whether target resolution was missing or uncertain
+  (`src/server/services/reopenFlow.ts:92-124`,
+  `src/server/services/reopenFlow.ts:137-165`). Runtime proof treats those rows
+  as authoritative capability status (`src/server/services/runtimeProof.ts:166-190`),
+  and the dashboard renders only the capability name plus `verified` label, not
+  the later fail-open result (`src/client/components/RuntimeBanner.ts:33-64`).
+  Existing route tests assert verified rows for successful report/update
+  deliveries (`src/routes/triggers.report.test.ts:63-91`,
+  `src/routes/triggers.update.test.ts:62-92`) and separately assert
+  `runtime_uncertain` reopen behavior for unresolved targets
+  (`src/routes/triggers.report.test.ts:223-243`,
+  `src/routes/triggers.update.test.ts:210-258`), but they do not assert that an
+  unresolved or failed delivery leaves the trigger capability unverified or
+  failed.
+- Why it matters: Runtime claims must be proven by playtest or clearly labeled
+  unverified. A live payload with a valid subreddit and target id but failed
+  refetch can put `postReportTrigger`, `commentReportTrigger`, or an update
+  trigger into `verified` even though ReviewLock never proved it could inspect
+  the target, suppress reports, or reopen based on a material fingerprint for
+  that delivery. That can make the dashboard and runtime proof artifacts
+  overstate live Devvit support for trigger paths that are still failing open.
+- Suggested fix: Record trigger capability only after a successful processed
+  outcome that proves the intended route path, or split the model into distinct
+  `delivered` and `processed` statuses so failed target resolution cannot be
+  displayed as `verified`. Add regressions where a route receives a live-shaped
+  payload with `subreddit: { name: 'alpha' }` and a prefixed target id while
+  the Reddit adapter cannot refetch the target; assert the service still
+  returns the correct `runtime_uncertain` fail-open result, but runtime proof
+  does not mark that trigger capability `verified`.
+- Files reviewed: `src/server/services/reportTriggers.ts`,
+  `src/server/services/reopenFlow.ts`, `src/server/services/updateTriggers.ts`,
+  `src/server/services/runtimeProof.ts`,
+  `src/client/components/RuntimeBanner.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/reopenFlow.test.ts`,
+  `src/routes/triggers.report.test.ts`,
+  `src/routes/triggers.update.test.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:02 IST - Finding
+
+- Severity: high
+- Area: Manual unlock can succeed in Reddit but leave ReviewLock actively
+  suppressing future reports
+- Evidence: `unlockReviewedContent()` calls `unignoreReportsForReviewLock()`
+  first, records runtime proof, and only then updates the lock to `unlocked`
+  through `updateLockStatus()` (`src/server/services/unlockFlow.ts:77-125`).
+  There is no `try/catch` or compensating cleanup around that status write. If
+  `updateLockStatus()` fails before the lock record is saved as `unlocked`,
+  the function throws after Reddit has already accepted `unignoreReports()`.
+  The dashboard route wraps that exception as a generic error response
+  (`src/routes/api.dashboard.ts:329-376`), and the Devvit form route does not
+  catch it locally (`src/routes/forms.ts:197-208`). The active lock index can
+  therefore remain reachable by `getActiveLockByTarget()` because that helper
+  trusts the target index and returns records whose stored status is still
+  `active` (`src/server/services/locks.ts:45-58`). Current unlock tests cover
+  the success path, stale lock id, subreddit mismatch, and failed
+  `unignoreReports()` (`src/server/services/unlockFlow.test.ts:62-160`), but
+  there is no regression where `unignoreReports()` succeeds and Redis fails
+  during `updateLockStatus()`.
+- Why it matters: Manual unlock is a human-confirmed action. If Reddit reports
+  were returned to normal handling but ReviewLock still records an active lock,
+  the next report trigger will find that active lock, call `ignoreReports()`,
+  and resume suppressing reports on content the moderator explicitly unlocked.
+  This can make the dashboard/API look failed while the underlying moderation
+  state has already changed, then silently undo the moderator's intent on the
+  next trigger delivery.
+- Suggested fix: Treat post-`unignoreReports()` Redis failures as a fail-open
+  unlock path. If the status write fails, best-effort remove active lock
+  indexes and append a `runtime_failure` audit event so future report/update
+  triggers cannot continue suppressing the target as active. Add a regression
+  with a Redis store that throws on `keys.lock('alpha', 'lock-1')` during
+  `updateLockStatus()`: assert `unignoreReports:t3_post` was called,
+  `getActiveLockByTarget()` is undefined or the lock is no longer active, and
+  the result exposes `redis_write_failed` instead of throwing a generic 500.
+- Files reviewed: `src/server/services/unlockFlow.ts`,
+  `src/server/services/locks.ts`, `src/server/services/reportTriggers.ts`,
+  `src/routes/api.dashboard.ts`, `src/routes/forms.ts`,
+  `src/server/services/unlockFlow.test.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:06 IST - Finding
+
+- Severity: medium
+- Area: Failed runtime smoke proof can be persisted but not shown after the
+  Verify runtime click
+- Evidence: The smoke routes now persist failed capability rows when Redis or
+  Reddit context checks fail after subreddit scope is known
+  (`src/routes/api.ts:162-187`, `src/routes/api.ts:243-268`), and route tests
+  assert `loadRuntimeProofStatus(redis, 'alpha')` contains `redis failed` or
+  `redditContext failed` for those server-side failures
+  (`src/routes/api.contract.test.ts:134-209`). The dashboard store only refreshes
+  runtime status after `runRuntimeSmoke()` resolves successfully
+  (`src/client/state/store.ts:178-184`). If either smoke endpoint rejects,
+  `verifyRuntime()` jumps to the catch block, sets `store.error`, and never calls
+  `fetchRuntimeStatus()` (`src/client/state/store.ts:185-190`). The store tests
+  cover only the successful verify path and demo-mode block
+  (`src/client/state/store.test.ts:176-193`), while the API client test covers a
+  malformed smoke rejection but not whether the store refreshes the persisted
+  failed proof after that rejection (`src/client/state/api.test.ts:187-193`).
+- Why it matters: The product has already hardened failed smoke checks so the
+  runtime proof ledger can show `failed` instead of stale `verified` or
+  `unverified`. In the actual dashboard workflow, the moderator who clicks
+  `Verify runtime` can still see only a transient error while the runtime panel
+  remains on the pre-click status until a later full refresh. That weakens the
+  proof boundary exactly when intermittent Devvit context or Redis failures need
+  to be visible.
+- Suggested fix: In `verifyRuntime()` catch, best-effort call
+  `fetchRuntimeStatus(this.subreddit, false)` and update `runtimeStatus`,
+  `dailyMetrics`, and `topChurnTargets` before surfacing the error. Add a store
+  regression where `runRuntimeSmoke()` rejects after the server persisted a
+  failed runtime row; assert `fetchRuntimeStatus()` is still called and the
+  store updates `runtimeStatus.overall` to `failed`.
+- Files reviewed: `src/client/state/store.ts`,
+  `src/client/state/store.test.ts`, `src/client/state/api.ts`,
+  `src/client/state/api.test.ts`, `src/routes/api.ts`,
+  `src/routes/api.contract.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:09 IST - Finding
+
+- Severity: medium
+- Area: NSFW/spoiler update routes do not accept the wrapper names implied by the installed Devvit service definitions.
+- Evidence:
+  - The update route only unwraps `nsfwPostUpdate` and `spoilerPostUpdate` for nested payloads; it does not look for `postNsfwUpdate` or `postSpoilerUpdate`: `src/routes/triggers.update.ts:31-52`.
+  - The sanitized payload logger mirrors the same two wrapper names, so a live payload under `postNsfwUpdate` or `postSpoilerUpdate` would be logged as absent and then fail target extraction: `src/routes/triggerPayloadLog.ts:71-78`.
+  - Installed Devvit definitions name these callbacks `OnPostNsfwUpdate` and `OnPostSpoilerUpdate`, with method fields `onPostNsfwUpdate` and `onPostSpoilerUpdate`: `node_modules/@devvit/protos/types/devvit/actor/automation/v1alpha/event_handlers.js:578-610`; the shared trigger request types are `PostNsfwUpdate` and `PostSpoilerUpdate`: `node_modules/@devvit/shared/types/triggers.d.ts:52-59`.
+  - Local route coverage proves direct `{ postId: 't3_post' }` bodies for NSFW/spoiler and a wrapped `postFlairUpdate`, but it does not cover wrapped NSFW or wrapped spoiler payloads: `src/routes/triggers.update.test.ts:452-541`.
+  - `docs/TRIGGER_PROOF.md` explicitly says NSFW/spoiler/flair live payloads have not been captured yet and remain representative local fixtures: `docs/TRIGGER_PROOF.md:23-28`.
+- Why it matters: if Devvit delivers these remaining unverified callbacks with the same `postNsfwUpdate` / `postSpoilerUpdate` spelling implied by its service names, ReviewLock will return `400 Update trigger target id is required` and fail to break locks on NSFW/spoiler changes.
+- Suggested fix: accept both wrapper spellings (`postNsfwUpdate` plus `nsfwPostUpdate`, and `postSpoilerUpdate` plus `spoilerPostUpdate`) in `TriggerBody`, `payloads()`, and `logTriggerPayloadShape()`, then add wrapped route regressions for the method-style names before live proof.
+
+## 2026-05-26 00:10 IST - Finding
+
+- Severity: medium
+- Area: Reopen dismiss can write a durable dismissal audit even when the queue mutation fails.
+- Evidence:
+  - Both dismiss entry points now append `reopen_dismissed` audit first, then call `dismissReopenEvent()`: `src/routes/forms.ts:277-296` and `src/routes/api.dashboard.ts:416-429`.
+  - `dismissReopenEvent()` performs two additional Redis writes after the audit: it writes the dismissed event body, then removes the event id from the reopen queue: `src/server/services/reopenQueue.ts:71-73`.
+  - If `redis.set(keys.reopenEvent(...))` throws, the event stays open but the audit already claims it was dismissed. If the later `zRem()` throws, the event body has `dismissedAt` and `listOpenReopenEvents()` filters it out even though the queue removal failed: `src/server/services/reopenQueue.ts:50-55`, `:71-73`.
+  - Current regressions cover audit write failure before dismissal and happy-path dismissal, but not `dismissReopenEvent()` failures after the audit succeeds: `src/routes/forms.test.ts:378-416`, `src/routes/api.dashboard.test.ts:255-288`, `src/server/services/reopenQueue.test.ts:40-47`.
+- Why it matters: dismiss is a human-confirmed moderation workflow. A transient Redis failure can produce either an audit trail that says a still-open item was dismissed or a hidden dismissed event with a route failure, making retries and moderator traceability unreliable.
+- Suggested fix: move audit plus event dismissal into one durability boundary, preferably a small service that can use Redis transaction semantics or a compensating `runtime_failure` audit on post-audit dismiss failure. Add dashboard and form regressions that fail `keys.reopenEvent(...)` set and `keys.reopenQueue(...)` zRem separately after audit success.
+
+## 2026-05-26 00:13 IST - Finding
+
+- Severity: medium
+- Area: Report suppression rollback can leave the lock's suppressed counters incremented.
+- Evidence:
+  - The unchanged-report path calls `ignoreReports()`, then persists the lock-level suppression count through `incrementLockSuppression()`, then writes daily/target metrics, then appends the `report_suppressed` audit event: `src/server/services/reportTriggers.ts:285-333`.
+  - If either `incrementSuppressedReportMetric()` or the later audit append throws after `incrementLockSuppression()` succeeded, the catch calls `unignoreReports()` and clears the report dedupe marker, but it does not restore the lock record's `suppressedReportCount`, `lastSuppressedAt`, or `lastReportCount`: `src/server/services/reportTriggers.ts:334-366`.
+  - `incrementLockSuppression()` saves those fields directly through `updateLock()`: `src/server/services/locks.ts:114-125`.
+  - Current Redis-failure regressions only fail the lock write itself before the counters can be persisted; they assert rollback calls but do not cover metric or audit failure after the lock counter update has already succeeded: `src/server/services/reportTriggers.test.ts:758-840`.
+- Why it matters: ReviewLock returns `runtime_uncertain` and attempts to undo Reddit `ignoreReports()` when the post-suppression ledger write fails. In the metric/audit failure ordering, the active lock can still show an extra suppressed report even though the suppression was rolled back and the dedupe marker was cleared for retry. A retry can then increment the same lock again, overstating "Reports suppressed" and item-level churn for a report delivery ReviewLock explicitly treated as not durably processed.
+- Suggested fix: make the unchanged-report persistence atomic enough to roll back the lock-level counter when a later success-path write fails, or move the counter update after all fallible metric/audit writes and write the lock last. Add regressions that fail `keys.metricsDaily(...)`, `keys.metricsTarget(...)`, and `keys.audit(...)` after `incrementLockSuppression()` succeeds, asserting `unignoreReports()` is called, dedupe is cleared, and the active lock's suppressed counters remain unchanged.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/locks.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:24 IST - Codex integration status
+
+- Resolved high finding: lock form submit can lock content that changed after
+  the moderator saw the review summary. Lock form bindings now store the
+  reviewed content hash/version, and submit rejects stale fingerprints before
+  moderation side effects. Regression added in `src/routes/forms.test.ts`.
+- Resolved high finding: Devvit Redis NX failures are treated as successful
+  lock acquisition. `createDevvitRedisStore().setIfNotExists()` now treats only
+  `OK` or boolean `true` as acquired. Regression added in
+  `src/server/adapters/redis.test.ts`.
+- Resolved high finding: runtime proof marks failed trigger deliveries as
+  verified. Report/update trigger proof rows are now written only after target
+  resolution and successful processing. Regressions added in
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/reopenFlow.test.ts`, and route proof expectations.
+- Resolved high finding: manual unlock can succeed in Reddit but leave
+  ReviewLock active. Unlock now best-effort clears active indexes and writes a
+  runtime-failure audit if status persistence fails after `unignoreReports()`.
+  Regression added in `src/server/services/unlockFlow.test.ts`.
+- Resolved medium finding: failed runtime smoke proof can be persisted but not
+  shown after Verify runtime. Client store now refreshes runtime status in the
+  smoke failure path. Regression added in `src/client/state/store.test.ts`.
+- Resolved medium finding: NSFW/spoiler update wrapper names. Update routes and
+  payload-shape logging now accept `postNsfwUpdate`/`postSpoilerUpdate` as well
+  as `nsfwPostUpdate`/`spoilerPostUpdate`. Regressions added in
+  `src/routes/triggers.update.test.ts`.
+- Partially resolved medium finding: report suppression rollback can leave lock
+  counters incremented. The unchanged-report catch path now restores the
+  original lock record if a later persistence write fails after
+  `incrementLockSuppression()`. Regression added in
+  `src/server/services/reportTriggers.test.ts`. Broader audit/metric
+  transactionality remains a hardening target.
+- Resolved medium finding added at 00:18: lock/unlock form submissions trust
+  submitted subreddit when runtime context is missing. Form actions now require
+  trusted runtime subreddit context and keep bindings unconsumed on missing or
+  throwing context. Regressions added in `src/routes/forms.test.ts`.
+- Remaining medium findings for later pass:
+  - Reopen dismiss can write durable dismissal audit before queue mutation
+    failure.
+  - Reopen flows can lose required `lock_reopened` audit after state is already
+    reopened.
+  - Dashboard metrics counters can lose updates under concurrent cross-target
+    writes.
+  - Suppression rollback still needs metric compensation when audit writes fail
+    after metrics increment.
+- Validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 293 tests.
+  - `npm run build` PASS.
+
+## 2026-05-26 00:14 IST - Finding
+
+- Severity: medium
+- Area: Reopen flows can lose the required `lock_reopened` audit after the lock is already reopened.
+- Evidence:
+  - Update-trigger reopen writes the reopen event, marks the lock `reopened`, writes reopen metrics, and only then appends the `lock_reopened` audit event: `src/server/services/reopenFlow.ts:166-190`.
+  - Changed-content report reopen follows the same ordering: it enqueues the reopen event, marks the lock reopened, increments reopen metrics, then appends the `lock_reopened` audit event: `src/server/services/reportTriggers.ts:377-402`.
+  - If the final audit append throws, both services fall into their outer `catch` and return `runtime_uncertain`/`redis_write_failed`, but the lock has already left the active index and the reopen queue event is already visible: `src/server/services/reopenFlow.ts:203-223`, `src/server/services/reportTriggers.ts:436-459`.
+  - A retry then sees `no_lock` because `getActiveLockByTarget()` filters for active status only: `src/server/services/locks.ts:45-58`; it will not recreate the missing audit row.
+  - Current reopen tests assert happy-path audit presence and status-write/index-failure behavior, but they do not fail the `lock_reopened` audit write after queue/status/metric persistence succeeds: `src/server/services/reopenFlow.test.ts:109-270`, `src/server/services/reportTriggers.test.ts:551-647`.
+- Why it matters: `lock_reopened` is one of ReviewLock's required audit event kinds, and edit-break reopening is the core product loop. Losing the audit after the queue/status transition leaves moderators with a reopened queue item and metrics, but no durable ledger entry explaining who/what reopened it or whether `unignoreReports()` succeeded.
+- Suggested fix: include audit creation in the same durability boundary as the reopen event and status transition, or write a compensating `runtime_failure` audit if the success audit fails after the reopen state is committed. Add regressions for update-trigger and report-trigger reopen where `keys.audit(...)` zAdd fails after queue/status writes, asserting the result does not leave an unaudited reopened item without a visible runtime-failure ledger entry.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/reopenFlow.test.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/locks.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:18 IST - Finding
+
+- Severity: medium
+- Area: Lock/unlock form submissions still trust submitted subreddit when runtime context is missing.
+- Evidence:
+  - `scopedFormSubreddit()` calls `reddit.getCurrentSubredditName()`, but if that returns `undefined`, it returns the normalized submitted subreddit instead of failing closed: `src/routes/forms.ts:75-103`.
+  - Lock and unlock submit routes use that value before consuming the binding and before calling `lockReviewedContent()` / `unlockReviewedContent()`: `src/routes/forms.ts:126-154`, `src/routes/forms.ts:175-202`.
+  - The form tests cover runtime mismatch for lock and unlock (`src/routes/forms.test.ts:161-187`, `src/routes/forms.test.ts:302-337`) and missing runtime context for dashboard launch (`src/routes/forms.test.ts:205-226`), but there is no lock/unlock form regression where `getCurrentSubredditName()` returns `undefined` or throws while the request supplies `subreddit: 'alpha'`.
+  - This differs from the live dashboard and runtime-smoke hardening, which now requires trusted runtime subreddit context instead of accepting a client/query namespace during context outages: `src/routes/api.dashboard.ts:83-180`, `src/routes/api.ts:39-89`.
+- Why it matters: internal Devvit form callbacks are moderation actions. If Devvit runtime subreddit lookup is temporarily unavailable, a still-valid form token plus submitted subreddit can approve/ignore or unignore content under a client-provided namespace instead of forcing the moderator to reopen the menu in a trusted subreddit context. That weakens the same namespace/proof boundary that dashboard actions already fail closed on.
+- Suggested fix: make `scopedFormSubreddit()` require a runtime subreddit for lock, unlock, and reopen-dismiss form actions, and reject missing runtime context with the same neutral toast used for mismatches. Add lock and unlock regressions with a Reddit adapter whose `getCurrentSubredditName()` returns `undefined` and one that throws; assert the binding remains unconsumed, no Reddit moderation call is made, and the active lock state is unchanged.
+- Files reviewed: `src/routes/forms.ts`, `src/routes/forms.test.ts`, `src/server/services/formBindings.ts`, `src/routes/api.dashboard.ts`, `src/routes/api.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:22 IST - Finding
+
+- Severity: medium
+- Area: Dashboard metrics counters can lose updates under concurrent cross-target writes.
+- Evidence:
+  - `recordLockCreatedMetric()`, `incrementSuppressedReportMetric()`, and `incrementReopenedMetric()` each load the whole daily metric and target metric JSON, increment in memory, then write the whole object back: `src/server/services/metrics.ts:131-195`.
+  - The persistence helpers use `redis.set()` with full JSON records and `zAdd()` score updates rather than Redis atomic counters: `src/server/services/metrics.ts:57-79`.
+  - Trigger mutexes are per target (`reviewlock:{subreddit}:trigger:mutex:{targetId}`), so they do not serialize reports or updates for different targets in the same subreddit: `src/server/services/triggerMutex.ts:14-28`; lock creation guards are also per target: `src/server/services/lockFlow.ts:148-183`.
+  - Current metrics tests are sequential and cover ordering/malformed records, but not two simultaneous metric increments against the same daily key or same target key: `src/server/services/metrics.test.ts:28-112`.
+- Why it matters: high-volume report bursts across different locked items are a core use case. Two successful trigger deliveries in the same subreddit/day can both read `reportsSuppressed = 0`, each write `1`, and leave the dashboard undercounting "Reports suppressed"; the same applies to lock-created and reopen counts. That weakens the product's evidence of avoided report churn even when moderation behavior succeeded.
+- Suggested fix: store mutable counters in Redis hashes and use `hincrby`/transactional updates for daily and target metrics, or add a scoped metrics mutex/transaction around read-modify-write. Add concurrent tests for same-day different-target suppressed reports, concurrent lock creation metrics, and concurrent reopen metrics proving aggregate counters reach `2` and top-target ordering remains correct.
+- Files reviewed: `src/server/services/metrics.ts`, `src/server/services/metrics.test.ts`, `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/lockFlow.ts`, `src/server/services/triggerMutex.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:23 IST - Finding
+
+- Severity: medium
+- Area: Report suppression rollback still leaves metrics incremented when the success audit write fails.
+- Evidence:
+  - The unchanged-report path persists the lock counter, then calls `incrementSuppressedReportMetric()`, then appends the `report_suppressed` audit event: `src/server/services/reportTriggers.ts:317-340`.
+  - The catch block now restores the lock record with `updateLock(deps.redis, lock)` after a later failure, but it does not undo daily or target metrics that may already have been written: `src/server/services/reportTriggers.ts:341-347`.
+  - `incrementSuppressedReportMetric()` writes both the daily `reportsSuppressed` JSON record and the target `reportsSuppressed` JSON record before the audit call can fail: `src/server/services/metrics.ts:153-172`; `appendAuditEvent()` has two fallible Redis writes after that: `src/server/services/audit.ts:22-31`.
+  - The new rollback regression only fails the daily metric write before metrics can persist, and asserts the lock counters are restored; there is still no regression where `keys.audit(...)` or `keys.auditEvent(...)` fails after metrics were incremented: `src/server/services/reportTriggers.test.ts:797-836`.
+- Why it matters: the service returns `runtime_uncertain`, calls `unignoreReports()`, and clears the dedupe marker when the final audit write fails, so the delivery is explicitly treated as not durably processed. Leaving dashboard metrics incremented in that state overstates "Reports suppressed"; a retry can then increment metrics again for the same report delivery.
+- Suggested fix: make suppression persistence one atomic durability boundary, or add compensating metric rollback when the audit write fails after `incrementSuppressedReportMetric()` succeeds. Add regressions that fail `keys.auditEvent(...)` and `keys.audit(...)` after metric writes, asserting Reddit rollback occurs, dedupe is cleared, lock counters are restored, and daily/target suppressed metrics remain unchanged.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.

@@ -129,3 +129,11 @@
 - [x] Fail open when Reddit target refetch throws during report/update trigger handling.
 - [x] Keep demo-mode exit retryable when server-side demo disable fails.
 - [x] Surface runtime-failure audit target, lock, operation, reason, and error details.
+- [x] Bind lock form submissions to the menu-time reviewed content fingerprint.
+- [x] Treat Devvit Redis empty-string `SET NX` results as failed guard acquisition.
+- [x] Mark report/update trigger runtime proof verified only after successful processing.
+- [x] Clear active lock indexes when manual unlock status persistence fails after `unignoreReports()`.
+- [x] Refresh dashboard runtime proof after failed live runtime smoke checks.
+- [x] Accept method-named `postNsfwUpdate` and `postSpoilerUpdate` wrappers.
+- [x] Restore lock suppression counters when later suppression ledger writes fail.
+- [x] Fail closed on lock/unlock form submissions when trusted runtime subreddit context is missing.

@@ -29,6 +29,8 @@ export interface LockReviewInput {
   lockReason: LockReasonPreset;
   customNote?: string;
   expiresAt?: string;
+  expectedContentHash?: string;
+  expectedFingerprintVersion?: string;
 }
 
 export interface LockFlowDependencies {
@@ -142,6 +144,20 @@ export const lockReviewedContent = async (
       ok: false,
       message: 'ReviewLock could not fingerprint the current content, so reports were not locked.',
       warnings: ['fingerprint_uncertain'],
+    };
+  }
+
+  if (
+    input.expectedContentHash &&
+    input.expectedFingerprintVersion &&
+    (input.expectedContentHash !== fingerprint.hash ||
+      input.expectedFingerprintVersion !== fingerprint.version)
+  ) {
+    return {
+      ok: false,
+      message:
+        'Reviewed content changed after the form opened. Reopen ReviewLock and review the updated content before locking.',
+      warnings: ['stale_review_confirmation'],
     };
   }
 
