@@ -16,6 +16,9 @@ Local route tests use payload fields accepted by ReviewLock trigger routes:
   `spoilerPostUpdate` wrappers.
 - Bare Devvit ids are normalized at route boundaries when the endpoint target
   kind is known: post routes use `t3_*`; comment routes use `t1_*`.
+- Target extraction is endpoint-kind-aware. Comment report/update routes prefer
+  `commentId` and `comment.id` over sibling parent `post.id` fields so comment
+  locks cannot accidentally resolve against the parent post.
 
 Live `PostReport` payload comparison is now available for a controlled
 unchanged locked post in `r/reviewlock_dev`. Comment report and update payloads
@@ -111,6 +114,8 @@ Targeted test result:
 - Trigger route coverage includes Devvit wrapper payloads, bare post/comment id
   normalization before target resolution, and sanitized payload-shape logging
   that rejects raw ids, content, subreddit names, and report reason text.
+- Comment report/update route coverage includes payloads with both sibling
+  `post.id` and `comment.id`, proving comment routes choose the comment target.
 
 Covered files:
 

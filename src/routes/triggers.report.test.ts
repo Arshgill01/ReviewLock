@@ -293,6 +293,29 @@ describe('report trigger routes', () => {
     expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
   });
 
+  it('prefers comment ids over sibling post ids on comment report payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-comment-sibling-post',
+        post: { id: 't3_parent_post' },
+        comment: { id: 't1_comment', numReports: 5 },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
+  });
+
   it('accepts Devvit nested comment report payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));

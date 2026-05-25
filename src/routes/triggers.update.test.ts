@@ -332,6 +332,52 @@ describe('update trigger routes', () => {
     expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
   });
 
+  it('prefers comment ids over sibling post ids on comment update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        post: { id: 't3_parent_post' },
+        comment: { id: 't1_comment' },
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+  });
+
+  it('prefers wrapped comment ids over sibling post ids on comment update payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock(commentTarget()));
+    const reddit = new FakeRedditAdapter([commentTarget('Edited comment')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        commentUpdate: {
+          post: { id: 't3_parent_post' },
+          comment: { id: 't1_comment' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'reopened' });
+    expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
+  });
+
   it('maps flair update route to flair_changed reopen reason', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock({ ...target(), flairText: 'Discussion' }));

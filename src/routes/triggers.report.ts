@@ -62,13 +62,11 @@ const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
   normalizeTargetId(
     kind,
     first(
-    payloads(body).flatMap((payload) => [
-      payload.targetId,
-      payload.postId,
-      payload.commentId,
-      payload.post?.id,
-      payload.comment?.id,
-    ]),
+      payloads(body).flatMap((payload) =>
+        kind === 'post'
+          ? [payload.targetId, payload.postId, payload.post?.id]
+          : [payload.targetId, payload.commentId, payload.comment?.id],
+      ),
     ),
   );
 

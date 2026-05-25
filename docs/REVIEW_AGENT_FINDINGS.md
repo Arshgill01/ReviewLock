@@ -611,3 +611,20 @@
 - Why it matters: Comment edit reopen is a must-ship part of the "locked until edited" loop. If Devvit sends the typed `post` field alongside the edited `comment`, ReviewLock will fail to resolve the active comment lock and can leave edited reviewed comments locked until a later report happens to force a refetch path.
 - Suggested fix: Make target id extraction kind-aware. For comment routes, prefer `commentId` and `comment?.id` before any post fields; for post routes, prefer `postId` and `post?.id`. Add route regressions for raw and `TriggerEvent`-wrapped `CommentUpdate` payloads that include both `post` and `comment`, asserting the resolved action reopens the `t1_*` lock and calls `unignoreReports:t1_comment`.
 - Files reviewed: `src/routes/triggers.update.ts`, `src/routes/triggers.update.test.ts`, `node_modules/@devvit/protos/json/devvit/events/v1alpha/events.d.ts`, `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/commentv2.d.ts`, `node_modules/@devvit/protos/json/devvit/reddit/v2alpha/postv2.d.ts`
+
+## 2026-05-25 15:42 IST - Recheck
+
+- Area: Comment update trigger target extraction with sibling post ids
+- Result: Resolved in the current worktree.
+- Evidence: `src/routes/triggers.update.ts` now makes target extraction kind-aware, so comment routes prefer `targetId`, `commentId`, and `comment?.id` without considering sibling post ids. `src/routes/triggers.update.test.ts` now covers both raw and wrapped comment update payloads that include `post: { id: 't3_parent_post' }` plus `comment: { id: 't1_comment' }`, asserting the comment lock reopens and `unignoreReports:t1_comment` is called. The same kind-aware extraction pattern was applied to `src/routes/triggers.report.ts` with a comment-report sibling-post regression.
+
+## 2026-05-25 15:43 IST - Recheck
+
+- Area: Comment update trigger target extraction can choose the parent post id
+- Result: Resolved in the current worktree.
+- Evidence: `targetId()` in report and update trigger routes is now
+  endpoint-kind-aware: post routes inspect post ids and comment routes inspect
+  comment ids. Route tests cover comment report/update payloads with sibling
+  `post.id` plus `comment.id`, including a wrapped comment update payload, and
+  prove the route calls `unignoreReports:t1_comment` or
+  `ignoreReports:t1_comment`.

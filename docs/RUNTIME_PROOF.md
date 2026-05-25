@@ -239,6 +239,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Hardened by recording granular capabilities such as `postReportTrigger`,
     `commentReportTrigger`, and individual update-trigger capabilities when
     those specific routes process accepted payloads.
+- Comment report/update route target extraction could previously choose a
+  sibling parent post id before the edited/reported comment id.
+  - Hardened by making trigger route target extraction kind-aware and adding
+    regressions for payloads that contain both `post.id` and `comment.id`.
 
 ## Current Claim Boundary
 

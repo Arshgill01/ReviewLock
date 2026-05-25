@@ -102,3 +102,4 @@
 - [x] Surface item-level runtime warnings on active dashboard locks.
 - [x] Surface item-level runtime warnings on reopened dashboard items.
 - [x] Record granular trigger delivery capabilities in runtime proof.
+- [x] Prefer comment ids over sibling post ids in comment report/update trigger payloads.

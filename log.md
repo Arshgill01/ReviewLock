@@ -1397,11 +1397,14 @@
   - accepted report/update trigger routes now record granular runtime proof
     capabilities such as `postReportTrigger` without marking unrelated trigger
     paths verified;
+  - comment report/update trigger routes now prefer comment ids over sibling
+    parent post ids;
   - duplicate dashboard-post candidate text was removed from the live scenario
     content.
 - Commands run:
   - `npm run test -- src/server/services/reopenFlow.test.ts src/client/render.test.ts --reporter verbose`
   - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
   - `npm run type-check`
   - `npm run lint`
   - `npm run test`

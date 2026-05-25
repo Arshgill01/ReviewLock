@@ -1157,3 +1157,22 @@ Reason:
 - This avoids converting one successful report event into an inflated "all
   triggers verified" claim while still allowing the app's own runtime ledger to
   reflect exact proof as it accumulates.
+
+### D071 - Make trigger target extraction kind-aware
+
+Devvit comment report/update payloads can include both the parent `post` object
+and the edited/reported `comment` object.
+
+Decision:
+
+- On post trigger routes, extract only post-oriented ids: `targetId`, `postId`,
+  and `post.id`.
+- On comment trigger routes, extract only comment-oriented ids: `targetId`,
+  `commentId`, and `comment.id`.
+- Do not let a sibling parent post id win over a comment id on comment routes.
+
+Reason:
+
+- The app must reopen or suppress the reviewed comment lock, not a normalized
+  version of the parent post id. Kind-aware extraction is the least surprising
+  route-boundary behavior and matches the Devvit payload model.
