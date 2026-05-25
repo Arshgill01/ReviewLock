@@ -743,6 +743,32 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('keeps changed-report trigger proof unverified when unignoreReports fails', async () => {
+    const dependencies = await deps(commentTarget('Edited comment'));
+    dependencies.reddit.failOperation('unignoreReports', 'permission denied');
+
+    const result = await handleReportTrigger(dependencies, {
+      targetId: 't1_comment',
+      eventId: 'evt-comment-unignore-failed',
+    });
+
+    expect(result.action).toBe('reopen_changed');
+    expect(result.warnings).toContain('unignoreReports failed for t1_comment');
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed', targetKind: 'comment' }),
+    ]);
+    expect(await loadRuntimeProofStatus(dependencies.redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+        expect.objectContaining({
+          name: 'unignoreReports',
+          status: 'failed',
+          evidence: 'unignoreReports on t1_comment',
+        }),
+      ]),
+    });
+  });
+
   it('reopens as runtime uncertain when a report target cannot be loaded but the active lock is known', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter();

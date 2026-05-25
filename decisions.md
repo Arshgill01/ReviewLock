@@ -2012,3 +2012,64 @@ Reason:
 
 - Display limits should protect the UI, not understate product value for larger
   communities.
+
+### D116 - Trigger proof means the complete ReviewLock loop
+
+Granular trigger rows in runtime proof are read by moderators and judges as
+evidence that ReviewLock completed the relevant moderation loop, not merely
+that a Devvit delivery reached a route.
+
+Decision:
+
+- Do not mark update-trigger rows verified for unchanged active-lock deliveries.
+- Keep update-trigger verification tied to a material fingerprint change,
+  visible reopen state, and successful `unignoreReports()`.
+- For changed-content report triggers, keep local fail-open reopening visible
+  when `unignoreReports()` fails, but do not mark the report-trigger row
+  verified.
+
+Reason:
+
+- A no-op delivery and a failed-unignore reopen are useful operational signals,
+  but neither proves the end-to-end loop that returns changed reviewed content
+  to normal moderator attention.
+
+### D117 - Unlock submit trusts the server-bound lock id
+
+The unlock form displays the lock id for moderator confirmation, but the
+authoritative lock id is stored in the Redis-backed form binding created when
+the menu rendered.
+
+Decision:
+
+- Treat submitted `lockId` as optional for unlock form callbacks.
+- Require `formToken` and scoped subreddit, then consume the binding and use
+  `binding.lockId` for the unlock operation.
+- If a submitted `lockId` is present, reject it only when it does not match the
+  bound lock id.
+
+Reason:
+
+- Disabled form fields can be display-only in platform submit payloads. The
+  server-side binding already prevents target swapping, so requiring a disabled
+  client field would make valid moderator confirmations fail unnecessarily.
+
+### D118 - Endpoint kind rejects contradictory prefixed target ids
+
+Devvit route payloads can include generic target fields, sibling post fields,
+and comment-specific fields in the same delivery.
+
+Decision:
+
+- Keep preferring comment-specific fields over generic target fields on comment
+  endpoints.
+- Reject already-prefixed ids when their thing kind contradicts the route kind,
+  instead of normalizing or refetching them.
+- Apply the rule in the shared target id normalizer so menu, report trigger,
+  and update trigger routes all fail closed consistently.
+
+Reason:
+
+- A comment endpoint must not operate on a post lock because a partial payload
+  supplied only `targetId: t3_*`. Wrong-kind processing can corrupt runtime
+  proof and apply moderation operations to the wrong content class.

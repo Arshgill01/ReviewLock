@@ -104,6 +104,24 @@ describe('menu routes', () => {
     });
   });
 
+  it('rejects post target ids sent as the only comment lock menu target', async () => {
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target(), commentTarget()]),
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-comment', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'Unsupported target id: missing',
+      },
+    });
+  });
+
   it('returns neutral unlock response when no lock exists', async () => {
     const router = createMenuRouter({
       reddit: new FakeRedditAdapter([target()]),
@@ -210,6 +228,45 @@ describe('menu routes', () => {
             expect.objectContaining({ name: 'lockId', defaultValue: 'lock-comment' }),
           ]),
         },
+      },
+    });
+  });
+
+  it('rejects post target ids sent as the only comment unlock menu target', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, {
+      id: 'lock-post',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      targetAuthor: 'u_author',
+      permalink: '/r/alpha/comments/post',
+      contentPreview: 'Reviewed body',
+      contentHash: 'hash',
+      fingerprintVersion: 'content-v1',
+      lockedBy: 'mod',
+      lockedAt: '2026-05-24T00:00:00.000Z',
+      lockReason: 'reviewed_policy_compliant',
+      status: 'active',
+      lastKnownEdited: false,
+      lastReportCount: 4,
+      suppressedReportCount: 0,
+      runtimeWarnings: [],
+      demo: false,
+    });
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target(), commentTarget()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/unlock-comment', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'Unsupported target id: missing',
       },
     });
   });

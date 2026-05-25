@@ -168,6 +168,45 @@ missing-`targetKind` guard:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Dashboard Proof Boundary Recheck
+
+After dashboard proof, count, and recovery-state hardening:
+
+- Playtest version: `v0.0.2.211`.
+- Existing Zen tab was used on the ReviewLock dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account was `u/BrightyBrainiac`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- Latest edit-break event showed `comment:ontlx1k`.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status rows showed:
+  - `approve verified`
+  - `commentReportTrigger unverified`
+  - `commentUpdateTrigger verified`
+  - `ignoreReports verified`
+  - `postFlairUpdateTrigger unverified`
+  - `postNsfwUpdateTrigger unverified`
+  - `postReportTrigger verified`
+  - `postSpoilerUpdateTrigger unverified`
+  - `postUpdateTrigger verified`
+  - `redditContext verified`
+  - `redis verified`
+  - `unignoreReports verified`
+- `npm exec devvit logs reviewlock_dev reviewlock --since 5m ...` was the
+  wrong npm passthrough shape and failed with `Unexpected argument: 5m`.
+- Correct passthrough shape is
+  `npm exec devvit logs -- reviewlock_dev reviewlock --since=5m ...`.
+- A later `--connect` log stream reported `listen EADDRINUSE: address already
+  in use :::5678` because an existing playtest/log server was already bound to
+  the port; it then connected but emitted no new lines during the sample
+  window.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -239,6 +278,16 @@ performed in this recheck.
   - Result: PASS, live dashboard rendered with `postReportTrigger verified`,
     `commentReportTrigger unverified`, and `Verify runtime` completed with
     `Runtime proof refreshed.`
+- Zen browser live WebView dashboard proof boundary recheck
+  - Result: PASS, live dashboard rendered on playtest `v0.0.2.211`, `Verify
+    runtime` completed, proof rows matched the current claim boundary, and
+    remaining unverified rows stayed unverified.
+- `npm exec devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
+  - Result: FAIL, npm passthrough treated `5m` as an unexpected argument.
+- `npm exec devvit logs -- reviewlock_dev reviewlock --connect --since=15m --show-timestamps --log-runtime`
+  - Result: PARTIAL, CLI reported `listen EADDRINUSE: address already in use
+    :::5678` because another Devvit process was already bound, then connected
+    to the log stream with no emitted lines during the sample window.
 
 ## Open Risks
 

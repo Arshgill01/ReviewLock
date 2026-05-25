@@ -1941,3 +1941,61 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:27 IST - Trigger proof and unlock form hardening
+
+- Integrated reviewer finding: unchanged active-lock update-trigger deliveries
+  no longer verify granular edit-break proof rows. A no-op update delivery is
+  treated as route processing evidence only, not proof that the reopen loop
+  completed.
+- Integrated reviewer finding: changed-content report-trigger reopens keep
+  fail-open local reopen behavior when `unignoreReports()` fails, but the
+  report-trigger capability row stays unverified until the full loop returns
+  reports to normal handling.
+- Integrated reviewer finding: unlock form submissions now trust the
+  server-bound form binding when Devvit omits the disabled display-only
+  `lockId` field, while still rejecting a submitted mismatched lock id.
+- Focused validation:
+  - `npm run test -- src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts src/routes/forms.test.ts --reporter verbose`
+  - PASS, 3 test files and 64 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 41 test files / 328 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:30 IST - Endpoint-kind hardening
+
+- Integrated reviewer finding: shared target id normalization now rejects
+  already-prefixed ids when their thing kind contradicts the endpoint target
+  kind.
+- Comment routes still prefer `commentId` and `comment.id` over generic
+  `targetId`, preserving the mixed-payload behavior already proven in tests.
+- Added regressions for the shared normalizer, `/on-comment-update`,
+  `/on-comment-report`, `/lock-comment`, and `/unlock-comment`.
+- Focused validation:
+  - `npm run test -- src/server/services/targetResolver.test.ts src/routes/triggers.update.test.ts src/routes/triggers.report.test.ts src/routes/menu.test.ts --reporter verbose`
+  - PASS, 4 test files and 51 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 41 test files / 333 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

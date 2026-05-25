@@ -101,10 +101,18 @@ class PausingIgnoreRedditAdapter extends FakeRedditAdapter {
 describe('breakLockForChangedContent', () => {
   it('leaves unchanged content locked', async () => {
     const dependencies = await deps();
-    const result = await breakLockForChangedContent(dependencies, { targetId: 't3_post' });
+    const result = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      triggerCapabilityName: 'postFlairUpdateTrigger',
+    });
 
     expect(result.action).toBe('unchanged');
     expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeDefined();
+    expect(await loadRuntimeProofStatus(dependencies.redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
   });
 
   it('does not verify update trigger proof for no-lock no-op deliveries', async () => {

@@ -340,6 +340,37 @@ describe('report trigger routes', () => {
     expect(reddit.calls).toEqual(['ignoreReports:t1_comment']);
   });
 
+  it('rejects post target ids sent as the only comment report target', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'evt-wrong-kind-comment-report',
+        targetId: 't3_parent_post',
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: 'Report trigger target id is required.',
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+      ]),
+    });
+  });
+
   it('uses comment report counts before parent post report counts on comment reports', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));

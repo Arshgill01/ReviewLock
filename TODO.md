@@ -157,3 +157,7 @@
 - [x] Classify client dashboard failures into actionable moderator recovery notices.
 - [x] Require update-trigger runtime proof to include successful report unignore.
 - [x] Keep dashboard headline counts independent from bounded display lists.
+- [x] Keep unchanged update-trigger deliveries from verifying edit-break runtime proof rows.
+- [x] Keep changed-report trigger proof unverified when reopening cannot unignore reports.
+- [x] Accept unlock form submissions when Devvit omits the disabled display-only lock id field.
+- [x] Reject wrong-kind prefixed target ids at endpoint boundaries.

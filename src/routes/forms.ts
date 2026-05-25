@@ -176,7 +176,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
 
     const body = await readJson<UnlockSubmitBody>(context);
 
-    if (!body.formToken || !body.subreddit || !body.lockId) {
+    if (!body.formToken || !body.subreddit) {
       return context.json<UiResponse>(uiToast('ReviewLock form token and lock are required.'));
     }
 
@@ -196,7 +196,10 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    if ((body.targetId && body.targetId !== binding.targetId) || body.lockId !== binding.lockId) {
+    if (
+      (body.targetId && body.targetId !== binding.targetId) ||
+      (body.lockId && body.lockId !== binding.lockId)
+    ) {
       return context.json<UiResponse>(
         uiToast('ReviewLock form target changed. Reopen the menu and try again.'),
       );

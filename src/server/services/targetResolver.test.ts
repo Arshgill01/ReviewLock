@@ -29,6 +29,11 @@ describe('target resolver', () => {
     expect(normalizeTargetId('comment', undefined)).toBeUndefined();
   });
 
+  it('rejects already-prefixed ids that contradict the route target kind', () => {
+    expect(normalizeTargetId('post', 't1_comment')).toBeUndefined();
+    expect(normalizeTargetId('comment', 't3_post')).toBeUndefined();
+  });
+
   it('refetches comments through the adapter', async () => {
     const reddit = new FakeRedditAdapter([target()]);
 

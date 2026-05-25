@@ -275,6 +275,25 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   returned a plain failing response without updating the runtime proof ledger.
   - Hardened by recording failed `redditContext` capability status when the
     subreddit namespace is known, matching the Redis smoke behavior.
+- Unchanged active-lock update deliveries could previously verify granular
+  update-trigger rows even though no edit-break loop completed.
+  - Hardened by reserving update-trigger verification for material changes that
+    reopen a lock and successfully unignore reports.
+- Changed-content report-trigger reopens could previously verify the
+  post/comment report-trigger row even when `unignoreReports()` failed.
+  - Hardened by keeping the row unverified unless the changed-report path
+    returns reports to normal handling.
+- Unlock form submissions previously required a disabled display-only `lockId`
+  field even though the server had already bound the confirmed lock id to the
+  form token.
+  - Hardened by treating submitted `lockId` as optional and using the
+    Redis-backed binding as the source of truth, while still rejecting present
+    mismatches.
+- Comment endpoints could previously accept a generic already-prefixed post id
+  when no comment-specific id was present.
+  - Hardened by rejecting prefixed target ids that contradict the route target
+    kind before any target refetch, moderation operation, or runtime proof
+    write.
 
 ## Current Claim Boundary
 

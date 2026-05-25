@@ -393,6 +393,36 @@ describe('update trigger routes', () => {
     expect(reddit.calls).toEqual(['unignoreReports:t1_comment']);
   });
 
+  it('rejects post target ids sent as the only comment update target', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target('Edited body')]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-comment-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_parent_post',
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: 'Update trigger target id is required.',
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'commentUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
+  });
+
   it('prefers wrapped comment ids over sibling post ids on comment update payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));

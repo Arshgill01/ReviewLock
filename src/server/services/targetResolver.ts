@@ -30,7 +30,7 @@ export const normalizeTargetId = (kind: TargetKind, id: string | undefined): str
   }
 
   if (id.startsWith('t1_') || id.startsWith('t3_')) {
-    return id;
+    return inferTargetKind(id) === kind ? id : undefined;
   }
 
   return kind === 'post' ? `t3_${id}` : `t1_${id}`;

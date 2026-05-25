@@ -329,6 +329,42 @@ describe('form routes', () => {
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
+  it('submits an unlock form when Devvit omits the disabled lock id field', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        appearance: 'success',
+        text: 'ReviewLock unlocked this reviewed content.',
+      },
+    });
+    expect(reddit.calls).toContain('unignoreReports:t3_post');
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('rejects stale unlock form submissions', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());

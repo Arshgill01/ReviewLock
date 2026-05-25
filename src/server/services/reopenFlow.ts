@@ -149,14 +149,6 @@ export const breakLockForChangedContent = async (
         : 'uncertain';
 
       if (comparison === 'unchanged') {
-        await recordUpdateTriggerProcessed(
-          deps,
-          lock.subreddit,
-          input.triggerCapabilityName,
-          lock.targetId,
-          now,
-        );
-
         return {
           ok: true,
           action: 'unchanged',

@@ -2713,3 +2713,121 @@
   - `rg -n "TODO" src` returned no source TODOs.
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:21 IST - Finding
+
+- Severity: medium
+- Area: Granular update-trigger proof can still be marked verified by unchanged active-lock deliveries.
+- Evidence:
+  - `recordUpdateTriggerProcessed()` always writes the provided update capability as `verified`: `src/server/services/reopenFlow.ts:92-115`.
+  - The unchanged branch calls `recordUpdateTriggerProcessed()` before returning `action: 'unchanged'`: `src/server/services/reopenFlow.ts:151-164`.
+  - The current regression only proves no-lock update deliveries stay unverified; the unchanged active-lock test does not pass `triggerCapabilityName` or assert runtime proof state: `src/server/services/reopenFlow.test.ts:102-122`.
+  - Runtime proof docs describe verified post/comment update trigger rows using controlled body edits that changed fingerprints, reopened locks, enqueued reopen events, and wrote `lock_reopened` audits: `docs/RUNTIME_PROOF.md:109-111`.
+- Why it matters: an unchanged active-lock delivery does prove Devvit reached ReviewLock and the fingerprint compare ran, but it does not prove the edit-break loop. For still-unverified post NSFW/spoiler/flair rows, a stale or no-op delivery could make the runtime panel say `verified` before the controlled flag/flair change actually reopens a lock. That weakens the proof boundary the project is using to avoid overclaiming live edit-aware behavior.
+- Suggested fix: either split the meaning explicitly, e.g. `delivered` vs `edit_break_verified`, or keep granular update-trigger capabilities `unverified` on unchanged deliveries and reserve `verified` for changed-content reopen audits with successful target resolution and `unignoreReportsOk === true`. Add a regression where an unchanged active lock with `triggerCapabilityName: 'postFlairUpdateTrigger'` does not mark the flag/flair capability verified unless the intended proof boundary is deliberately delivery-only and the UI/docs say so.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/reopenFlow.test.ts`, `docs/RUNTIME_PROOF.md`.
+
+## 2026-05-26 01:21 IST - Finding
+
+- Severity: medium
+- Area: Changed-content report triggers can verify report-trigger proof even when `unignoreReports()` failed.
+- Evidence:
+  - The changed-report path calls `unignoreReportsForReviewLock()` and records its runtime proof, but carries on regardless of `unignoreResult.ok`: `src/server/services/reportTriggers.ts:399-410`.
+  - After queueing the reopen event, marking the lock reopened, writing metrics, and appending `lock_reopened` audit data with `unignoreReportsOk`, the path always calls `recordReportTriggerProcessed()`: `src/server/services/reportTriggers.ts:411-461`.
+  - `recordReportTriggerProcessed()` writes `postReportTrigger` or `commentReportTrigger` as `verified`: `src/server/services/reportTriggers.ts:161-180`.
+  - Existing changed-report tests cover successful post/comment reopen and post-reopen Redis failures, but there is no regression where changed-content report handling sees `unignoreReports()` fail and asserts the report-trigger capability remains unverified or explicitly scoped: `src/server/services/reportTriggers.test.ts:561-744`.
+- Why it matters: fail-open local reopening is correct, but if Reddit still ignores reports then the full report-driven edit-break loop did not return the item to normal report handling. The runtime panel can still show a green `commentReportTrigger`/`postReportTrigger` row from that delivery, which is especially risky for the still-unverified comment-report path judges care about.
+- Suggested fix: decide the same proof boundary used for update triggers. If report-trigger proof means the complete locked-content moderation loop, only call `recordReportTriggerProcessed()` on changed-content report reopens when `unignoreResult.ok === true`; otherwise keep the failed `unignoreReports` row visible and leave the trigger row unverified. If proof means delivery-only, change the capability notes/docs so the row cannot be read as suppression/reopen proof. Add a regression with forced `unignoreReports` failure on a changed comment report.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`.
+
+## 2026-05-26 01:24 IST - Finding
+
+- Severity: medium
+- Area: Unlock form depends on a disabled `lockId` field even though the lock id is already server-bound.
+- Evidence:
+  - `buildUnlockReviewForm()` renders `lockId` as a disabled string field with `required: true`: `src/routes/menu.ts:136-143`.
+  - `createFormBinding()` stores the confirmed `lockId` in Redis for unlock bindings: `src/server/services/formBindings.ts:44-52`.
+  - `/unlock-review-submit` rejects the form before consuming the binding unless `body.lockId` is present: `src/routes/forms.ts:177-181`.
+  - The submit path then compares `body.lockId` to the bound `binding.lockId`, but the actual unlock operation already uses `binding.lockId`: `src/routes/forms.ts:191-209`.
+  - Current form tests manually include `lockId` in the JSON body and do not cover the platform-like case where a disabled field is omitted from submitted results: `src/routes/forms.test.ts:311-319`.
+- Why it matters: disabled form fields are display-only in many form systems, and Devvit submit results are platform-provided rather than generated by these route tests. If Devvit omits disabled fields, a moderator can open a valid Unlock review form and submit it, but ReviewLock will respond `ReviewLock form token and lock are required.` even though the Redis binding has the exact confirmed lock id. This is a user-visible installability/runtime failure on a core moderation action.
+- Suggested fix: treat `body.lockId` as optional on form submit. Require `formToken` and `subreddit`, consume the unlock binding, require `binding.lockId`, and only reject when a submitted `body.lockId` is present and mismatches `binding.lockId`. Add a regression that submits an unlock form with `subreddit` and `formToken` but no `lockId`, proving it unlocks the bound lock.
+- Files reviewed: `src/routes/menu.ts`, `src/routes/forms.ts`, `src/server/services/formBindings.ts`, `src/routes/forms.test.ts`.
+
+## 2026-05-26 01:27 IST - Integration Status
+
+- Resolved medium finding added at 01:21: unchanged active-lock update
+  deliveries no longer mark granular update-trigger runtime proof rows
+  verified. Runtime proof verification remains reserved for material
+  fingerprint changes that reopen a lock and successfully unignore reports.
+- Regression expanded in `src/server/services/reopenFlow.test.ts` so an
+  unchanged active lock delivered through `postFlairUpdateTrigger` leaves that
+  capability `unverified`.
+- Resolved medium finding added at 01:21: changed-content report-trigger
+  reopens keep local fail-open behavior when `unignoreReports()` fails, but no
+  longer mark the post/comment report-trigger proof row verified.
+- Regression added in `src/server/services/reportTriggers.test.ts` for forced
+  comment `unignoreReports()` failure during a changed-report reopen.
+- Resolved medium finding added at 01:24: unlock form submit no longer depends
+  on a disabled `lockId` field being present in Devvit's submit payload. The
+  server consumes the Redis form binding and only rejects a submitted lock id
+  when it is present and mismatched.
+- Regression added in `src/routes/forms.test.ts` for an unlock submission with
+  `subreddit` and `formToken` but no submitted `lockId`.
+- Focused validation:
+  - `npm run test -- src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts src/routes/forms.test.ts --reporter verbose`
+    PASS, 3 files / 64 tests.
+  - `npm run type-check` PASS.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 41 files / 328 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:25 IST - Finding
+
+- Severity: medium
+- Area: Endpoint-kind target extraction accepts already-prefixed IDs for the wrong thing kind.
+- Evidence:
+  - `normalizeTargetId(kind, id)` returns any `t1_` or `t3_` id unchanged without checking that it matches the requested endpoint kind: `src/server/services/targetResolver.ts:27-36`.
+  - Comment update routes prefer `commentId` and `comment.id`, but then fall back to generic `targetId`; if that fallback is `t3_parent_post`, `normalizeTargetId('comment', 't3_parent_post')` still returns the post id: `src/routes/triggers.update.ts:62-72`.
+  - `handleUpdateTrigger()` derives `commentUpdateTrigger` solely from the route's `triggerKind`, not from the resolved target kind: `src/server/services/updateTriggers.ts:34-55`.
+  - `recordUpdateTriggerProcessed()` writes the supplied capability name as `verified` without checking target kind: `src/server/services/reopenFlow.ts:92-115`.
+  - Existing route tests prove comment routes prefer `commentId` when present, but there is no regression that a comment endpoint with only a prefixed post `targetId` is rejected instead of processing a post lock: `src/routes/triggers.update.test.ts:386-417`.
+- Why it matters: a malformed or partial comment-trigger payload can make the comment endpoint operate on a post target. In the update path that can also mark `commentUpdateTrigger` verified for work done on a post, which undermines the granular runtime-proof boundary around still-sensitive comment proof. The same normalization helper is used by report and menu routes, so rejecting wrong-kind prefixed ids at the boundary is safer than relying on every caller to re-check.
+- Suggested fix: make `normalizeTargetId()` return `undefined` when an already-prefixed id contradicts the supplied `kind`, or add a stricter `normalizeTargetIdForEndpoint()` for routes. Add regressions for `/on-comment-update`, `/on-comment-report`, `/lock-comment`, and `/unlock-comment` with only `targetId: 't3_parent_post'`, expecting a neutral/400 target-id error and no moderation or runtime-proof writes.
+- Files reviewed: `src/server/services/targetResolver.ts`, `src/routes/triggers.update.ts`, `src/server/services/updateTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/routes/triggers.update.test.ts`.
+
+## 2026-05-26 01:30 IST - Integration Status
+
+- Resolved medium finding added at 01:25: shared target id normalization now
+  rejects already-prefixed ids when their thing kind contradicts the endpoint
+  kind.
+- Comment-specific fields still win when present, so mixed payloads with
+  `commentId` or `comment.id` continue to process the comment target.
+- Regressions added:
+  - `src/server/services/targetResolver.test.ts` rejects `normalizeTargetId('comment', 't3_post')`
+    and `normalizeTargetId('post', 't1_comment')`.
+  - `src/routes/triggers.update.test.ts` rejects `/on-comment-update` when
+    only `targetId: 't3_parent_post'` is supplied.
+  - `src/routes/triggers.report.test.ts` rejects `/on-comment-report` when
+    only `targetId: 't3_parent_post'` is supplied.
+  - `src/routes/menu.test.ts` rejects `/lock-comment` and `/unlock-comment`
+    when only a post `targetId` is supplied.
+- Focused validation:
+  - `npm run test -- src/server/services/targetResolver.test.ts src/routes/triggers.update.test.ts src/routes/triggers.report.test.ts src/routes/menu.test.ts --reporter verbose`
+    PASS, 4 files / 51 tests.
+  - `npm run type-check` PASS.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 41 files / 333 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.

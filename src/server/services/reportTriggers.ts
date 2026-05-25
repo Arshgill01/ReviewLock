@@ -452,13 +452,15 @@ export const handleReportTrigger = async (
           };
         }
 
-        await recordReportTriggerProcessed(
-          deps,
-          lock.subreddit,
-          lock.targetKind,
-          lock.targetId,
-          now,
-        );
+        if (unignoreResult.ok) {
+          await recordReportTriggerProcessed(
+            deps,
+            lock.subreddit,
+            lock.targetKind,
+            lock.targetId,
+            now,
+          );
+        }
 
         return {
           ok: true,
