@@ -2093,3 +2093,24 @@ Reason:
 - Form tokens authorize moderator confirmation flows. A malformed binding must
   not be treated as trusted state, and a token without TTL is worse than a
   failed menu response because it can outlive the intended review context.
+
+### D120 - Redis smoke includes sorted-set ordering
+
+ReviewLock depends on Redis sorted sets for audit, reopen, metrics, and trigger
+dedupe indexes.
+
+Decision:
+
+- Keep the dashboard's `Verify runtime` Redis check on the existing
+  `/api/smoke/redis` route, but expand it beyond string set/get/delete.
+- Verify a namespaced sorted set by writing three members, reading newest-first
+  with `zRange(..., reverse=true)`, and deleting the smoke key.
+- Mark the `redis` runtime capability failed if sorted-set ordering does not
+  match the expected newest-first order.
+
+Reason:
+
+- A passing string smoke is not enough proof for ReviewLock's queue and ledger
+  behavior. ModMirror's runtime proof matrix caught this as a separate concern;
+  ReviewLock should prove the Redis primitive it actually relies on during live
+  judging.

@@ -124,6 +124,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       const subreddit = scope.subreddit;
       smokeSubreddit = subreddit;
       const smokeKey = key(subreddit, `runtime:smoke:${Date.parse(checkedAt)}`);
+      const sortedSetSmokeKey = key(subreddit, `runtime:smoke:zset:${Date.parse(checkedAt)}`);
       const value = `reviewlock-smoke:${checkedAt}`;
 
       await deps.redis.set(smokeKey, value);
@@ -134,10 +135,25 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         throw new Error('Redis smoke read did not match the written value.');
       }
 
+      try {
+        await deps.redis.zAdd(sortedSetSmokeKey, { member: 'oldest', score: 1 });
+        await deps.redis.zAdd(sortedSetSmokeKey, { member: 'middle', score: 2 });
+        await deps.redis.zAdd(sortedSetSmokeKey, { member: 'newest', score: 3 });
+        const observedOrder = (await deps.redis.zRange(sortedSetSmokeKey, 0, 2, true)).map(
+          (entry) => entry.member,
+        );
+
+        if (observedOrder.join(',') !== 'newest,middle,oldest') {
+          throw new Error('Redis sorted-set smoke order did not match newest-first order.');
+        }
+      } finally {
+        await deps.redis.del(sortedSetSmokeKey).catch(() => undefined);
+      }
+
       const result = verifiedSmokeResult(
         'redis',
-        'POST /api/smoke/redis wrote, read, and deleted a namespaced smoke key.',
-        [`key=${smokeKey}`],
+        'POST /api/smoke/redis verified namespaced string and sorted-set operations.',
+        [`key=${smokeKey}`, `zset=${sortedSetSmokeKey}`, 'zRange=newest,middle,oldest'],
         checkedAt,
       );
       await recordCapabilityStatus(
@@ -162,7 +178,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
     } catch (error) {
       const result = failedSmokeResult(
         'redis',
-        'POST /api/smoke/redis could not complete the namespaced write/read/delete check.',
+        'POST /api/smoke/redis could not complete the namespaced Redis operation check.',
         error,
         checkedAt,
       );

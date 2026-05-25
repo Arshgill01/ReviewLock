@@ -162,3 +162,4 @@
 - [x] Accept unlock form submissions when Devvit omits the disabled display-only lock id field.
 - [x] Reject wrong-kind prefixed target ids at endpoint boundaries.
 - [x] Validate and clean Redis-backed form bindings before lock/unlock confirmation.
+- [x] Extend Redis runtime smoke to cover sorted-set ordering used by audit and queue ledgers.

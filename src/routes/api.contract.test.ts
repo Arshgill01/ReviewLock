@@ -166,7 +166,46 @@ describe('API/client route contract', () => {
           name: 'redis',
           status: 'failed',
           evidence:
-            'POST /api/smoke/redis could not complete the namespaced write/read/delete check.',
+            'POST /api/smoke/redis could not complete the namespaced Redis operation check.',
+        }),
+      ]),
+    });
+  });
+
+  it('records failed Redis smoke proof when sorted-set ordering is wrong', async () => {
+    class WrongOrderRedisStore extends InMemoryRedisStore {
+      override async zRange(key: string, start: number, stop: number, reverse?: boolean) {
+        void reverse;
+        return super.zRange(key, start, stop, false);
+      }
+    }
+
+    const redis = new WrongOrderRedisStore();
+    const app = createApp({
+      redis,
+      reddit: new FakeRedditAdapter(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
+    });
+
+    const response = await app.request('/api/smoke/redis?subreddit=alpha', { method: 'POST' });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      capability: 'redis',
+      status: 'failed',
+      error: 'Redis sorted-set smoke order did not match newest-first order.',
+    });
+    expect(await redis.exists('reviewlock:alpha:runtime:smoke:zset:1779552000000')).toBe(false);
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      overall: 'failed',
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'redis',
+          status: 'failed',
+          evidence:
+            'POST /api/smoke/redis could not complete the namespaced Redis operation check.',
         }),
       ]),
     });

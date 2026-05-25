@@ -2025,3 +2025,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:35 IST - Redis runtime smoke hardening
+
+- Used ModMirror's runtime proof matrix as a reference for Redis sorted-set
+  smoke coverage.
+- Expanded ReviewLock's existing `/api/smoke/redis` route to verify both
+  namespaced string set/get/delete and sorted-set newest-first ordering.
+- The smoke route cleans up the sorted-set key in a `finally` block and records
+  the `redis` runtime proof row as failed if sorted-set ordering is wrong.
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts --reporter verbose`
+  - PASS, 1 test file and 10 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 337 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

@@ -298,6 +298,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   left without an expiry if the `expire` write failed after `set`.
   - Hardened by validating binding shape on consume, deleting malformed token
     records, and rolling back the binding write when expiry cannot be set.
+- Redis runtime smoke previously proved only string write/read/delete behavior.
+  - Hardened by also writing a namespaced sorted set, reading newest-first
+    order, and deleting the smoke key before marking the `redis` capability
+    verified.
 
 ## Current Claim Boundary
 
