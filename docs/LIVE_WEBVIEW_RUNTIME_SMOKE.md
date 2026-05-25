@@ -1,6 +1,6 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-26 01:48 IST.
+Last updated: 2026-05-26 01:51 IST.
 
 ## Scope
 
@@ -33,6 +33,8 @@ This pass does not prove live moderation methods or live report/edit trigger del
   Zen: `v0.0.2.234`.
 - Latest state-integrity hardening playtest version observed in Zen:
   `v0.0.2.246`.
+- Latest Redis hash smoke hardening playtest version observed in Zen:
+  `v0.0.2.250`.
 
 ## Failure Found
 
@@ -278,6 +280,31 @@ counter validation hardening:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Redis Hash Smoke Recheck
+
+After Redis runtime smoke was expanded to verify hash write/read/delete
+operations:
+
+- Playtest version: `v0.0.2.250`.
+- Existing Zen tab was used on the ReviewLock dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account was `u/BrightyBrainiac`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- Latest edit-break event showed `comment:ontlx1k`.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status kept `redis verified` after the updated
+  `/api/smoke/redis` route checked namespaced string, hash, and sorted-set
+  operations.
+- Remaining unverified trigger rows stayed unverified:
+  `commentReportTrigger`, `postFlairUpdateTrigger`, `postNsfwUpdateTrigger`,
+  and `postSpoilerUpdateTrigger`.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -362,6 +389,10 @@ performed in this recheck.
   - Result: PASS, live dashboard rendered on playtest `v0.0.2.246`, `Verify
     runtime` completed, the known runtime capability matrix remained stable,
     and remaining unverified trigger rows stayed unverified.
+- Zen browser live WebView Redis hash smoke recheck
+  - Result: PASS, live dashboard rendered on playtest `v0.0.2.250`, `Verify
+    runtime` completed, and `redis verified` remained verified after the
+    expanded string/hash/sorted-set smoke route.
 - `npm exec devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
   - Result: FAIL, npm passthrough treated `5m` as an unexpected argument.
 - `npm exec devvit logs -- reviewlock_dev reviewlock --connect --since=15m --show-timestamps --log-runtime`
