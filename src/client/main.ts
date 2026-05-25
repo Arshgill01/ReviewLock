@@ -1,14 +1,14 @@
 import './styles.css';
 import { renderDashboardPage } from './pages/DashboardPage';
 import { ReviewLockApiClient } from './state/api';
-import { inferEmbeddedSubreddit } from './state/runtimeContext';
+import { inferEmbeddedSubreddit, normalizeSubredditName } from './state/runtimeContext';
 import { ReviewLockStore } from './state/store';
 import { DEMO_SUBREDDIT } from '../shared/constants';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 const params = new URLSearchParams(window.location.search);
 const api = new ReviewLockApiClient();
-const requestedSubreddit = params.get('subreddit');
+const requestedSubreddit = normalizeSubredditName(params.get('subreddit'));
 const initialDemo = params.get('demo') === 'true';
 const shouldInferEmbeddedSubreddit =
   !requestedSubreddit || (initialDemo && requestedSubreddit === DEMO_SUBREDDIT);

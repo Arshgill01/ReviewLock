@@ -84,6 +84,33 @@ describe('ReviewLockStore', () => {
     expect(store.confirmation).toBeNull();
   });
 
+  it('normalizes invalid initial and updated subreddit scope to safe values', async () => {
+    store = new ReviewLockStore(apiClient, '', false);
+
+    await store.fetchState();
+
+    expect(store.subreddit).toBe('reviewlock');
+    expect(store.getLiveSubreddit()).toBe('reviewlock');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock', false);
+
+    await store.setSubreddit('not-a-subreddit');
+
+    expect(store.subreddit).toBe('reviewlock');
+    expect(store.getLiveSubreddit()).toBe('reviewlock');
+    expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock', false);
+  });
+
+  it('ignores invalid runtime subreddit context updates', () => {
+    const callback = vi.fn();
+    store.subscribe(callback);
+
+    store.updateSubredditContext('invalid-subreddit');
+
+    expect(store.subreddit).toBe('test_subreddit');
+    expect(store.getLiveSubreddit()).toBe('test_subreddit');
+    expect(callback).not.toHaveBeenCalled();
+  });
+
   it('tracks dashboard confirmation state explicitly', () => {
     const callback = vi.fn();
     store.subscribe(callback);

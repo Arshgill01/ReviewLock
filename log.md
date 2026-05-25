@@ -2609,3 +2609,32 @@
   some platform trigger capabilities are still unverified.
 - No live report submission, post edit, comment edit, unlock, dismiss, or
   destructive moderation action was performed in this recheck.
+
+## 2026-05-26 02:31 IST - Client runtime context validation hardening
+
+- Tightened client runtime subreddit discovery so Devvit WebView globals are
+  treated as unknown records before reading `context.subredditName`.
+- Rejected malformed Devvit globals, primitive nested contexts, array contexts,
+  and invalid subreddit names before falling back to Reddit URL/referrer scope.
+- Normalized query-string subreddit values before store construction.
+- Normalized store constructor, `setSubreddit()`, and `updateSubredditContext()`
+  inputs before using them for dashboard API fetches.
+- Added regressions for malformed Devvit globals, invalid initial scope,
+  invalid manual subreddit changes, and ignored invalid runtime-context updates.
+- Focused validation:
+  - `npm run test -- src/client/state/runtimeContext.test.ts src/client/state/store.test.ts --reporter verbose`
+  - PASS, 2 test files and 24 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 370 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

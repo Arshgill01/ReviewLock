@@ -8,6 +8,8 @@ import type {
   TargetMetrics,
   RuntimeProofStatus,
 } from '../../shared/schema';
+import { APP_SLUG, DEMO_SUBREDDIT } from '../../shared/constants';
+import { normalizeSubredditName } from './runtimeContext';
 
 export type DashboardConfirmation =
   | {
@@ -43,12 +45,14 @@ export class ReviewLockStore {
 
   constructor(
     api: ReviewLockApiClient,
-    initialSubreddit: string = 'reviewlock',
+    initialSubreddit: string = APP_SLUG,
     initialDemo: boolean = false,
   ) {
     this.api = api;
-    this.subreddit = initialDemo ? 'reviewlock_demo' : initialSubreddit;
-    this.liveSubreddit = initialSubreddit === 'reviewlock_demo' ? 'reviewlock' : initialSubreddit;
+    const safeInitialSubreddit = normalizeSubredditName(initialSubreddit) ?? APP_SLUG;
+    this.subreddit = initialDemo ? DEMO_SUBREDDIT : safeInitialSubreddit;
+    this.liveSubreddit =
+      safeInitialSubreddit === DEMO_SUBREDDIT ? APP_SLUG : safeInitialSubreddit;
     this.demo = initialDemo;
   }
 
@@ -199,19 +203,24 @@ export class ReviewLockStore {
   }
 
   async setSubreddit(subreddit: string) {
-    this.subreddit = subreddit;
+    this.subreddit = normalizeSubredditName(subreddit) ?? APP_SLUG;
     if (!this.demo) {
-      this.liveSubreddit = subreddit;
+      this.liveSubreddit = this.subreddit;
     }
     await this.fetchState();
   }
 
   updateSubredditContext(subreddit: string) {
+    const safeSubreddit = normalizeSubredditName(subreddit);
+    if (!safeSubreddit) {
+      return;
+    }
+
     if (!this.demo) {
-      this.subreddit = subreddit;
-      this.liveSubreddit = subreddit;
+      this.subreddit = safeSubreddit;
+      this.liveSubreddit = safeSubreddit;
     } else {
-      this.liveSubreddit = subreddit;
+      this.liveSubreddit = safeSubreddit;
     }
     this.notify();
   }

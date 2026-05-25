@@ -2284,3 +2284,25 @@ Reason:
   corrupt Redis schema, or mark runtime proof against the wrong thing kind.
   Required id failures are safer as target refetch failures; optional metadata
   should degrade to safe defaults.
+
+### D129 - Client runtime subreddit context is validated before fetch scope changes
+
+The embedded dashboard receives subreddit scope from URL parameters, Reddit
+referrers, and Devvit WebView globals.
+
+Decision:
+
+- Normalize query-string subreddit values before the store is created.
+- Treat Devvit global context as an unknown record and reject arrays, primitive
+  contexts, and malformed subreddit names.
+- Normalize store constructor, manual subreddit changes, and runtime-context
+  updates to a safe subreddit name before any dashboard API fetch.
+- Fall back to the app slug for invalid live scope instead of issuing invalid
+  live dashboard reads.
+
+Reason:
+
+- Runtime context is platform/browser-provided input. The server still enforces
+  trusted runtime scope for live data, but the client should not render or fetch
+  against malformed subreddit identifiers while waiting for that server-side
+  rejection.

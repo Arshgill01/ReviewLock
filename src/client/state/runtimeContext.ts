@@ -1,11 +1,8 @@
 const SUBREDDIT_NAME_RE = /^[A-Za-z0-9_]{3,21}$/;
 const SUBREDDIT_PATH_RE = /\/r\/([A-Za-z0-9_]{3,21})(?:[/?#]|$)/;
 
-type DevvitRuntimeGlobal = {
-  context?: {
-    subredditName?: unknown;
-  };
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const normalizeSubredditName = (value: unknown): string | undefined => {
   if (typeof value !== 'string') {
@@ -17,11 +14,11 @@ export const normalizeSubredditName = (value: unknown): string | undefined => {
 };
 
 export const subredditFromDevvitGlobal = (value: unknown): string | undefined => {
-  if (!value || typeof value !== 'object') {
+  if (!isRecord(value) || !isRecord(value.context)) {
     return undefined;
   }
 
-  return normalizeSubredditName((value as DevvitRuntimeGlobal).context?.subredditName);
+  return normalizeSubredditName(value.context.subredditName);
 };
 
 export const subredditFromUrl = (value: string | undefined): string | undefined => {
