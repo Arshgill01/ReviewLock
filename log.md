@@ -2154,3 +2154,30 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:47 IST - Persisted counter validation hardening
+
+- Tightened shared schema validators so persisted lock counters and metrics
+  counters must be non-negative integers.
+- `ReviewLockConfig.lockExpiryDays` now also requires a positive integer.
+- Malformed lock records with negative report counters are skipped by lock
+  loaders and active-lock lists.
+- Malformed daily and target metrics with negative counters are skipped by
+  metric loaders and aggregate lists.
+- Focused validation:
+  - `npm run test -- src/shared/schema.test.ts src/server/services/locks.test.ts src/server/services/metrics.test.ts src/server/services/config.test.ts --reporter verbose`
+  - PASS, 4 test files and 22 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 346 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

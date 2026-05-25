@@ -227,6 +227,12 @@ const isBoolean = (value: unknown): value is boolean => typeof value === 'boolea
 const isNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
+const isNonNegativeInteger = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value >= 0;
+
+const isPositiveInteger = (value: unknown): value is number =>
+  isNumber(value) && Number.isInteger(value) && value > 0;
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(isString);
 
@@ -265,8 +271,8 @@ export const isReviewLockRecord = (value: unknown): value is ReviewLockRecord =>
   isOptionalString(value.expiresAt) &&
   isLockStatus(value.status) &&
   isBoolean(value.lastKnownEdited) &&
-  isNumber(value.lastReportCount) &&
-  isNumber(value.suppressedReportCount) &&
+  isNonNegativeInteger(value.lastReportCount) &&
+  isNonNegativeInteger(value.suppressedReportCount) &&
   isOptionalString(value.lastSuppressedAt) &&
   isOptionalString(value.reopenedAt) &&
   (value.reopenReason === undefined || isReopenReason(value.reopenReason)) &&
@@ -309,9 +315,9 @@ export const isDailyMetrics = (value: unknown): value is DailyMetrics =>
   isRecord(value) &&
   isString(value.subreddit) &&
   isString(value.date) &&
-  isNumber(value.locksCreated) &&
-  isNumber(value.reportsSuppressed) &&
-  isNumber(value.locksReopened) &&
+  isNonNegativeInteger(value.locksCreated) &&
+  isNonNegativeInteger(value.reportsSuppressed) &&
+  isNonNegativeInteger(value.locksReopened) &&
   isBoolean(value.demo);
 
 export const isTargetMetrics = (value: unknown): value is TargetMetrics =>
@@ -319,17 +325,16 @@ export const isTargetMetrics = (value: unknown): value is TargetMetrics =>
   isString(value.subreddit) &&
   isString(value.targetId) &&
   isTargetKind(value.targetKind) &&
-  isNumber(value.reportsSuppressed) &&
-  isNumber(value.locksCreated) &&
-  isNumber(value.locksReopened) &&
+  isNonNegativeInteger(value.reportsSuppressed) &&
+  isNonNegativeInteger(value.locksCreated) &&
+  isNonNegativeInteger(value.locksReopened) &&
   isString(value.lastActivityAt) &&
   isBoolean(value.demo);
 
 export const isReviewLockConfig = (value: unknown): value is ReviewLockConfig =>
   isRecord(value) &&
   isString(value.subreddit) &&
-  isNumber(value.lockExpiryDays) &&
-  value.lockExpiryDays > 0 &&
+  isPositiveInteger(value.lockExpiryDays) &&
   isBoolean(value.demoModeEnabled) &&
   isLockReasonPresetArray(value.reasonPresets) &&
   isString(value.updatedAt);
