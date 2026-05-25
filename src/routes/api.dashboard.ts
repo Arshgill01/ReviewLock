@@ -426,7 +426,37 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
         data: { reopenReason: event.reason },
         demo: event.demo,
       });
-      await dismissReopenEvent(deps.redis, scope.subreddit, body.eventId, dismissedAt, actor);
+      try {
+        await dismissReopenEvent(deps.redis, scope.subreddit, body.eventId, dismissedAt, actor);
+      } catch (error) {
+        await appendAuditEvent(deps.redis, {
+          id: `audit-reopen-dismiss-failed-${Date.parse(dismissedAt)}-${event.id}`,
+          kind: 'runtime_failure',
+          subreddit: event.subreddit,
+          targetId: event.targetId,
+          targetKind: event.targetKind,
+          lockId: event.lockId,
+          actor,
+          createdAt: dismissedAt,
+          message:
+            'ReviewLock recorded dismissal intent but could not update the reopen queue.',
+          data: {
+            operation: 'dismissReopenEvent',
+            error: error instanceof Error ? error.message : 'unknown error',
+          },
+          demo: event.demo,
+        }).catch(() => undefined);
+
+        return context.json(
+          {
+            ok: false,
+            message:
+              'ReviewLock recorded the dismissal audit but could not update the reopen queue.',
+            requestId: requestId(),
+          },
+          500,
+        );
+      }
 
       return context.json({
         ok: true,

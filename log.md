@@ -1676,6 +1676,15 @@
 - Integrated reviewer finding: suppression metrics are decremented when a
   success audit write fails after metrics increment, matching the retryable
   rollback path.
+- Integrated reviewer finding: stale relock failures between old-lock reopen
+  and replacement creation now return a structured failure with runtime-failure
+  audit instead of throwing through the form route.
+- Integrated reviewer finding: report/update reopen paths now write a
+  compensating runtime-failure audit if the required `lock_reopened` audit
+  fails after state is already reopened.
+- Integrated reviewer finding: form and dashboard reopen-dismiss paths now
+  write a compensating runtime-failure audit if queue mutation fails after the
+  dismissal audit.
 - Focused validation:
   - `npm run test -- src/server/adapters/redis.test.ts src/routes/forms.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/server/services/unlockFlow.test.ts --reporter verbose`
   - PASS, 5 test files and 60 tests.
@@ -1691,10 +1700,20 @@
   - PASS, 2 test files and 38 tests.
   - `npm run test -- src/server/services/metrics.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
   - PASS, 2 test files and 31 tests.
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - PASS, 1 test file and 13 tests.
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - Initial FAIL because `src/server/services/reopenFlow.test.ts` needed
+    `listAuditEvents` imported for the new audit-failure assertion; fixed and
+    re-ran PASS, 3 test files and 54 tests.
+  - `npm run test -- src/routes/api.dashboard.test.ts src/routes/forms.test.ts src/server/services/lockFlow.test.ts src/server/services/reopenFlow.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - Initial FAIL because the dashboard dismiss failure test enabled the Redis
+    fault before seeding the reopen event; fixed and re-ran PASS, 5 test files
+    and 81 tests.
 - Full validation:
   - `npm run type-check`
   - `npm run lint`
   - `npm run test`
   - `npm run build`
-- Pass/fail status: PASS for type-check, lint, 40 test files / 296 tests, and
+- Pass/fail status: PASS for type-check, lint, 40 test files / 301 tests, and
   build.

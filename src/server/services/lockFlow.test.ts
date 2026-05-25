@@ -334,6 +334,67 @@ describe('lockReviewedContent', () => {
     ]);
   });
 
+  it('returns structured failure when stale relock reopening persistence fails before replacement', async () => {
+    class StaleReopenMetricsFailingRedisStore extends InMemoryRedisStore {
+      failReopenMetrics = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failReopenMetrics && key === keys.metricsDaily('alpha', '2026-05-24')) {
+          throw new Error('reopen metrics down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const reddit = new FakeRedditAdapter([target()]);
+    const redis = new StaleReopenMetricsFailingRedisStore();
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis,
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    redis.failReopenMetrics = true;
+    reddit.setTarget(target({ body: 'Edited body', edited: true, reportCount: 6 }));
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(second).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock reopened the stale lock or attempted to, but could not durably create the replacement lock. Reopen the menu and try again.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ lockId: first.lock?.id, reason: 'content_changed' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'lock_created' }),
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'Lock review found changed content but could not complete stale relock replacement.',
+        data: expect.objectContaining({
+          operation: 'staleRelockReopen',
+          error: 'reopen metrics down',
+        }),
+      }),
+    ]));
+  });
+
   it('keeps the stale lock active when stale unignore fails before replacement', async () => {
     const reddit = new FakeRedditAdapter([target()]);
     const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];

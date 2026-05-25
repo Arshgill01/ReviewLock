@@ -140,3 +140,6 @@
 - [x] Keep no-lock report/update deliveries from marking trigger runtime proof verified.
 - [x] Serialize same-subreddit dashboard metric writes across concurrent targets.
 - [x] Roll back suppression metrics when success audit persistence fails.
+- [x] Return structured stale-relock failures before replacement lock creation.
+- [x] Record runtime-failure audits when reopen success-audit writes fail after state changes.
+- [x] Record runtime-failure audits when dismiss queue mutation fails after dismissal audit.

@@ -2215,15 +2215,28 @@
   incremented when the success audit write fails. Report trigger rollback now
   decrements daily and target suppressed-report metrics after audit failure.
   Regression added in `src/server/services/reportTriggers.test.ts`.
+- Resolved medium finding: reopen dismiss can write durable dismissal audit
+  before queue mutation failure. Dashboard and form dismiss routes now append a
+  compensating `runtime_failure` audit when queue/event mutation fails after the
+  dismissal audit. Regressions added in `src/routes/api.dashboard.test.ts` and
+  `src/routes/forms.test.ts`.
+- Resolved medium finding: reopen flows can lose required `lock_reopened` audit
+  after state is already reopened. Report and update reopen paths now append a
+  compensating `runtime_failure` audit and return `runtime_uncertain`.
+  Regressions added in `src/server/services/reportTriggers.test.ts` and
+  `src/server/services/reopenFlow.test.ts`.
+- Resolved medium finding added at 00:30: stale relock can fail after reopening
+  the old lock but before creating the replacement lock. The stale-reopen
+  section now catches metrics/audit failures, attempts a runtime-failure audit,
+  returns a structured `LockFlowResult`, and does not call replacement
+  `approve()`/`ignoreReports()`. Regression added in
+  `src/server/services/lockFlow.test.ts`.
 - Remaining medium findings for later pass:
-  - Reopen dismiss can write durable dismissal audit before queue mutation
-    failure.
-  - Reopen flows can lose required `lock_reopened` audit after state is already
-    reopened.
+  - None from the currently logged reviewer list.
 - Validation:
   - `npm run type-check` PASS.
   - `npm run lint` PASS.
-  - `npm run test` PASS, 40 files / 296 tests.
+  - `npm run test` PASS, 40 files / 301 tests.
   - `npm run build` PASS.
 
 ## 2026-05-26 00:14 IST - Finding
@@ -2305,3 +2318,29 @@
 - Why it matters: This is fail-open for report suppression, which is good, but it can leave a moderator with a failed form submission after ReviewLock already reopened the old lock and before a replacement active lock exists. The moderator intended to lock newly reviewed edited content, but the service can stop halfway with no structured runtime-failure audit/toast explaining that only the old lock was reopened.
 - Suggested fix: Put the stale-reopen transition and replacement-lock attempt behind one explicit durability boundary. At minimum, catch metrics/audit failures in the stale-reopen section, write or attempt a `runtime_failure` audit, and return a structured `LockFlowResult` that tells the moderator the old lock was reopened but the new lock was not created. Add regressions that fail `incrementReopenedMetric()` and the stale `lock_reopened` audit after `markLockReopenedAfterQueue()`.
 - Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/routes/forms.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:32 IST - Finding
+
+- Severity: medium
+- Area: Suppression metrics rollback still misses partial metric writes inside the metrics helper.
+- Evidence:
+  - The current report-trigger catch only compensates metrics when `incrementSuppressedReportMetric()` returns and flips `metricsIncremented = true`: `src/server/services/reportTriggers.ts:313-351`.
+  - `incrementSuppressedReportMetric()` writes daily metrics first and target metrics second: `src/server/services/metrics.ts:191-212`. Each helper also performs multiple Redis writes, such as daily record `set` then daily index `zAdd`: `src/server/services/metrics.ts:94-115`.
+  - If `saveDailyMetrics()` succeeds but `saveTargetMetrics()` fails, or if the daily record `set` succeeds and the daily index `zAdd` fails, `incrementSuppressedReportMetric()` rejects before `metricsIncremented` becomes true. The report-trigger rollback restores the lock counter and calls `unignoreReports()`, but it skips `decrementSuppressedReportMetric()`.
+  - The new regressions cover failure before daily metrics persist and audit failure after the full metrics helper returns, but not a partial write inside `incrementSuppressedReportMetric()`: `src/server/services/reportTriggers.test.ts:802-883`.
+- Why it matters: ReviewLock would return `runtime_uncertain`, clear the dedupe marker, and undo Reddit suppression for a report delivery that was not durably processed, while the dashboard daily metric can still show an extra "Reports suppressed." A retry of the same report can then count again, overstating the core churn-suppression evidence.
+- Suggested fix: Make the metrics helper itself atomic/compensating, or have it return a write-state that lets the report-trigger catch undo partial daily/target writes even when the helper throws. Add regressions that fail `keys.metricsTarget(...)`, `keys.metricsDailyIndex(...)`, and `keys.metricsTargetIndex(...)` after the daily metric record has been updated.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/metrics.ts`, `src/server/services/metrics.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:33 IST - Finding
+
+- Severity: medium
+- Area: Stale relock failure can leave a reopen queue item while the old lock remains active.
+- Evidence:
+  - The current stale-relock block writes the reopen event first, then marks the old lock `reopened` and removes active indexes: `src/server/services/lockFlow.ts:263-270`.
+  - `enqueueReopenEvent()` itself writes the reopen event body and queue index before returning: `src/server/services/reopenQueue.ts:22-35`.
+  - If `enqueueReopenEvent()` succeeds but `markLockReopenedAfterQueue()` fails, the catch returns a structured failure and writes a `runtime_failure` audit, but it does not remove the already-queued reopen event or force the old lock out of the active indexes: `src/server/services/lockFlow.ts:289-321`. `getActiveLockByTarget()` will still return the old active lock when its status/index writes were not updated: `src/server/services/locks.ts:45-58`.
+  - The new stale-relock persistence regression fails `keys.metricsDaily(...)`, which happens after `markLockReopenedAfterQueue()` has already removed the active lock; it explicitly expects no active lock and a visible reopen event: `src/server/services/lockFlow.test.ts:337-396`. There is no regression where the status/index update fails after the reopen event has been queued.
+- Why it matters: A moderator can see an item in the reopen queue while ReviewLock still treats the same target as actively locked. Future report triggers can continue to evaluate the stale active lock, and a retry can enqueue another reopen event for the same old lock. That undercuts the clean "lock breaks and returns to review" state model.
+- Suggested fix: Reorder the stale-relock transition so the old active lock cannot remain active after a durable queue write, or compensate by removing the queued reopen event if status/index mutation fails. Add a regression that fails `keys.lock(...)`, `keys.activeLocks(...)`, `keys.activeLocksByTarget(...)`, or `keys.targetLock(...)` during `markLockReopenedAfterQueue()` after `enqueueReopenEvent()` has succeeded, asserting the final state is either active-with-no-queue or reopened-with-queue.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/reopenQueue.ts`, `src/server/services/locks.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.

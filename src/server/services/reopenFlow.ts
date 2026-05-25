@@ -193,19 +193,48 @@ export const breakLockForChangedContent = async (
         await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
       }
 
-      await appendAuditEvent(deps.redis, {
-        id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
-        kind: 'lock_reopened',
-        subreddit: lock.subreddit,
-        targetId: lock.targetId,
-        targetKind: lock.targetKind,
-        lockId: lock.id,
-        actor: 'reviewlock',
-        createdAt: now,
-        message: 'Lock reopened after reviewed content changed or became uncertain.',
-        data: { reason, unignoreReportsOk: unignoreResult?.ok ?? false },
-        demo: lock.demo,
-      });
+      try {
+        await appendAuditEvent(deps.redis, {
+          id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
+          kind: 'lock_reopened',
+          subreddit: lock.subreddit,
+          targetId: lock.targetId,
+          targetKind: lock.targetKind,
+          lockId: lock.id,
+          actor: 'reviewlock',
+          createdAt: now,
+          message: 'Lock reopened after reviewed content changed or became uncertain.',
+          data: { reason, unignoreReportsOk: unignoreResult?.ok ?? false },
+          demo: lock.demo,
+        });
+      } catch (error) {
+        await appendAuditEvent(deps.redis, {
+          id: `audit-update-reopen-audit-failed-${Date.parse(now)}-${lock.id}`,
+          kind: 'runtime_failure',
+          subreddit: lock.subreddit,
+          targetId: lock.targetId,
+          targetKind: lock.targetKind,
+          lockId: lock.id,
+          actor: 'reviewlock',
+          createdAt: now,
+          message:
+            'Lock reopened after reviewed content changed, but the reopen audit failed.',
+          data: {
+            operation: 'lockReopenedAudit',
+            error: error instanceof Error ? error.message : 'unknown error',
+          },
+          demo: lock.demo,
+        }).catch(() => undefined);
+
+        return {
+          ok: false,
+          action: 'runtime_uncertain',
+          message:
+            'Lock reopened, but ReviewLock could not persist the required reopen audit.',
+          event,
+          warnings: [...warnings, 'redis_write_failed'],
+        };
+      }
 
       if (resolution.target) {
         await recordUpdateTriggerProcessed(

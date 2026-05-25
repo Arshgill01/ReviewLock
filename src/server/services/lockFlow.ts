@@ -260,31 +260,66 @@ export const lockReviewedContent = async (
         ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
         runtimeWarnings: staleUnignoreResult.warnings,
       };
-      await enqueueReopenEvent(deps.redis, reopenEvent);
-      await markLockReopenedAfterQueue(deps.redis, existingLock, {
-        reopenedAt: now,
-        reopenReason: 'content_changed',
-        reopenEventId: reopenEvent.id,
-        runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
-      });
-      await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
-      await appendAuditEvent(deps.redis, {
-        id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
-        kind: 'lock_reopened',
-        subreddit: existingLock.subreddit,
-        targetId: existingLock.targetId,
-        targetKind: existingLock.targetKind,
-        lockId: existingLock.id,
-        actor: input.actor,
-        createdAt: now,
-        message: 'Lock review reopened a stale lock because reviewed content changed.',
-        data: {
-          reason: 'content_changed',
-          source: 'lock_review',
-          unignoreReportsOk: staleUnignoreResult.ok,
-        },
-        demo: existingLock.demo,
-      });
+      try {
+        await enqueueReopenEvent(deps.redis, reopenEvent);
+        await markLockReopenedAfterQueue(deps.redis, existingLock, {
+          reopenedAt: now,
+          reopenReason: 'content_changed',
+          reopenEventId: reopenEvent.id,
+          runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
+        });
+        await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
+        await appendAuditEvent(deps.redis, {
+          id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
+          kind: 'lock_reopened',
+          subreddit: existingLock.subreddit,
+          targetId: existingLock.targetId,
+          targetKind: existingLock.targetKind,
+          lockId: existingLock.id,
+          actor: input.actor,
+          createdAt: now,
+          message: 'Lock review reopened a stale lock because reviewed content changed.',
+          data: {
+            reason: 'content_changed',
+            source: 'lock_review',
+            unignoreReportsOk: staleUnignoreResult.ok,
+          },
+          demo: existingLock.demo,
+        });
+      } catch (error) {
+        await appendAuditEvent(deps.redis, {
+          id: `audit-${existingLock.id}-stale-relock-failed-${Date.parse(now)}`,
+          kind: 'runtime_failure',
+          subreddit: existingLock.subreddit,
+          targetId: existingLock.targetId,
+          targetKind: existingLock.targetKind,
+          lockId: existingLock.id,
+          actor: input.actor,
+          createdAt: now,
+          message:
+            'Lock review found changed content but could not complete stale relock replacement.',
+          data: {
+            operation: 'staleRelockReopen',
+            error: error instanceof Error ? error.message : 'unknown error',
+          },
+          demo: existingLock.demo,
+        }).catch(() => undefined);
+
+        return {
+          ok: false,
+          lock: {
+            ...existingLock,
+            runtimeWarnings: [
+              ...existingLock.runtimeWarnings,
+              ...staleUnignoreResult.warnings,
+              'redis_write_failed',
+            ],
+          },
+          message:
+            'ReviewLock reopened the stale lock or attempted to, but could not durably create the replacement lock. Reopen the menu and try again.',
+          warnings: [...staleUnignoreResult.warnings, 'redis_write_failed'],
+        };
+      }
     }
 
     const approveResult = await approveForReviewLock(deps.reddit, resolution.target);

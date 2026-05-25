@@ -523,4 +523,56 @@ describe('form routes', () => {
       expect.objectContaining({ id: 'reopen-1' }),
     ]);
   });
+
+  it('records runtime failure when form dismiss queue removal fails after audit', async () => {
+    class DismissQueueFailingRedisStore extends InMemoryRedisStore {
+      override async zRem(key: string, member: string): Promise<void> {
+        if (key === 'reviewlock:alpha:reopen:queue' && member === 'reopen-1') {
+          throw new Error('reopen queue unavailable');
+        }
+
+        await super.zRem(key, member);
+      }
+    }
+
+    const redis = new DismissQueueFailingRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-action-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        action: 'dismiss',
+        actor: 'client_supplied_actor',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock recorded the dismissal audit but could not update the reopen queue.',
+      },
+    });
+    expect(await getReopenEvent(redis, 'alpha', 'reopen-1')).toMatchObject({
+      dismissedAt: '2026-05-24T01:00:00.000Z',
+      dismissedBy: 'mod_test',
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'reopen_dismissed' }),
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'ReviewLock recorded dismissal intent but could not update the reopen queue.',
+        data: expect.objectContaining({
+          operation: 'dismissReopenEvent',
+          error: 'reopen queue unavailable',
+        }),
+      }),
+    ]));
+  });
 });

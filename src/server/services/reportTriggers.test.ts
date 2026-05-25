@@ -591,6 +591,49 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('records runtime failure when changed-report reopen audit fails after state is reopened', async () => {
+    class ReopenAuditFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-report-reopened')) {
+          throw new Error('report reopen audit down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenAuditFailingRedisStore();
+    await saveLock(redis, lock());
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target('Edited body')]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-reopen-audit-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'Report trigger reopened the lock, but the reopen audit failed.',
+        data: expect.objectContaining({
+          operation: 'lockReopenedAudit',
+          error: 'report reopen audit down',
+        }),
+      }),
+    ]);
+  });
+
   it('removes active indexes when changed-report status write fails after queueing reopen event', async () => {
     class ReopenStatusWriteFailingRedisStore extends InMemoryRedisStore {
       failLockStatusWrites = false;

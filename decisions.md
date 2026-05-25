@@ -1690,3 +1690,58 @@ Reason:
 - A retryable delivery should not leave visible dashboard metrics claiming a
   durable suppression. Otherwise a retry can double-count the same report
   delivery.
+
+### D099 - Stale relock replacement failures return structured results
+
+Manual lock review can find an existing active lock whose content fingerprint
+differs from the current target.
+
+Decision:
+
+- If stale-lock reopening persistence fails before replacement lock creation,
+  catch the error, attempt a runtime-failure audit, and return a structured
+  `LockFlowResult`.
+- Do not proceed to replacement `approve()` or `ignoreReports()` after a failed
+  stale-reopen durability step.
+
+Reason:
+
+- The old lock may already be reopened and reports may already be unignored.
+  The moderator needs a clear toast/result instead of an unhandled route error,
+  and ReviewLock must not half-create a replacement lock after a failed stale
+  transition.
+
+### D100 - Reopened state without success audit gets compensating runtime failure
+
+Report and update reopen paths can commit reopened state before appending the
+required `lock_reopened` audit event.
+
+Decision:
+
+- If the success `lock_reopened` audit fails after reopen state is already
+  visible, append a `runtime_failure` audit best-effort and return
+  `runtime_uncertain`.
+
+Reason:
+
+- Edit-break reopening is the core product loop. A reopened queue item without
+  either the required success audit or a visible failure audit weakens moderator
+  traceability.
+
+### D101 - Dismiss queue mutation failures get compensating runtime failure
+
+Dismiss actions write the moderator dismissal audit before mutating the reopen
+queue.
+
+Decision:
+
+- Keep audit-first dismissal so an audit write failure leaves the reopen event
+  visible and retryable.
+- If queue/event mutation fails after audit succeeds, append a runtime-failure
+  audit best-effort and return an explicit dashboard/form error.
+
+Reason:
+
+- Moderator intent and queue state can diverge during transient Redis failures.
+  A compensating runtime-failure audit preserves traceability and avoids a
+  silent "dismissed" claim when the queue mutation did not cleanly complete.

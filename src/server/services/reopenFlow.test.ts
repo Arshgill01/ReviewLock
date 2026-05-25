@@ -3,6 +3,7 @@ import { fixedClock } from '../adapters/clock';
 import { InMemoryRedisStore } from '../adapters/redis';
 import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
+import { listAuditEvents } from './audit';
 import { fingerprintTarget } from './fingerprint';
 import { getActiveLockByTarget, saveLock } from './locks';
 import { getDailyMetrics, getTargetMetrics } from './metrics';
@@ -293,6 +294,50 @@ describe('breakLockForChangedContent', () => {
       expect.objectContaining({ reason: 'content_changed' }),
     ]);
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
+  it('records runtime failure when update reopen audit fails after state is reopened', async () => {
+    class ReopenAuditFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-update-reopened-')) {
+          throw new Error('reopen audit down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new ReopenAuditFailingRedisStore();
+    await saveLock(redis, lock());
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target({ body: 'Edited body', edited: true })]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'Lock reopened after reviewed content changed, but the reopen audit failed.',
+        data: expect.objectContaining({
+          operation: 'lockReopenedAudit',
+          error: 'reopen audit down',
+        }),
+      }),
+    ]);
   });
 
   it('keeps report and update races idempotent for the same edited target', async () => {

@@ -288,6 +288,60 @@ describe('dashboard API routes', () => {
     ]);
   });
 
+  it('records runtime failure when dashboard dismiss queue mutation fails after audit', async () => {
+    class DismissEventFailingRedisStore extends InMemoryRedisStore {
+      failDismissWrite = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failDismissWrite && key === 'reviewlock:alpha:reopen:reopen-1') {
+          throw new Error('reopen event write unavailable');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new DismissEventFailingRedisStore();
+    await enqueueReopenEvent(redis, reopenEvent());
+    redis.failDismissWrite = true;
+    const router = createDashboardApiRouter({
+      reddit: new FakeRedditAdapter([target()], 'dash_mod'),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-queue/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        actor: 'client_supplied_actor',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message: 'ReviewLock recorded the dismissal audit but could not update the reopen queue.',
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'reopen_dismissed' }),
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'ReviewLock recorded dismissal intent but could not update the reopen queue.',
+        data: expect.objectContaining({
+          operation: 'dismissReopenEvent',
+          error: 'reopen event write unavailable',
+        }),
+      }),
+    ]));
+  });
+
   it('rejects client-supplied subreddit namespaces that do not match runtime context', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
