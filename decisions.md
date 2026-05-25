@@ -1231,3 +1231,44 @@ Reason:
 - A browser-only state flip would make demo mode appear exited while server
   cleanup failed. Keeping the old state visible is more honest and keeps the
   retry path available.
+
+### D075 - Record failed Redis smoke attempts in runtime proof when scope is known
+
+Runtime smoke checks can fail after the route has already resolved the
+subreddit namespace.
+
+Decision:
+
+- If Redis smoke write/read/delete fails after subreddit scope is known, record
+  the failed `redis` capability in runtime proof before returning the failing
+  response.
+- If subreddit scope is not known, return the failing response without guessing
+  a namespace.
+- Do not mask the HTTP failure; the dashboard should still show that the
+  runtime check failed.
+
+Reason:
+
+- Moderators need failed runtime checks to be visible in the same operational
+  proof panel as successful checks. A raw HTTP 500 without a ledger entry makes
+  the failure easy to miss and weakens the runtime proof story.
+
+### D076 - Treat live post body edit proof as post-update only
+
+S02 verified the real Devvit post update path for a controlled body edit, but
+it did not exercise comment update, flair update, NSFW update, or spoiler update
+payloads.
+
+Decision:
+
+- Mark `postUpdateTrigger` verified after the S02 proof.
+- Keep comment update, post flair, post NSFW, and post spoiler trigger
+  capabilities unverified until their own controlled events run.
+- Keep docs and dashboard claim language granular instead of saying all update
+  triggers are verified.
+
+Reason:
+
+- The product can now honestly demonstrate the core edit-aware reopen loop for
+  posts, while avoiding an inflated runtime claim for trigger variants that
+  still need live payload evidence.

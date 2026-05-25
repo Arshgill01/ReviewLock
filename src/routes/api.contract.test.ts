@@ -3,6 +3,7 @@ import { createApp } from '../app';
 import { fixedClock } from '../server/adapters/clock';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import { InMemoryRedisStore } from '../server/adapters/redis';
+import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { createApiRouter } from './api';
 
 const createContractApp = () =>
@@ -103,6 +104,47 @@ describe('API/client route contract', () => {
     await expect(response.json()).resolves.toMatchObject({
       ok: false,
       error: 'Runtime smoke subreddit context is required.',
+    });
+  });
+
+  it('records failed Redis smoke proof when Redis readback does not match', async () => {
+    class ReadMismatchRedisStore extends InMemoryRedisStore {
+      override async get(key: string): Promise<string | undefined> {
+        if (key.includes(':runtime:smoke:')) {
+          return 'unexpected-smoke-value';
+        }
+
+        return super.get(key);
+      }
+    }
+
+    const redis = new ReadMismatchRedisStore();
+    const app = createApp({
+      redis,
+      reddit: new FakeRedditAdapter(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
+    });
+
+    const response = await app.request('/api/smoke/redis?subreddit=alpha', { method: 'POST' });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      capability: 'redis',
+      status: 'failed',
+      error: 'Redis smoke read did not match the written value.',
+    });
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      overall: 'failed',
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'redis',
+          status: 'failed',
+          evidence:
+            'POST /api/smoke/redis could not complete the namespaced write/read/delete check.',
+        }),
+      ]),
     });
   });
 

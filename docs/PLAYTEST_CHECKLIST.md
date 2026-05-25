@@ -55,12 +55,12 @@ Dev account: `u/BrightyBrainiac`.
 
 ## Edit-aware reopen flow
 
-- [ ] Edit the locked test post.
-- [ ] Confirm post update trigger reaches ReviewLock.
-- [ ] Confirm new fingerprint differs.
-- [ ] Confirm lock status changes to `reopened`.
-- [ ] Confirm `unignoreReports()` is called when supported.
-- [ ] Confirm reopen queue event and audit event are written.
+- [x] Edit the locked test post.
+- [x] Confirm post update trigger reaches ReviewLock.
+- [x] Confirm new fingerprint differs.
+- [x] Confirm lock status changes to `reopened`.
+- [x] Confirm `unignoreReports()` is called when supported.
+- [x] Confirm reopen queue event and audit event are written.
 - [ ] Edit the locked test comment.
 - [ ] Confirm comment update trigger path and reopen behavior.
 
@@ -74,6 +74,7 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Confirm unverified moderation operations remain labeled unverified until separately tested.
 - [x] Confirm dashboard unlock records `unignoreReports verified` on the controlled post target.
 - [x] Confirm lock review records `approve verified` and `ignoreReports verified` on the controlled post target.
+- [x] Confirm `postUpdateTrigger verified` after controlled S02 body edit reopen.
 - [x] Confirm no product copy says "not reportable", "disable reports", or "blocked reports".
 
 ## Browser safety notes

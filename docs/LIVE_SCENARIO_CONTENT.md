@@ -1,6 +1,6 @@
 # Live Scenario Content
 
-Last updated: 2026-05-25 15:35 IST.
+Last updated: 2026-05-25 22:56 IST.
 
 This file contains the exact controlled content to create in
 `r/reviewlock_dev` for live ReviewLock proof. These are not demo fixtures and
@@ -100,6 +100,18 @@ Observed result:
 
 ## S02 - Body Edit Reopen
 
+Live record:
+
+- Status: posted, locked, edited, and verified as reopened after edit in the
+  live dashboard on playtest `v0.0.2.107`.
+- Permalink:
+  `/r/reviewlock_dev/comments/1tnfgqf/reviewlock_proof_s02_body_edit_reopen/`
+- Thing id: `t3_1tnfgqf`
+- Author: `u/BrightyBrainiac`
+- Lock created: `5/25/2026, 10:46:33 PM`, lock id
+  `lock-t3_1tnfgqf-1779729393648`.
+- Reopen observed: `5/25/2026, 10:53:00 PM`.
+
 Title:
 
 ```txt
@@ -128,6 +140,22 @@ Expected result:
 - New fingerprint differs from the stored fingerprint.
 - Lock moves to `reopened`.
 - Reopen event reason is `content_changed`.
+
+Observed result:
+
+- Verified on playtest `v0.0.2.107`.
+- Devvit emitted sanitized `reviewlock.trigger.payload_shape` for
+  `on-post-update`; the payload had a nested `post` object with `post.id`,
+  `post.subredditId`, and `post.numReports` present. Direct top-level
+  `targetId`, `postId`, and `eventId` were absent.
+- ReviewLock dashboard showed active locks decrease from `3` to `2`,
+  `Reopened after edit` increase from `0` to `1`, latest reopen event
+  `post:1tnfgqf` with reason `content changed`, and runtime proof
+  `postUpdateTrigger verified`.
+- Reopen queue showed `post:1tnfgqf content changed 5/25/2026, 10:53:00 PM`
+  with fingerprint delta `c322d267` to `fc05f41b`.
+- Audit timeline showed `Lock Reopened 5/25/2026, 10:53:00 PM · reviewlock`
+  for target `t3_1tnfgqf` and lock `lock-t3_1tnfgqf-1779729393648`.
 
 ## S03 - Flair Edit Reopen
 

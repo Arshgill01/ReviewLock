@@ -1449,3 +1449,44 @@
   - Forbidden-copy scan matched only guardrail tests and documentation
     references.
   - Controlled live edit/update trigger proof remains pending.
+
+## 2026-05-25 - Wave 33 controlled post update proof and Redis smoke hardening
+
+- Posted and locked S02 in `r/reviewlock_dev`:
+  `/r/reviewlock_dev/comments/1tnfgqf/reviewlock_proof_s02_body_edit_reopen/`
+  (`t3_1tnfgqf`, author `u/BrightyBrainiac`).
+- Verified `Lock review` created lock `lock-t3_1tnfgqf-1779729393648` at
+  `5/25/2026, 10:46:33 PM` with reason `reviewed policy compliant`.
+- Edited the S02 body to the planned material rewrite and verified the live
+  `PostUpdate` path:
+  - sanitized `reviewlock.trigger.payload_shape` emitted for `on-post-update`;
+  - active locks changed from `3` to `2`;
+  - `Reopened after edit` increased to `1`;
+  - latest reopen event was `post:1tnfgqf`, reason `content changed`;
+  - reopen queue showed fingerprint delta `c322d267` to `fc05f41b`;
+  - audit recorded `Lock Reopened 5/25/2026, 10:53:00 PM`;
+  - runtime proof showed `postUpdateTrigger verified`.
+- Hardened Redis runtime smoke so failed checks update the runtime proof ledger
+  when subreddit scope has already been resolved.
+- Commands run so far:
+  - `npm run dev -- reviewlock_dev`
+  - `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`
+  - Zen browser S02 post creation, `Lock review`, body edit, and dashboard
+    inspection on playtest `v0.0.2.107`
+  - `npm run test -- src/routes/api.contract.test.ts src/server/services/runtimeProof.test.ts --reporter verbose`
+  - `npm run type-check`
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src || true`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+- Pass/fail status: PASS for controlled post update proof, type-check, lint,
+  full test suite, build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+- Open risks:
+  - Comment report/update and post NSFW/spoiler/flair trigger variants remain
+    unverified.

@@ -95,8 +95,8 @@
 - [x] Record S01 live post permalink and thing id in proof docs.
 - [x] Add sanitized report/update trigger payload-shape logging for live proof.
 - [x] Generate controlled live report trigger events in `r/reviewlock_dev`.
-- [ ] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
-- [ ] Capture sanitized `devvit logs` payload evidence for live update triggers.
+- [x] Generate controlled live edit/update trigger events in `r/reviewlock_dev`.
+- [x] Capture sanitized `devvit logs` payload evidence for live post update triggers.
 - [x] Capture sanitized `devvit logs` payload evidence for live post report triggers.
 - [x] Record update-trigger `unignoreReports()` results in runtime proof.
 - [x] Surface item-level runtime warnings on active dashboard locks.

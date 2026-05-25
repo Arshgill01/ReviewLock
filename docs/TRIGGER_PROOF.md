@@ -1,6 +1,6 @@
 # Trigger Proof
 
-Last updated: 2026-05-25 15:35 IST.
+Last updated: 2026-05-25 22:56 IST.
 
 This document traces every ReviewLock trigger path from incoming payload to target resolution, lock decision, moderation operation, Redis mutation, metrics, audit, and reopen queue effects.
 
@@ -21,9 +21,11 @@ Local route tests use payload fields accepted by ReviewLock trigger routes:
   locks cannot accidentally resolve against the parent post.
 
 Live `PostReport` payload comparison is now available for a controlled
-unchanged locked post in `r/reviewlock_dev`. Comment report and update payloads
-have not been captured from Reddit runtime yet, so those route payloads remain
-representative local fixtures only.
+unchanged locked post in `r/reviewlock_dev`. Live `PostUpdate` payload
+comparison is now available for a controlled locked post body edit in
+`r/reviewlock_dev`. Comment report/update, NSFW, spoiler, and flair update
+payloads have not been captured from Reddit runtime yet, so those route payloads
+remain representative local fixtures only.
 
 The live bootstrap now passes `console` into the trigger router so playtest logs
 include `reviewlock.trigger.payload_shape` entries for report and update
@@ -75,6 +77,26 @@ Verified on 2026-05-25 in `r/reviewlock_dev` against locked dashboard post
 | PostNsfwUpdate material change     | `postId: t3_post`, NSFW flag differs                | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: nsfw_changed`                                 | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: nsfw_changed`    |
 | PostSpoilerUpdate material change  | `postId: t3_post`, spoiler flag differs             | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: spoiler_changed`                              | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: spoiler_changed` |
 | PostFlairUpdate material change    | `postId: t3_post`, flair differs                    | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: flair_changed`                                | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: flair_changed`   |
+
+### Controlled Live PostUpdate Evidence
+
+Verified on 2026-05-25 in `r/reviewlock_dev` against locked proof post
+`t3_1tnfgqf` on playtest `v0.0.2.107`.
+
+- Browser action: edited the S02 post body from the original reviewed body to
+  the material rewrite documented in `docs/LIVE_SCENARIO_CONTENT.md`.
+- Log command:
+  `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`.
+- Sanitized log event: `reviewlock.trigger.payload_shape` for
+  `route: 'on-post-update'`, `targetKind: 'post'`.
+- Observed shape: direct top-level target/event ids absent; nested `post`
+  object present with `post.id`, `post.subredditId`, and `post.numReports`.
+  `subreddit` arrived as an object, not a raw logged subreddit string.
+- Dashboard after refresh: active locks decreased from `3` to `2`, `Reopened
+  after edit` increased to `1`, latest reopen event was `post:1tnfgqf` with
+  reason `content changed`, reopen queue included fingerprint delta
+  `c322d267` to `fc05f41b`, audit recorded `Lock Reopened 5/25/2026,
+  10:53:00 PM`, and runtime proof showed `postUpdateTrigger verified`.
 
 ## Fail-Open Rule
 
@@ -128,6 +150,8 @@ Covered files:
 
 ## Remaining Runtime Work
 
-- Generate live `PostReport` and `CommentReport` events in `r/reviewlock_dev`.
-- Generate live post/comment update, NSFW, spoiler, and flair update events in `r/reviewlock_dev`.
-- Capture sanitized `devvit logs` payload shape evidence and compare it with the local route fixtures above.
+- Generate live `CommentReport` events in `r/reviewlock_dev`.
+- Generate live comment update, NSFW, spoiler, and flair update events in
+  `r/reviewlock_dev`.
+- Capture sanitized `devvit logs` payload shape evidence for the remaining
+  trigger variants and compare it with the local route fixtures above.

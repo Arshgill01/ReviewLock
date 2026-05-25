@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 15:35 IST.
+Last updated: 2026-05-25 22:56 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -25,7 +25,10 @@ is explicitly selected.
   boolean/object-shape flags, not raw target ids, content text, reporter names,
   or report reason text.
 - Controlled live `PostReport` delivery is verified for unchanged locked post
-  `t3_1tm8nak` on playtest `v0.0.2.87`. Comment report and update trigger
+  `t3_1tm8nak` on playtest `v0.0.2.87`.
+- Controlled live `PostUpdate` body-edit delivery is verified for locked proof
+  post `t3_1tnfgqf` on playtest `v0.0.2.107`.
+- Comment report/update, post NSFW/spoiler, and post flair update trigger
   deliveries remain unverified.
 - S01 is authored by the currently logged-in dev account, so Reddit does not
   expose a `Report` action for S01 from this session. The first unchanged-report
@@ -147,6 +150,21 @@ Expected proof:
 - Reopen queue receives an event with `content_changed`.
 - Dashboard `Reopened after edit` increments.
 
+Observed proof on 2026-05-25:
+
+- S02 was posted at
+  `/r/reviewlock_dev/comments/1tnfgqf/reviewlock_proof_s02_body_edit_reopen/`
+  with thing id `t3_1tnfgqf`.
+- `Lock review` created lock `lock-t3_1tnfgqf-1779729393648` at
+  `5/25/2026, 10:46:33 PM`.
+- Editing the body emitted sanitized `reviewlock.trigger.payload_shape` for
+  `on-post-update` from
+  `npx devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime`.
+- The dashboard showed active locks `3 -> 2`, `Reopened after edit = 1`,
+  latest reopen `post:1tnfgqf` with reason `content changed`, reopen queue
+  fingerprint delta `c322d267` to `fc05f41b`, audit `Lock Reopened
+  5/25/2026, 10:53:00 PM`, and runtime proof `postUpdateTrigger verified`.
+
 ## Evidence To Record
 
 For each live scenario, update:
@@ -169,9 +187,11 @@ Record:
 
 ## Do Not Claim Yet
 
-Until the runbook is executed and evidence is captured:
+Until the remaining runbook sections are executed and evidence is captured:
 
-- Do not claim live report suppression is verified.
-- Do not claim live edit-trigger reopening is verified.
+- Do not claim live comment report suppression is verified.
+- Do not claim live comment edit-trigger reopening is verified.
+- Do not claim live post NSFW/spoiler/flair-trigger reopening is verified.
 - Do not claim comment-target moderation methods are verified.
-- Do not claim trigger payload logs have been captured.
+- Do not claim trigger payload logs have been captured for untested trigger
+  variants.

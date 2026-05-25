@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-25 15:35 IST.
+Last updated: 2026-05-25 22:56 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -30,6 +30,8 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     `v0.0.2.87`.
   - Observed hot reload after update-trigger runtime-proof hardening:
     `v0.0.2.89`; subsequent doc-only validation reloads continued after that.
+  - Latest observed hot reload in the controlled post body edit proof pass:
+    `v0.0.2.107`.
 - Zen browser embedded WebView smoke
   - Result: PASS, the ReviewLock dashboard rendered inside Reddit at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
   - Result: PASS, the header showed `r/reviewlock_dev` after the WebView context fix.
@@ -48,6 +50,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, submitted one controlled Reddit report against unchanged locked post `t3_1tm8nak`.
   - Result: PASS, Devvit emitted sanitized `reviewlock.trigger.payload_shape` for `on-post-report`.
   - Result: PASS, Reddit showed native `Reports ignored 1`; ReviewLock dashboard showed `Reports suppressed = 1`, active row `post:1tm8nak` suppressed count `1`, report churn `post:1tm8nak` count `1`, and audit `Report Suppressed 5/25/2026, 3:29:43 PM`.
+- Zen browser controlled post body edit proof
+  - Result: PASS, posted S02 as `t3_1tnfgqf`, locked it through `Lock review`, edited the body, and observed ReviewLock reopen the lock.
+  - Result: PASS, Devvit emitted sanitized `reviewlock.trigger.payload_shape` for `on-post-update`.
+  - Result: PASS, dashboard showed active locks decrease from `3` to `2`, `Reopened after edit = 1`, latest reopen `post:1tnfgqf` with reason `content changed`, reopen queue fingerprint delta `c322d267` to `fc05f41b`, audit `Lock Reopened 5/25/2026, 10:53:00 PM`, and runtime proof `postUpdateTrigger verified`.
 - `npm run type-check`
   - Result: PASS after runtime hardening patches.
 - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
@@ -90,8 +96,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | `unignoreReports()` live behavior            | verified   | Dashboard `Unlock` on controlled target `t3_1tm8nak` removed the lock, wrote audit, and runtime status showed `unignoreReports verified`.                                        | Verified through ReviewLock dashboard API and Reddit adapter path.                                               |
 | Post report trigger delivery                 | verified   | Controlled report against unchanged locked post `t3_1tm8nak` emitted sanitized `on-post-report` payload-shape logs, kept the lock active, incremented suppressed metrics, and wrote `report_suppressed` audit. | Verified for a controlled post target. Comment report trigger remains unverified.                                |
 | Comment report trigger delivery              | unverified | `devvit.json` registers `onCommentReport`; routes and services are locally tested.                                                                                               | Need live or controlled comment report proof.                                                                    |
-| Update trigger delivery                      | unverified | `devvit.json` registers post/comment update, NSFW, spoiler, and flair update triggers; routes and services are locally tested.                                                   | Need live or controlled trigger proof in a dedicated playtest pass.                                              |
-| Devvit logs                                  | verified   | `devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime` captured sanitized `on-post-report` payload-shape evidence during controlled report proof. | Update trigger payload logs remain uncaptured.                                                                   |
+| Post update trigger delivery                 | verified   | Controlled S02 body edit against locked post `t3_1tnfgqf` emitted sanitized `on-post-update` payload-shape logs, changed the fingerprint, reopened the lock, enqueued reopen, and wrote `lock_reopened` audit. | Verified for a controlled post body edit target.                                                                 |
+| Comment update trigger delivery              | unverified | `devvit.json` registers `onCommentUpdate`; routes and services are locally tested.                                                                                               | Need live or controlled comment update proof.                                                                    |
+| Post NSFW/spoiler/flair update triggers      | unverified | `devvit.json` registers `onPostNsfwUpdate`, `onPostSpoilerUpdate`, and `onPostFlairUpdate`; routes and services are locally tested.                                             | Need live or controlled flag/flair update proof.                                                                 |
+| Devvit logs                                  | verified   | `devvit logs reviewlock_dev reviewlock --connect --since 15m --show-timestamps --log-runtime` captured sanitized `on-post-report` and `on-post-update` payload-shape evidence during controlled proof. | Remaining trigger variants still need payload logs.                                                              |
 
 ## Runtime Failures Found And Hardened
 
@@ -243,6 +251,11 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   sibling parent post id before the edited/reported comment id.
   - Hardened by making trigger route target extraction kind-aware and adding
     regressions for payloads that contain both `post.id` and `comment.id`.
+- Redis smoke failures after subreddit scope was resolved previously returned a
+  plain failing response without updating the runtime proof ledger.
+  - Hardened by recording failed Redis smoke capability status when the
+    subreddit namespace is known, so moderators can see the failure in the same
+    runtime proof surface as successful checks.
 
 ## Current Claim Boundary
 
@@ -259,6 +272,10 @@ Allowed claims:
   target `t3_1tm8nak`, including sanitized trigger payload-shape log, native
   Reddit `Reports ignored 1`, dashboard suppressed count, report churn, and
   audit evidence.
+- Controlled post edit reopening is live-verified for locked target
+  `t3_1tnfgqf`, including sanitized `on-post-update` payload-shape log,
+  fingerprint delta, reopen queue, runtime proof `postUpdateTrigger verified`,
+  and audit evidence.
 - Future trigger deliveries now write granular runtime proof capabilities
   without marking unrelated comment or update trigger paths verified.
 - A controlled live scenario matrix exists for the remaining edit/comment
@@ -267,6 +284,6 @@ Allowed claims:
 Not allowed yet:
 
 - Do not claim live comment report suppression is verified.
-- Do not claim live edit-trigger reopening is verified.
+- Do not claim live comment edit-trigger reopening, post NSFW/spoiler/flair
+  reopening, or comment report/update trigger delivery is verified.
 - Do not claim comment-target `approve()`, `ignoreReports()`, or `unignoreReports()` are verified in production-like Devvit runtime.
-- Do not claim update-trigger payload logs have been captured.

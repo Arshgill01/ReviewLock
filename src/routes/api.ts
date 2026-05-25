@@ -114,6 +114,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
     }
 
     const checkedAt = deps.clock?.now() ?? new Date().toISOString();
+    let smokeSubreddit: string | undefined;
 
     try {
       const scope = await resolveSmokeSubreddit(context.req.query('subreddit'));
@@ -123,6 +124,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       }
 
       const subreddit = scope.subreddit;
+      smokeSubreddit = subreddit;
       const smokeKey = key(subreddit, `runtime:smoke:${Date.parse(checkedAt)}`);
       const value = `reviewlock-smoke:${checkedAt}`;
 
@@ -166,6 +168,20 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         error,
         checkedAt,
       );
+      if (smokeSubreddit) {
+        await recordCapabilityStatus(
+          deps.redis,
+          smokeSubreddit,
+          {
+            name: result.capability,
+            status: result.status,
+            checkedAt: result.checkedAt,
+            evidence: result.evidence,
+            notes: result.notes,
+          },
+          checkedAt,
+        ).catch(() => undefined);
+      }
 
       return context.json(
         { ok: false, capability: result.capability, status: result.status, error: result.notes[0] },

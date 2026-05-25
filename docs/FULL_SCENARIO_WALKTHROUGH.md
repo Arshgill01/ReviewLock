@@ -22,7 +22,14 @@ Test Files  2 passed (2)
 Tests  10 passed (10)
 ```
 
-Current live status: this Wave 19 scenario remains a local integration harness, not live trigger proof. Later controlled playtest verified post-target `approve()`, `ignoreReports()`, and `unignoreReports()` on `t3_1tm8nak`; comment-target moderation methods and real Reddit report/update trigger delivery remain unverified. See `docs/RUNTIME_PROOF.md` for the current claim boundary.
+Current live status: this Wave 19 scenario remains a local integration harness,
+not a full live end-to-end comment proof. Later controlled playtest verified
+post-target `approve()`, `ignoreReports()`, and `unignoreReports()` on
+`t3_1tm8nak`; live `PostReport` suppression on `t3_1tm8nak`; and live
+`PostUpdate` body-edit reopening on S02 `t3_1tnfgqf`. Comment-target moderation
+methods, comment report/update triggers, and post NSFW/spoiler/flair update
+triggers remain unverified. See `docs/RUNTIME_PROOF.md` for the current claim
+boundary.
 
 ## Route Payloads
 
