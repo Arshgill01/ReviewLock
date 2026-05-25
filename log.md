@@ -2683,6 +2683,18 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 370 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
 - Live/visual verification:
   - Reloaded the Reddit Devvit WebView in Zen; playtest links showed
     `v0.0.2.306`.
@@ -2691,3 +2703,19 @@
     Playwright screenshot.
   - Visual preview confirmed audit kind, timestamp, actor, message, and long
     lock/target details now wrap vertically without overlap.
+
+## 2026-05-26 02:41 IST - Audit timeline accessibility hardening
+
+- Added an `aria-label` summary to each audit timeline row so browser
+  accessibility tooling and assistive technology can read the audit kind,
+  timestamp, actor, message, target, lock, operation, error, and reason as one
+  coherent ledger entry.
+- Reused the same normalized audit detail fields already rendered visually and
+  escaped the generated label as an HTML attribute.
+- Added a render regression that verifies audit rows include a readable
+  accessible summary.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+  - PASS, 1 test file and 17 tests.
+  - `npm run type-check`
+  - PASS.

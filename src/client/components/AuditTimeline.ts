@@ -6,14 +6,17 @@ const text = (value: string | undefined): string =>
 const attr = (value: string | undefined): string =>
   text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 
-const renderAuditDetails = (event: AuditEvent): string => {
-  const details = [
+const auditDetails = (event: AuditEvent): string[] =>
+  [
     event.targetId ? `Target ${event.targetKind ?? 'target'} ${event.targetId}` : undefined,
     event.lockId ? `Lock ${event.lockId}` : undefined,
     event.data.operation ? `Operation ${String(event.data.operation)}` : undefined,
     event.data.error ? `Error ${String(event.data.error)}` : undefined,
     event.data.reason ? `Reason ${String(event.data.reason)}` : undefined,
   ].filter((detail): detail is string => Boolean(detail));
+
+const renderAuditDetails = (event: AuditEvent): string => {
+  const details = auditDetails(event);
 
   if (details.length === 0) {
     return '';
@@ -26,9 +29,17 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
   const rows = events
     .map((event) => {
       const createdAt = new Date(event.createdAt);
+      const details = auditDetails(event);
+      const summary = [
+        event.kind.replace(/_/g, ' '),
+        createdAt.toLocaleString(),
+        event.actor,
+        event.message,
+        ...details,
+      ].join(' · ');
 
       return `
-        <li class="audit-row">
+        <li class="audit-row" aria-label="${attr(summary)}">
           <div class="audit-row-header">
             <strong class="audit-kind">${event.kind.replace(/_/g, ' ')}</strong>
             <span class="audit-meta">
