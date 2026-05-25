@@ -1857,3 +1857,22 @@ Reason:
 - Edit-break reopening is ReviewLock's core loop. A visible reopen queue item
   needs either a success audit or a failure audit explaining why the proof
   boundary is incomplete.
+
+### D108 - Demo dashboard mutations are rejected server-side
+
+Demo dashboard rows are seeded judge/demo fixtures and are presented as
+read-only in the client.
+
+Decision:
+
+- Reject dashboard unlock and reopen-dismiss mutation routes when `demo=true`
+  after scope validation and before Reddit calls, audit writes, or queue/lock
+  mutations.
+- Continue allowing demo read routes only through the isolated
+  `reviewlock_demo` namespace.
+
+Reason:
+
+- Demo mode must stay deterministic even if a caller bypasses rendered controls.
+  The read-only contract belongs at the route boundary, not only in client
+  button visibility.

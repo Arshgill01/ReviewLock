@@ -149,3 +149,4 @@
 - [x] Roll back lock-created metrics when lock creation rolls back after metric/audit failure.
 - [x] Preserve prior valid suppression and lock-created metrics when a failed attempt never increments.
 - [x] Record runtime-failure audits when reopen metrics fail after visible reopen state changes.
+- [x] Enforce seeded demo dashboard read-only behavior at the server mutation boundary.

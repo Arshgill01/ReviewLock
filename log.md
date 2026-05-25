@@ -1793,3 +1793,25 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 00:55 IST - Reviewer hardening integration
+
+- Integrated reviewer finding: seeded demo dashboard mutations are now rejected
+  server-side. `demo=true` unlock and reopen-dismiss requests return a
+  read-only error before Reddit calls, audit writes, or lock/reopen queue state
+  changes.
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 1 test file and 13 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 312 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

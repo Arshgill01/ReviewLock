@@ -2486,3 +2486,52 @@
   - `npm run build` PASS.
   - `git diff --check` PASS.
   - `rg -n "TODO" src` returned no source TODOs.
+
+## 2026-05-26 00:53 IST - Finding
+
+- Severity: medium
+- Area: Demo read-only enforcement is client-only for dashboard mutation APIs.
+- Evidence:
+  - The dashboard scope resolver explicitly permits `demo=true` requests for `reviewlock_demo` even when the live runtime subreddit is different: `src/routes/api.dashboard.ts:141-160`.
+  - The dashboard unlock route calls `unlockReviewedContent()` after scope resolution without rejecting demo mode: `src/routes/api.dashboard.ts:329-375`.
+  - The dashboard reopen-dismiss route appends `reopen_dismissed` audit and calls `dismissReopenEvent()` after scope resolution without rejecting demo mode: `src/routes/api.dashboard.ts:379-464`.
+  - The client does render demo rows as read-only (`src/client/components/LockTable.ts:25-32`, `src/client/components/ReopenQueue.ts:38-46`), and render tests assert demo controls are absent, but `rg` found no server-side regression for `demo=true` unlock/dismiss mutation attempts.
+- Why it matters: Demo mode is a judge-facing, seeded scenario and the UI correctly says "Demo read-only." If a dashboard request bypasses the rendered controls, `/api/reopen-queue/dismiss?demo=true` with `subreddit: "reviewlock_demo"` can mutate the seeded reopen queue and audit state. That makes demo isolation depend on the client instead of the server and can make a demo session drift from the deterministic story.
+- Suggested fix: Reject dashboard mutation routes when `demoFrom(context)` is true, or require dedicated demo-reset/enable endpoints for all demo mutations. Add regressions that `POST /api/locks/unlock?subreddit=reviewlock_demo&demo=true` and `POST /api/reopen-queue/dismiss?demo=true` with `subreddit: "reviewlock_demo"` return a non-mutating error and leave demo locks/reopen events/audit unchanged.
+- Files reviewed: `src/routes/api.dashboard.ts`, `src/routes/api.dashboard.test.ts`, `src/client/components/LockTable.ts`, `src/client/components/ReopenQueue.ts`, `src/client/render.test.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:55 IST - Integration Status
+
+- Resolved medium finding added at 00:53: dashboard mutation routes now reject
+  `demo=true` unlock and reopen-dismiss requests with
+  `Demo dashboard data is read-only.` before Reddit calls, audit writes, or
+  lock/reopen queue state changes.
+- Regressions added in `src/routes/api.dashboard.test.ts` for demo unlock and
+  demo reopen-dismiss mutation attempts, asserting seeded state and audit logs
+  remain unchanged.
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts --reporter verbose`
+    PASS, 1 file / 13 tests.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 312 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.
+
+## 2026-05-26 00:55 IST - Integration Status
+
+- Resolved medium finding added at 00:53: dashboard mutation APIs now reject
+  `demo=true` requests with `Demo dashboard data is read-only.`
+- Regression added in `src/routes/api.dashboard.test.ts` for demo unlock
+  attempts, asserting no Reddit moderation calls, active demo lock remains, and
+  no audit is written.
+- Regression added in `src/routes/api.dashboard.test.ts` for demo reopen
+  dismiss attempts, asserting the demo reopen event remains queued and no audit
+  is written.
+- Focused validation:
+  - `npm run test -- src/routes/api.dashboard.test.ts --reporter verbose`
+    PASS, 1 file / 13 tests.

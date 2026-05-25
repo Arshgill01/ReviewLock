@@ -195,6 +195,16 @@ const withErrors = async (context: Context, action: () => Promise<Response>): Pr
   }
 };
 
+const rejectDemoMutation = (context: Context): Response =>
+  context.json(
+    {
+      ok: false,
+      message: 'Demo dashboard data is read-only.',
+      requestId: requestId(),
+    },
+    403,
+  );
+
 export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();
 
@@ -355,6 +365,10 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
         return scope.response;
       }
 
+      if (demoFrom(context)) {
+        return rejectDemoMutation(context);
+      }
+
       const result = await unlockReviewedContent(
         { reddit: deps.reddit, redis: deps.redis, clock: deps.clock },
         {
@@ -394,6 +408,10 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
 
       if (!scope.ok) {
         return scope.response;
+      }
+
+      if (demoFrom(context)) {
+        return rejectDemoMutation(context);
       }
 
       const dismissedAt = generatedAt(deps);

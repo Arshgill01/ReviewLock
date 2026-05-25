@@ -3,6 +3,7 @@ import { fixedClock } from '../server/adapters/clock';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import type { ReopenEvent, ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
+import { DEMO_SUBREDDIT } from '../shared/constants';
 import { listAuditEvents } from '../server/services/audit';
 import { getActiveLockByTarget, saveLock } from '../server/services/locks';
 import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
@@ -179,6 +180,51 @@ describe('dashboard API routes', () => {
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_alpha')).toMatchObject({ id: 'lock-1' });
   });
 
+  it('rejects demo dashboard unlock mutations before changing state', async () => {
+    const demoTarget: ReviewLockTarget = {
+      ...target(),
+      subreddit: DEMO_SUBREDDIT,
+      id: 't3_demo',
+      permalink: '/r/reviewlock_demo/comments/demo',
+    };
+    const demoLock: ReviewLockRecord = {
+      ...lock(),
+      id: 'lock-demo',
+      subreddit: DEMO_SUBREDDIT,
+      targetId: 't3_demo',
+      permalink: '/r/reviewlock_demo/comments/demo',
+      demo: true,
+    };
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([demoTarget], 'dash_mod', 'alpha');
+    await saveLock(redis, demoLock);
+    const router = createDashboardApiRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request(
+      `/locks/unlock?subreddit=${DEMO_SUBREDDIT}&demo=true`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId: 't3_demo', lockId: 'lock-demo' }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message: 'Demo dashboard data is read-only.',
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await getActiveLockByTarget(redis, DEMO_SUBREDDIT, 't3_demo')).toMatchObject({
+      id: 'lock-demo',
+    });
+    expect(await listAuditEvents(redis, DEMO_SUBREDDIT)).toEqual([]);
+  });
+
   it('rejects dashboard unlocks outside the runtime subreddit scope', async () => {
     const betaTarget: ReviewLockTarget = {
       ...target(),
@@ -250,6 +296,48 @@ describe('dashboard API routes', () => {
         actor: 'dash_mod',
       }),
     ]);
+  });
+
+  it('rejects demo reopen dismiss mutations before changing state', async () => {
+    const demoEvent: ReopenEvent = {
+      ...reopenEvent(),
+      id: 'reopen-demo',
+      lockId: 'lock-demo',
+      subreddit: DEMO_SUBREDDIT,
+      targetId: 't3_demo',
+      demo: true,
+    };
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([], 'dash_mod', 'alpha');
+    await enqueueReopenEvent(redis, demoEvent);
+    const router = createDashboardApiRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request(
+      `/reopen-queue/dismiss?subreddit=${DEMO_SUBREDDIT}&demo=true`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: 'reopen-demo',
+          actor: 'client_supplied_actor',
+          subreddit: DEMO_SUBREDDIT,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message: 'Demo dashboard data is read-only.',
+    });
+    expect(await listOpenReopenEvents(redis, DEMO_SUBREDDIT)).toEqual([
+      expect.objectContaining({ id: 'reopen-demo' }),
+    ]);
+    expect(await listAuditEvents(redis, DEMO_SUBREDDIT)).toEqual([]);
   });
 
   it('keeps reopened items visible when dashboard dismiss audit write fails', async () => {
