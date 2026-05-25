@@ -1,10 +1,5 @@
 import type { AuditEvent } from '../../shared/schema';
-
-const text = (value: string | undefined): string =>
-  (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-
-const attr = (value: string | undefined): string =>
-  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+import { escapeAttr, escapeText, formatLocalDateTime, labelFromToken } from '../utils/format';
 
 const auditDetails = (event: AuditEvent): string[] =>
   [
@@ -22,32 +17,32 @@ const renderAuditDetails = (event: AuditEvent): string => {
     return '';
   }
 
-  return `<p class="audit-details">${text(details.join(' · '))}</p>`;
+  return `<p class="audit-details">${escapeText(details.join(' · '))}</p>`;
 };
 
 export const renderAuditTimeline = (events: AuditEvent[]): string => {
   const rows = events
     .map((event) => {
-      const createdAt = new Date(event.createdAt);
+      const createdAt = formatLocalDateTime(event.createdAt);
       const details = auditDetails(event);
       const summary = [
-        event.kind.replace(/_/g, ' '),
-        createdAt.toLocaleString(),
+        labelFromToken(event.kind),
+        createdAt,
         event.actor,
         event.message,
         ...details,
       ].join(' · ');
 
       return `
-        <li class="audit-row" aria-label="${attr(summary)}">
+        <li class="audit-row" aria-label="${escapeAttr(summary)}">
           <div class="audit-row-header">
-            <strong class="audit-kind">${event.kind.replace(/_/g, ' ')}</strong>
+            <strong class="audit-kind">${labelFromToken(event.kind)}</strong>
             <span class="audit-meta">
-              <time datetime="${attr(event.createdAt)}">${createdAt.toLocaleString()}</time>
-              <span>${text(event.actor)}</span>
+              <time datetime="${escapeAttr(event.createdAt)}">${createdAt}</time>
+              <span>${escapeText(event.actor)}</span>
             </span>
           </div>
-          <p class="audit-message">${text(event.message)}</p>
+          <p class="audit-message">${escapeText(event.message)}</p>
           ${renderAuditDetails(event)}
         </li>
       `;

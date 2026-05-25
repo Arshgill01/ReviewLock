@@ -2326,3 +2326,23 @@ Reason:
   overlaps text and makes the proof ledger unreadable. The audit ledger is
   central runtime evidence, so readability is a product requirement, not just
   polish.
+
+### D131 - Client render formatting uses one shared helper module
+
+The dashboard is rendered from string templates and several components output
+Redis-backed or Devvit-backed values.
+
+Decision:
+
+- Use shared client helpers for text escaping, attribute escaping, local date
+  labels, enum-token labels, and displayed Reddit thing ids.
+- Keep attribute escaping stricter than text escaping.
+- Remove only canonical `t1_` and `t3_` prefixes from displayed target ids
+  instead of replacing those strings anywhere in the id.
+
+Reason:
+
+- The audit timeline overlap fix touched the highest-risk rendering surface,
+  but duplicated helpers across components made future regressions likely.
+  Centralizing the render primitives keeps dashboard output consistent and
+  makes escaping behavior easier to test directly.

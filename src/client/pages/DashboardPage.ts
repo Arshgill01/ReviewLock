@@ -7,9 +7,7 @@ import { renderLatestReopenEvent, renderReopenQueue } from '../components/Reopen
 import { renderRuntimeBanner } from '../components/RuntimeBanner';
 import { classifyClientNotice } from '../state/clientNotice';
 import type { ReviewLockStore } from '../state/store';
-
-const text = (value: string | undefined): string =>
-  (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+import { displayThingId, escapeText, formatLocalDate } from '../utils/format';
 
 export const renderTopChurnTargets = (targets: TargetMetrics[]): string => {
   const rows = targets
@@ -19,9 +17,9 @@ export const renderTopChurnTargets = (targets: TargetMetrics[]): string => {
       (target) => `
         <li class="churn-row">
           <div>
-            <code>${target.targetKind}:${text(target.targetId.replace('t1_', '').replace('t3_', ''))}</code>
+            <code>${target.targetKind}:${escapeText(displayThingId(target.targetId))}</code>
             <span class="churn-date">
-              Last active: ${new Date(target.lastActivityAt).toLocaleDateString()}
+              Last active: ${formatLocalDate(target.lastActivityAt)}
             </span>
           </div>
           <span class="number-pill">${target.reportsSuppressed}</span>
@@ -62,9 +60,9 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
       <main class="shell shell-centered">
         <section class="panel panel-error">
           <h1>ReviewLock</h1>
-          <strong>${text(notice.title)}</strong>
-          <p>${text(notice.message)}</p>
-          <p class="error-action">${text(notice.action)}</p>
+          <strong>${escapeText(notice.title)}</strong>
+          <p>${escapeText(notice.message)}</p>
+          <p class="error-action">${escapeText(notice.action)}</p>
           <div class="error-actions">
             <button class="button" data-action="retry-fetch">Retry</button>
             ${
@@ -89,7 +87,7 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
           <p>Lock reviewed content until it changes.</p>
         </div>
         <div class="header-actions">
-          <span>r/${text(store.subreddit)}</span>
+          <span>r/${escapeText(store.subreddit)}</span>
           <button class="button ${store.demo ? 'button-secondary' : ''}" data-action="toggle-mode" data-mode="live">
             Live
           </button>
@@ -102,9 +100,9 @@ export const renderDashboardPage = (store: ReviewLockStore): string => {
       ${
         inlineNotice
           ? `<section class="panel panel-error-inline" role="alert">
-              <strong>${text(inlineNotice.title)}</strong>
-              <span>${text(inlineNotice.message)}</span>
-              <span class="error-action">${text(inlineNotice.action)}</span>
+              <strong>${escapeText(inlineNotice.title)}</strong>
+              <span>${escapeText(inlineNotice.message)}</span>
+              <span class="error-action">${escapeText(inlineNotice.action)}</span>
               <button class="button button-secondary button-compact" data-action="retry-fetch">Retry</button>
             </section>`
           : ''

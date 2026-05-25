@@ -1,13 +1,12 @@
 import type { ReviewLockRecord } from '../../shared/schema';
 import type { DashboardConfirmation } from '../state/store';
-
-const text = (value: string | undefined): string =>
-  (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-
-const attr = (value: string | undefined): string =>
-  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-
-const reason = (value: string): string => value.replace(/_/g, ' ');
+import {
+  displayThingId,
+  escapeAttr,
+  escapeText,
+  formatLocalDate,
+  labelFromToken,
+} from '../utils/format';
 
 const renderRuntimeWarnings = (warnings: string[]): string => {
   if (warnings.length === 0) {
@@ -17,7 +16,7 @@ const renderRuntimeWarnings = (warnings: string[]): string => {
   return `
     <div class="lock-warning" role="status">
       <span class="status status-failed">Needs attention</span>
-      <span>${text(warnings.join('; '))}</span>
+      <span>${escapeText(warnings.join('; '))}</span>
     </div>
   `;
 };
@@ -40,7 +39,7 @@ const renderUnlockAction = (
     return `
       <div class="confirm-actions" role="group" aria-label="Confirm unlock">
         <span>Confirm unlock?</span>
-        <button class="button" data-action="confirm-unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
+        <button class="button" data-action="confirm-unlock" data-lock-id="${escapeAttr(lock.id)}" data-target-id="${escapeAttr(lock.targetId)}">
           Confirm
         </button>
         <button class="button button-secondary" data-action="cancel-confirmation">
@@ -51,7 +50,7 @@ const renderUnlockAction = (
   }
 
   return `
-    <button class="button button-secondary" data-action="unlock" data-lock-id="${attr(lock.id)}" data-target-id="${attr(lock.targetId)}">
+    <button class="button button-secondary" data-action="unlock" data-lock-id="${escapeAttr(lock.id)}" data-target-id="${escapeAttr(lock.targetId)}">
       Unlock
     </button>
   `;
@@ -69,30 +68,30 @@ export const renderLockTable = (
       (lock) => `
         <tr>
           <td>
-            <a href="${attr(lock.permalink)}" target="_blank" rel="noopener noreferrer">
-              <code>${lock.targetKind}:${text(lock.targetId.replace('t1_', '').replace('t3_', ''))}</code>
+            <a href="${escapeAttr(lock.permalink)}" target="_blank" rel="noopener noreferrer">
+              <code>${lock.targetKind}:${escapeText(displayThingId(lock.targetId))}</code>
             </a>
           </td>
           <td>
-            <span class="target-author">u/${text(lock.targetAuthor)}</span>
+            <span class="target-author">u/${escapeText(lock.targetAuthor)}</span>
           </td>
           <td>
             <div class="content-summary">
-              <strong>${text(lock.title ?? lock.targetId)}</strong>
-              <span class="content-preview" title="${attr(lock.contentPreview)}">
-                ${text(lock.contentPreview)}
+              <strong>${escapeText(lock.title ?? lock.targetId)}</strong>
+              <span class="content-preview" title="${escapeAttr(lock.contentPreview)}">
+                ${escapeText(lock.contentPreview)}
               </span>
               ${renderRuntimeWarnings(lock.runtimeWarnings)}
             </div>
           </td>
           <td>
-            <span class="count-badge reason-badge">${text(reason(lock.lockReason))}</span>
+            <span class="count-badge reason-badge">${escapeText(labelFromToken(lock.lockReason))}</span>
           </td>
           <td class="number-cell">
             <span class="number-pill">${lock.suppressedReportCount}</span>
           </td>
           <td class="date-cell">
-            ${new Date(lock.lockedAt).toLocaleDateString()}
+            ${formatLocalDate(lock.lockedAt)}
           </td>
           <td>
             ${renderUnlockAction(lock, confirmation, readOnly)}

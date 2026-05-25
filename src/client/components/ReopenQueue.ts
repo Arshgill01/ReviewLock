@@ -1,17 +1,14 @@
 import type { ReopenEvent } from '../../shared/schema';
 import type { DashboardConfirmation } from '../state/store';
+import {
+  displayThingId,
+  escapeAttr,
+  escapeText,
+  formatLocalDateTime,
+  labelFromToken,
+} from '../utils/format';
 
-const text = (value: string | undefined): string =>
-  (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-
-const attr = (value: string | undefined): string =>
-  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-
-const date = (value: string): string => new Date(value).toLocaleString();
-
-const reason = (value: string): string => value.replace(/_/g, ' ');
-
-const shortHash = (value: string): string => text(value.slice(0, 8));
+const shortHash = (value: string): string => escapeText(value.slice(0, 8));
 
 const renderHashTransition = (event: ReopenEvent): string => `
   <div class="hash-transition">
@@ -30,7 +27,7 @@ const renderRuntimeWarnings = (warnings: string[]): string => {
   return `
     <div class="runtime-item-warning" role="status">
       <span class="status status-failed">Needs attention</span>
-      <span>${text(warnings.join('; '))}</span>
+      <span>${escapeText(warnings.join('; '))}</span>
     </div>
   `;
 };
@@ -52,7 +49,7 @@ const renderDismissAction = (
     return `
       <div class="confirm-actions" role="group" aria-label="Confirm dismiss reopen">
         <span>Confirm dismiss?</span>
-        <button class="button" data-action="confirm-dismiss-reopen" data-event-id="${attr(event.id)}">
+        <button class="button" data-action="confirm-dismiss-reopen" data-event-id="${escapeAttr(event.id)}">
           Confirm
         </button>
         <button class="button button-secondary" data-action="cancel-confirmation">
@@ -63,7 +60,7 @@ const renderDismissAction = (
   }
 
   return `
-    <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${attr(event.id)}">
+    <button class="button button-secondary" data-action="dismiss-reopen" data-event-id="${escapeAttr(event.id)}">
       ${label}
     </button>
   `;
@@ -94,18 +91,18 @@ export const renderLatestReopenEvent = (
       <div class="latest-grid">
         <div>
           <span class="field-label">Target</span>
-          <strong><code>${event.targetKind}:${text(event.targetId.replace('t1_', '').replace('t3_', ''))}</code></strong>
+          <strong><code>${event.targetKind}:${escapeText(displayThingId(event.targetId))}</code></strong>
         </div>
         <div>
           <span class="field-label">Reason</span>
-          <strong class="status status-reopened latest-reason">${text(reason(event.reason))}</strong>
+          <strong class="status status-reopened latest-reason">${escapeText(labelFromToken(event.reason))}</strong>
         </div>
         <div>
           <span class="field-label">Created</span>
-          <strong>${date(event.createdAt)}</strong>
+          <strong>${formatLocalDateTime(event.createdAt)}</strong>
         </div>
       </div>
-      <p>${text(event.summary)}</p>
+      <p>${escapeText(event.summary)}</p>
       ${renderRuntimeWarnings(event.runtimeWarnings)}
       <div class="hash-transition-wrap">
         ${renderHashTransition(event)}
@@ -128,11 +125,11 @@ export const renderReopenQueue = (
         <li class="queue-row">
           <div class="queue-row-body">
             <div class="queue-row-heading">
-              <code>${event.targetKind}:${text(event.targetId.replace('t1_', '').replace('t3_', ''))}</code>
-              <span class="status status-reopened">${text(reason(event.reason))}</span>
-              <span class="date-cell">${date(event.createdAt)}</span>
+              <code>${event.targetKind}:${escapeText(displayThingId(event.targetId))}</code>
+              <span class="status status-reopened">${escapeText(labelFromToken(event.reason))}</span>
+              <span class="date-cell">${formatLocalDateTime(event.createdAt)}</span>
             </div>
-            <p>${text(event.summary)}</p>
+            <p>${escapeText(event.summary)}</p>
             ${renderRuntimeWarnings(event.runtimeWarnings)}
             ${renderHashTransition(event)}
           </div>

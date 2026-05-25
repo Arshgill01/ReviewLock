@@ -2719,3 +2719,30 @@
   - PASS, 1 test file and 17 tests.
   - `npm run type-check`
   - PASS.
+
+## 2026-05-26 02:47 IST - Client render formatting hardening
+
+- Centralized client string-template helpers for text escaping, attribute
+  escaping, local date labels, enum-token labels, and displayed Reddit thing
+  ids in `src/client/utils/format.ts`.
+- Updated the dashboard page, active-lock table, reopen queue, latest reopen
+  panel, runtime banner, and audit timeline to use the shared helpers.
+- Added direct helper regressions for text escaping, attribute escaping,
+  token-label rendering, and canonical thing-prefix trimming.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts src/client/utils/format.test.ts --reporter verbose`
+  - PASS, 2 test files and 21 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 374 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
