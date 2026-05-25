@@ -27,6 +27,8 @@ This pass does not prove live moderation methods or live report/edit trigger del
 - Latest trigger-wrapper hardening playtest version observed in Zen: `v0.0.2.64`.
 - Latest dashboard UI hardening playtest version observed in Zen: `v0.0.2.66`.
 - Latest demo data depth hardening playtest version observed in Zen: `v0.0.2.68`.
+- Latest runtime proof reconciliation hardening playtest version observed in
+  Zen: `v0.0.2.185`.
 
 ## Failure Found
 
@@ -140,6 +142,32 @@ After the deterministic demo scenario was expanded:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Runtime Proof Reconciliation Recheck
+
+After report-trigger runtime proof reconciliation and the reviewer-found
+missing-`targetKind` guard:
+
+- Playtest version: `v0.0.2.185`.
+- Existing Zen tab was used on the ReviewLock dashboard post.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport still showed 2 active locks, 1 report suppressed, and 2
+  reopened after edit.
+- Runtime proof/status showed:
+  - `postReportTrigger verified`
+  - `commentReportTrigger unverified`
+  - `postUpdateTrigger verified`
+  - `commentUpdateTrigger verified`
+  - `postFlairUpdateTrigger unverified`
+  - `postNsfwUpdateTrigger unverified`
+  - `postSpoilerUpdateTrigger unverified`
+  - `redditContext verified`
+  - `redis verified`
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -205,8 +233,15 @@ performed in this recheck.
   - Result: PASS, playtest reached `v0.0.2.68`.
 - Zen browser demo-mode recheck
   - Result: PASS, demo mode rendered the expanded seeded scenario with 12 active locks, 47 reports suppressed, 5 reopened after edit, read-only demo actions, report churn, runtime warning, and audit timeline.
+- `npm run dev -- reviewlock_dev`
+  - Result: PASS, playtest reached `v0.0.2.185`.
+- Zen browser live WebView runtime proof reconciliation recheck
+  - Result: PASS, live dashboard rendered with `postReportTrigger verified`,
+    `commentReportTrigger unverified`, and `Verify runtime` completed with
+    `Runtime proof refreshed.`
 
 ## Open Risks
 
-- `PostReport`, `CommentReport`, and edit/update trigger delivery still need controlled live event proof.
+- `CommentReport` and post NSFW/spoiler/flair update trigger delivery still
+  need controlled live event proof.
 - Runtime smoke endpoint proof is dashboard/WebView-only; direct terminal calls remain intentionally unauthorized without Reddit WebView headers.

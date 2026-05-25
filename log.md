@@ -1842,3 +1842,16 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:04 IST - Live WebView proof recheck
+
+- Rechecked the live Reddit embedded dashboard in Zen on playtest
+  `v0.0.2.185`.
+- Runtime proof/status showed `postReportTrigger verified` from durable
+  suppression audit reconciliation while keeping `commentReportTrigger
+  unverified`.
+- `Verify runtime` completed and displayed `Runtime proof refreshed.`
+- Dashboard still showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- No report submission, post edit, comment edit, unlock, dismiss, remove, or
+  approval action was performed in this recheck.

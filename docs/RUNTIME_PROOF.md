@@ -32,6 +32,8 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     `v0.0.2.89`; subsequent doc-only validation reloads continued after that.
   - Latest observed hot reload in the controlled post body edit proof pass:
     `v0.0.2.107`.
+  - Latest observed hot reload in the runtime proof reconciliation hardening
+    recheck: `v0.0.2.185`.
 - Zen browser embedded WebView smoke
   - Result: PASS, the ReviewLock dashboard rendered inside Reddit at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
   - Result: PASS, the header showed `r/reviewlock_dev` after the WebView context fix.
@@ -40,6 +42,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, repeated after Reddit adapter mapping and trigger-wrapper
     hardening; Zen showed `Runtime proof refreshed.` under `r/reviewlock_dev`
     and demo mode showed visibly labeled seeded data under `reviewlock_demo`.
+  - Result: PASS, repeated after runtime proof audit reconciliation hardening;
+    Zen showed `postReportTrigger verified`, kept
+    `commentReportTrigger unverified`, and `Verify runtime` completed with
+    `Runtime proof refreshed.` under `r/reviewlock_dev`.
 - Zen browser dashboard unlock proof
   - Result: PASS, the dashboard inline `Unlock` confirmation called `/api/locks/unlock`, removed the active lock, wrote audit, and runtime status showed `unignoreReports verified`.
   - Controlled target: `t3_1tm8nak`.
@@ -98,7 +104,7 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | `approve()` live behavior                    | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock, wrote audit, and runtime status showed `approve verified`.                                          | Verified for a controlled post target; comment target remains unverified.                                        |
 | `ignoreReports()` live behavior              | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock and runtime status showed `ignoreReports verified`.                                                  | Verified for a controlled post target; comment target remains unverified.                                        |
 | `unignoreReports()` live behavior            | verified   | Dashboard `Unlock` on controlled target `t3_1tm8nak` removed the lock, wrote audit, and runtime status showed `unignoreReports verified`.                                        | Verified through ReviewLock dashboard API and Reddit adapter path.                                               |
-| Post report trigger delivery                 | verified   | Controlled report against unchanged locked post `t3_1tm8nak` emitted sanitized `on-post-report` payload-shape logs, kept the lock active, incremented suppressed metrics, and wrote `report_suppressed` audit. | Verified for a controlled post target. Comment report trigger remains unverified.                                |
+| Post report trigger delivery                 | verified   | Controlled report against unchanged locked post `t3_1tm8nak` emitted sanitized `on-post-report` payload-shape logs, kept the lock active, incremented suppressed metrics, and wrote `report_suppressed` audit. Runtime proof reconciliation rechecked this durable audit on playtest `v0.0.2.185`. | Verified for a controlled post target. Comment report trigger remains unverified.                                |
 | Comment report trigger delivery              | unverified | `devvit.json` registers `onCommentReport`; routes and services are locally tested.                                                                                               | Need live or controlled comment report proof.                                                                    |
 | Post update trigger delivery                 | verified   | Controlled S02 body edit against locked post `t3_1tnfgqf` emitted sanitized `on-post-update` payload-shape logs, changed the fingerprint, reopened the lock, enqueued reopen, and wrote `lock_reopened` audit. | Verified for a controlled post body edit target.                                                                 |
 | Comment update trigger delivery              | verified   | Controlled S08 body edit against locked comment `t1_ontlx1k` emitted sanitized `on-comment-update` payload-shape logs, changed the fingerprint, reopened the lock, enqueued reopen, and wrote `lock_reopened` audit. | Verified for a controlled comment body edit target. Comment report trigger remains unverified.                    |
