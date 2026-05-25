@@ -2195,3 +2195,25 @@ Reason:
 - A dashboard judge or moderator should not see unknown status strings or
   malformed evidence timestamps as if they were credible runtime proof. Failing
   back to explicit contract/runtime errors keeps the proof boundary honest.
+
+### D125 - Client API arrays must validate every domain record
+
+The dashboard client receives Redis-backed locks, reopen events, audit events,
+and metric rows through JSON API endpoints.
+
+Decision:
+
+- Treat an API list as valid only when the field is an array and every element
+  passes the shared domain validator for that record type.
+- Validate dashboard overview counts as non-negative integers.
+- Validate nested overview `topChurnTargets` and `latestReopenEvent` before
+  rendering.
+- Surface malformed records as explicit API contract errors instead of
+  coercing or partially rendering them.
+
+Reason:
+
+- The server already skips malformed persisted records at the Redis boundary,
+  but the browser should remain defensive against bad API responses, stale
+  deployments, or accidental schema drift. A hard dashboard error is safer than
+  showing moderators misleading locks, metrics, or audit history.

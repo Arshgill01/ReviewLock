@@ -16,6 +16,76 @@ const overview = {
   runtimeStatus,
 };
 
+const targetMetric = {
+  subreddit: 'alpha',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  reportsSuppressed: 2,
+  locksCreated: 1,
+  locksReopened: 0,
+  lastActivityAt: '2026-05-24T00:00:00.000Z',
+  demo: false,
+};
+
+const reopenEvent = {
+  id: 'reopen-1',
+  lockId: 'lock-1',
+  subreddit: 'alpha',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  oldContentHash: 'old',
+  newContentHash: 'new',
+  reason: 'content_changed',
+  createdAt: '2026-05-24T00:00:00.000Z',
+  summary: 'Reviewed content changed after the lock was created.',
+  runtimeWarnings: [],
+  demo: false,
+};
+
+const lockRecord = {
+  id: 'lock-1',
+  subreddit: 'alpha',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  targetAuthor: 'u_author',
+  permalink: '/r/alpha/comments/reviewed',
+  contentPreview: 'Reviewed content',
+  contentHash: 'hash',
+  fingerprintVersion: 'content-v1',
+  lockedBy: 'mod',
+  lockedAt: '2026-05-24T00:00:00.000Z',
+  lockReason: 'reviewed_policy_compliant',
+  status: 'active',
+  lastKnownEdited: false,
+  lastReportCount: 0,
+  suppressedReportCount: 0,
+  runtimeWarnings: [],
+  demo: false,
+};
+
+const auditEvent = {
+  id: 'audit-1',
+  kind: 'lock_created',
+  subreddit: 'alpha',
+  targetId: 't3_reviewed',
+  targetKind: 'post',
+  lockId: 'lock-1',
+  actor: 'mod',
+  createdAt: '2026-05-24T00:00:00.000Z',
+  message: 'Reviewed content locked until it changes.',
+  data: {},
+  demo: false,
+};
+
+const dailyMetric = {
+  subreddit: 'alpha',
+  date: '2026-05-24',
+  locksCreated: 1,
+  reportsSuppressed: 2,
+  locksReopened: 0,
+  demo: false,
+};
+
 const jsonResponse = (body: unknown, init: ResponseInit = {}): Response =>
   new Response(JSON.stringify(body), {
     status: init.status ?? 200,
@@ -131,6 +201,90 @@ describe('ReviewLockApiClient contract handling', () => {
 
     await expect(new ReviewLockApiClient().fetchOverview('alpha', false)).rejects.toThrow(
       'overview object is missing required dashboard fields',
+    );
+  });
+
+  it('rejects malformed dashboard overview nested records before rendering', async () => {
+    stubFetch(
+      jsonResponse({
+        ok: true,
+        demo: false,
+        overview: { ...overview, activeLockCount: -1 },
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        overview: {
+          ...overview,
+          topChurnTargets: [{ ...targetMetric, reportsSuppressed: -1 }],
+        },
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        overview: {
+          ...overview,
+          latestReopenEvent: { ...reopenEvent, createdAt: '2026-05-24' },
+        },
+      }),
+    );
+    const api = new ReviewLockApiClient();
+
+    await expect(api.fetchOverview('alpha', false)).rejects.toThrow(
+      'overview object is missing required dashboard fields',
+    );
+    await expect(api.fetchOverview('alpha', false)).rejects.toThrow(
+      'overview object is missing required dashboard fields',
+    );
+    await expect(api.fetchOverview('alpha', false)).rejects.toThrow(
+      'overview object is missing required dashboard fields',
+    );
+  });
+
+  it('rejects malformed list records before dashboard rendering', async () => {
+    stubFetch(
+      jsonResponse({ ok: true, demo: false, locks: [{ ...lockRecord, lastReportCount: -1 }] }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        events: [{ ...reopenEvent, targetKind: 'message' }],
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        events: [{ ...auditEvent, createdAt: '2026-05-24T00:00:00Z' }],
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        runtime: runtimeStatus,
+        dailyMetrics: [{ ...dailyMetric, date: '2026-02-31' }],
+        topChurnTargets: [],
+      }),
+      jsonResponse({
+        ok: true,
+        demo: false,
+        runtime: runtimeStatus,
+        dailyMetrics: [],
+        topChurnTargets: [{ ...targetMetric, lastActivityAt: '2026-05-24' }],
+      }),
+    );
+    const api = new ReviewLockApiClient();
+
+    await expect(api.fetchLocks('alpha', false)).rejects.toThrow(
+      'locks array contains malformed records',
+    );
+    await expect(api.fetchReopenQueue('alpha', false)).rejects.toThrow(
+      'events array contains malformed records',
+    );
+    await expect(api.fetchAuditLog('alpha', false)).rejects.toThrow(
+      'events array contains malformed records',
+    );
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'dailyMetrics array contains malformed records',
+    );
+    await expect(api.fetchRuntimeStatus('alpha', false)).rejects.toThrow(
+      'topChurnTargets array contains malformed records',
     );
   });
 

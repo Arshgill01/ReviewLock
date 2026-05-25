@@ -1,5 +1,10 @@
 import {
   isIsoTimestamp,
+  isAuditEvent,
+  isDailyMetrics,
+  isReviewLockRecord,
+  isReopenEvent,
+  isTargetMetrics,
   type RuntimeCapabilityStatus,
   type RuntimeProofStatus,
   type DashboardOverview,
@@ -37,9 +42,10 @@ const isObject = (value: unknown): value is JsonObject =>
 
 const hasBoolean = (data: JsonObject, key: string): boolean => typeof data[key] === 'boolean';
 
-const hasArray = (data: JsonObject, key: string): boolean => Array.isArray(data[key]);
-
 const hasObject = (data: JsonObject, key: string): boolean => isObject(data[key]);
+
+const isNonNegativeInteger = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
 const errorText = (data: unknown): string | undefined =>
   isObject(data) && typeof data.error === 'string'
@@ -127,11 +133,13 @@ export class ReviewLockApiClient {
 
     const overview = data.overview as JsonObject;
     if (
-      typeof overview.activeLockCount !== 'number' ||
-      typeof overview.reportsSuppressed !== 'number' ||
-      typeof overview.reopenedAfterEditCount !== 'number' ||
+      !isNonNegativeInteger(overview.activeLockCount) ||
+      !isNonNegativeInteger(overview.reportsSuppressed) ||
+      !isNonNegativeInteger(overview.reopenedAfterEditCount) ||
       !Array.isArray(overview.topChurnTargets) ||
-      !isRuntimeProofStatus(overview.runtimeStatus)
+      !overview.topChurnTargets.every(isTargetMetrics) ||
+      !isRuntimeProofStatus(overview.runtimeStatus) ||
+      (overview.latestReopenEvent !== undefined && !isReopenEvent(overview.latestReopenEvent))
     ) {
       throw contractError(endpoint, 'overview object is missing required dashboard fields');
     }
@@ -139,12 +147,22 @@ export class ReviewLockApiClient {
     return overview as unknown as DashboardOverview;
   }
 
-  private expectArray<T>(data: JsonObject, endpoint: string, key: string): T[] {
-    if (!hasArray(data, key)) {
+  private expectArray<T>(
+    data: JsonObject,
+    endpoint: string,
+    key: string,
+    validator: (value: unknown) => value is T,
+  ): T[] {
+    const entries = data[key];
+    if (!Array.isArray(entries)) {
       throw contractError(endpoint, `missing ${key} array`);
     }
 
-    return data[key] as T[];
+    if (!entries.every(validator)) {
+      throw contractError(endpoint, `${key} array contains malformed records`);
+    }
+
+    return entries;
   }
 
   private expectDemoStatus(data: JsonObject, endpoint: string): DemoModeStatus {
@@ -197,21 +215,21 @@ export class ReviewLockApiClient {
     const endpoint = `/api/locks${this.getQueryString(subreddit, demo)}`;
     const data = await this.requestJson(endpoint);
     this.expectOk(data, endpoint);
-    return this.expectArray<ReviewLockRecord>(data, endpoint, 'locks');
+    return this.expectArray<ReviewLockRecord>(data, endpoint, 'locks', isReviewLockRecord);
   }
 
   async fetchReopenQueue(subreddit: string, demo: boolean): Promise<ReopenEvent[]> {
     const endpoint = `/api/reopen-queue${this.getQueryString(subreddit, demo)}`;
     const data = await this.requestJson(endpoint);
     this.expectOk(data, endpoint);
-    return this.expectArray<ReopenEvent>(data, endpoint, 'events');
+    return this.expectArray<ReopenEvent>(data, endpoint, 'events', isReopenEvent);
   }
 
   async fetchAuditLog(subreddit: string, demo: boolean): Promise<AuditEvent[]> {
     const endpoint = `/api/audit${this.getQueryString(subreddit, demo)}`;
     const data = await this.requestJson(endpoint);
     this.expectOk(data, endpoint);
-    return this.expectArray<AuditEvent>(data, endpoint, 'events');
+    return this.expectArray<AuditEvent>(data, endpoint, 'events', isAuditEvent);
   }
 
   async fetchRuntimeStatus(
@@ -230,8 +248,18 @@ export class ReviewLockApiClient {
     }
     return {
       runtime: data.runtime,
-      dailyMetrics: this.expectArray<DailyMetrics>(data, endpoint, 'dailyMetrics'),
-      topChurnTargets: this.expectArray<TargetMetrics>(data, endpoint, 'topChurnTargets'),
+      dailyMetrics: this.expectArray<DailyMetrics>(
+        data,
+        endpoint,
+        'dailyMetrics',
+        isDailyMetrics,
+      ),
+      topChurnTargets: this.expectArray<TargetMetrics>(
+        data,
+        endpoint,
+        'topChurnTargets',
+        isTargetMetrics,
+      ),
     };
   }
 

@@ -2417,3 +2417,31 @@
   and `unignoreReports verified`.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 02:09 IST - Client API domain-record contract hardening
+
+- Tightened the dashboard API client so locks, reopen events, audit events,
+  daily metrics, and target metrics are validated with shared domain validators
+  before rendering.
+- Tightened overview validation so headline counts must be non-negative
+  integers and nested churn/reopen records must match their domain contracts.
+- Added client API regressions for malformed lock, reopen, audit, daily metric,
+  target metric, overview count, overview churn, and overview latest-reopen
+  payloads.
+- Focused validation:
+  - `npm run test -- src/client/state/api.test.ts --reporter verbose`
+  - PASS, 1 test file and 11 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 355 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
