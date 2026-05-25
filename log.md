@@ -1667,6 +1667,15 @@
 - Integrated reviewer finding: lock/unlock form submissions now require trusted
   runtime subreddit context; missing or throwing context leaves bindings
   unconsumed and prevents moderation calls.
+- Integrated reviewer finding: no-lock report/update deliveries no longer mark
+  trigger runtime proof verified; verified rows are reserved for active-lock
+  unchanged, suppression, or reopen paths.
+- Integrated reviewer finding: dashboard metric writes are now serialized by a
+  short subreddit-scoped Redis mutex to prevent concurrent cross-target
+  read-modify-write losses.
+- Integrated reviewer finding: suppression metrics are decremented when a
+  success audit write fails after metrics increment, matching the retryable
+  rollback path.
 - Focused validation:
   - `npm run test -- src/server/adapters/redis.test.ts src/routes/forms.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/server/services/unlockFlow.test.ts --reporter verbose`
   - PASS, 5 test files and 60 tests.
@@ -1678,10 +1687,14 @@
   - Re-run PASS, 3 test files and 61 tests.
   - `npm run test -- src/routes/forms.test.ts --reporter verbose`
   - PASS, 1 test file and 15 tests.
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 38 tests.
+  - `npm run test -- src/server/services/metrics.test.ts src/server/services/reportTriggers.test.ts --reporter verbose`
+  - PASS, 2 test files and 31 tests.
 - Full validation:
   - `npm run type-check`
   - `npm run lint`
   - `npm run test`
   - `npm run build`
-- Pass/fail status: PASS for type-check, lint, 40 test files / 293 tests, and
+- Pass/fail status: PASS for type-check, lint, 40 test files / 296 tests, and
   build.

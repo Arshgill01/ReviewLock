@@ -137,3 +137,6 @@
 - [x] Accept method-named `postNsfwUpdate` and `postSpoilerUpdate` wrappers.
 - [x] Restore lock suppression counters when later suppression ledger writes fail.
 - [x] Fail closed on lock/unlock form submissions when trusted runtime subreddit context is missing.
+- [x] Keep no-lock report/update deliveries from marking trigger runtime proof verified.
+- [x] Serialize same-subreddit dashboard metric writes across concurrent targets.
+- [x] Roll back suppression metrics when success audit persistence fails.

@@ -106,6 +106,25 @@ describe('breakLockForChangedContent', () => {
     expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeDefined();
   });
 
+  it('does not verify update trigger proof for no-lock no-op deliveries', async () => {
+    const redis = new InMemoryRedisStore();
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new FakeRedditAdapter([target()]),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', triggerCapabilityName: 'postUpdateTrigger' },
+    );
+
+    expect(result.action).toBe('no_lock');
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),
+      ]),
+    });
+  });
+
   it('reopens content edits and queues an event', async () => {
     const dependencies = await deps(target({ body: 'Edited body', edited: true }));
     const result = await breakLockForChangedContent(dependencies, { targetId: 't3_post' });

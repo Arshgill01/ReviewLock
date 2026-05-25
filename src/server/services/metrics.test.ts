@@ -45,6 +45,36 @@ describe('metrics persistence', () => {
     });
   });
 
+  it('serializes concurrent same-day metric writes across targets', async () => {
+    const redis = new InMemoryRedisStore();
+    const now = '2026-05-24T01:00:00.000Z';
+
+    await Promise.all([
+      incrementSuppressedReportMetric(redis, target({ id: 't3_a' }), now),
+      incrementSuppressedReportMetric(redis, target({ id: 't3_b' }), now),
+    ]);
+    await Promise.all([
+      recordLockCreatedMetric(redis, target({ id: 't3_c' }), now),
+      recordLockCreatedMetric(redis, target({ id: 't3_d' }), now),
+    ]);
+    await Promise.all([
+      incrementReopenedMetric(redis, target({ id: 't3_e' }), now),
+      incrementReopenedMetric(redis, target({ id: 't3_f' }), now),
+    ]);
+
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 2,
+      locksCreated: 2,
+      locksReopened: 2,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_a')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_b')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+  });
+
   it('orders daily and top target metrics', async () => {
     const redis = new InMemoryRedisStore();
 

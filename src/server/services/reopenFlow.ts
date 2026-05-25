@@ -136,16 +136,6 @@ export const breakLockForChangedContent = async (
       const lock = await getActiveLockByTarget(deps.redis, subreddit, input.targetId);
 
       if (!lock) {
-        if (resolution.target) {
-          await recordUpdateTriggerProcessed(
-            deps,
-            subreddit,
-            input.triggerCapabilityName,
-            input.targetId,
-            now,
-          );
-        }
-
         return {
           ok: true,
           action: 'no_lock',

@@ -2202,19 +2202,28 @@
   submitted subreddit when runtime context is missing. Form actions now require
   trusted runtime subreddit context and keep bindings unconsumed on missing or
   throwing context. Regressions added in `src/routes/forms.test.ts`.
+- Resolved high finding added at 00:26: no-lock report/update deliveries can
+  mark trigger runtime proof verified. No-lock paths no longer write verified
+  trigger capability rows; regressions added in
+  `src/server/services/reportTriggers.test.ts` and
+  `src/server/services/reopenFlow.test.ts`.
+- Resolved medium finding added at 00:22: dashboard metric counters can lose
+  updates under concurrent cross-target writes. Metric mutations are now
+  serialized with a short subreddit-scoped Redis mutex. Regression added in
+  `src/server/services/metrics.test.ts`.
+- Resolved medium finding added at 00:23: suppression rollback can leave metrics
+  incremented when the success audit write fails. Report trigger rollback now
+  decrements daily and target suppressed-report metrics after audit failure.
+  Regression added in `src/server/services/reportTriggers.test.ts`.
 - Remaining medium findings for later pass:
   - Reopen dismiss can write durable dismissal audit before queue mutation
     failure.
   - Reopen flows can lose required `lock_reopened` audit after state is already
     reopened.
-  - Dashboard metrics counters can lose updates under concurrent cross-target
-    writes.
-  - Suppression rollback still needs metric compensation when audit writes fail
-    after metrics increment.
 - Validation:
   - `npm run type-check` PASS.
   - `npm run lint` PASS.
-  - `npm run test` PASS, 40 files / 293 tests.
+  - `npm run test` PASS, 40 files / 296 tests.
   - `npm run build` PASS.
 
 ## 2026-05-26 00:14 IST - Finding
@@ -2269,3 +2278,30 @@
 - Why it matters: the service returns `runtime_uncertain`, calls `unignoreReports()`, and clears the dedupe marker when the final audit write fails, so the delivery is explicitly treated as not durably processed. Leaving dashboard metrics incremented in that state overstates "Reports suppressed"; a retry can then increment metrics again for the same report delivery.
 - Suggested fix: make suppression persistence one atomic durability boundary, or add compensating metric rollback when the audit write fails after `incrementSuppressedReportMetric()` succeeds. Add regressions that fail `keys.auditEvent(...)` and `keys.audit(...)` after metric writes, asserting Reddit rollback occurs, dedupe is cleared, lock counters are restored, and daily/target suppressed metrics remain unchanged.
 - Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:26 IST - Finding
+
+- Severity: high
+- Area: Trigger runtime proof can still be marked verified by no-lock no-op deliveries.
+- Evidence:
+  - Report triggers call `recordReportTriggerProcessed()` before returning `action: 'no_lock'` when the target resolves but has no active ReviewLock lock: `src/server/services/reportTriggers.ts:265-286`.
+  - Update triggers call `recordUpdateTriggerProcessed()` before returning `action: 'no_lock'` when the target resolves but no active lock exists: `src/server/services/reopenFlow.ts:134-154`.
+  - Both helpers write the corresponding trigger capability as `status: 'verified'`: `src/server/services/reportTriggers.ts:157-175`, `src/server/services/reopenFlow.ts:92-114`.
+  - The new decision note explicitly includes "successful no-lock" as enough to mark trigger runtime proof verified: `decisions.md:1568-1578`.
+  - Current live proof docs correctly distinguish the stronger evidence for verified rows as locked-content behavior: post report proof kept a lock active, incremented suppression metrics, and wrote `report_suppressed`; post/comment update proof changed fingerprints and wrote reopen state: `docs/RUNTIME_PROOF.md:101-104`.
+- Why it matters: ReviewLock's core claim is not "Devvit delivered a trigger." It is "locked reviewed content suppresses repeat reports while unchanged, and reopens when changed." If a report or update arrives for unrelated unlocked content, the runtime panel can mark `commentReportTrigger`, `postNsfwUpdateTrigger`, `postSpoilerUpdateTrigger`, or `postFlairUpdateTrigger` verified without proving any lock lookup, suppression, fingerprint comparison, or reopen behavior. That weakens the exact live-proof boundary both external reviews called out as the project’s biggest core risk.
+- Suggested fix: split proof levels or tighten the verified condition. For example, record no-lock deliveries as `unverified` with evidence/notes, or add a separate `delivered` capability state if the schema supports it; reserve `verified` for locked-content outcomes that exercise the ReviewLock loop (`suppress_unchanged`, `reopen_changed`, update reopen, or unchanged active-lock comparison). Add regressions where no-lock report/update deliveries do not mark the capability `verified`, while locked suppress/reopen paths still do.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/runtimeProof.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.test.ts`, `src/routes/triggers.report.test.ts`, `src/routes/triggers.update.test.ts`, `docs/RUNTIME_PROOF.md`, `decisions.md`, `docs/REVIEW_AGENT_FINDINGS.md`.
+
+## 2026-05-26 00:30 IST - Finding
+
+- Severity: medium
+- Area: Manual stale relock can fail after reopening the old lock but before creating the replacement lock.
+- Evidence:
+  - When `lockReviewedContent()` finds an existing active lock whose fingerprint differs from the current target, it calls `unignoreReports()`, enqueues a reopen event, marks the old lock `reopened`, increments reopen metrics, and only then appends the `lock_reopened` audit before attempting the replacement `approve()` / `ignoreReports()` flow: `src/server/services/lockFlow.ts:221-291`.
+  - Failures in `incrementReopenedMetric()` or the stale-reopen `appendAuditEvent()` are outside the inner replacement-lock persistence `try/catch`, which starts later at `src/server/services/lockFlow.ts:338`. They therefore reject out of the service after the old lock may already be reopened and removed from active indexes.
+  - The Devvit form submit route awaits `lockReviewedContent()` directly and only converts returned `LockFlowResult` objects into toasts: `src/routes/forms.ts:154-168`. It does not catch a thrown stale-reopen metrics/audit failure.
+  - Current stale relock tests cover the happy path, replacement `ignoreReports()` failure, and stale `unignoreReports()` failure, but not Redis metrics/audit failure between old-lock reopen and replacement-lock creation: `src/server/services/lockFlow.test.ts:237-396`.
+- Why it matters: This is fail-open for report suppression, which is good, but it can leave a moderator with a failed form submission after ReviewLock already reopened the old lock and before a replacement active lock exists. The moderator intended to lock newly reviewed edited content, but the service can stop halfway with no structured runtime-failure audit/toast explaining that only the old lock was reopened.
+- Suggested fix: Put the stale-reopen transition and replacement-lock attempt behind one explicit durability boundary. At minimum, catch metrics/audit failures in the stale-reopen section, write or attempt a `runtime_failure` audit, and return a structured `LockFlowResult` that tells the moderator the old lock was reopened but the new lock was not created. Add regressions that fail `incrementReopenedMetric()` and the stale `lock_reopened` audit after `markLockReopenedAfterQueue()`.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/routes/forms.ts`, `src/server/services/metrics.ts`, `src/server/services/audit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`.

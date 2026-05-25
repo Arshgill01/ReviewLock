@@ -95,6 +95,11 @@ describe('handleReportTrigger', () => {
     );
 
     expect(result.action).toBe('no_lock');
+    expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
+      ]),
+    });
   });
 
   it('suppresses unchanged content and increments metrics once', async () => {
@@ -833,6 +838,48 @@ describe('handleReportTrigger', () => {
     });
     expect(restoredLock?.lastSuppressedAt).toBeUndefined();
     expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-metric-fail')).toBe(false);
+  });
+
+  it('rolls back suppression metrics when the success audit write fails', async () => {
+    class FailingSuppressionAuditRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-report-suppressed')) {
+          throw new Error('audit event down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new FailingSuppressionAuditRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-audit-fail' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'unignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 0,
+      lastReportCount: 4,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 0,
+    });
+    expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
+      reportsSuppressed: 0,
+    });
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-audit-fail')).toBe(false);
   });
 
   it('records failed unignore rollback when Redis fails after report suppression', async () => {

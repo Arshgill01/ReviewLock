@@ -12,7 +12,11 @@ import {
   updateLock,
   updateLockStatus,
 } from './locks';
-import { incrementReopenedMetric, incrementSuppressedReportMetric } from './metrics';
+import {
+  decrementSuppressedReportMetric,
+  incrementReopenedMetric,
+  incrementSuppressedReportMetric,
+} from './metrics';
 import { ignoreReportsForReviewLock, unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
 import { recordCapabilityStatus, recordModerationOperationStatus } from './runtimeProof';
@@ -270,14 +274,6 @@ export const handleReportTrigger = async (
       const decision = decideReportTriggerAction(lock, resolution.target);
 
       if (!lock || decision.action === 'no_lock') {
-        await recordReportTriggerProcessed(
-          deps,
-          resolution.target.subreddit,
-          resolution.target.kind,
-          resolution.target.id,
-          now,
-        );
-
         return {
           ok: true,
           action: 'no_lock',
@@ -315,6 +311,7 @@ export const handleReportTrigger = async (
         }
 
         let lockCounterIncremented = false;
+        let metricsIncremented = false;
 
         try {
           await incrementLockSuppression(
@@ -325,6 +322,7 @@ export const handleReportTrigger = async (
           );
           lockCounterIncremented = true;
           await incrementSuppressedReportMetric(deps.redis, resolution.target, now, lock.demo);
+          metricsIncremented = true;
           await appendAuditEvent(deps.redis, {
             id: reportAuditId('audit-report-suppressed', input, now, lock.id),
             kind: 'report_suppressed',
@@ -344,6 +342,12 @@ export const handleReportTrigger = async (
 
           if (lockCounterIncremented) {
             await updateLock(deps.redis, lock).catch(() => undefined);
+          }
+
+          if (metricsIncremented) {
+            await decrementSuppressedReportMetric(deps.redis, resolution.target, now).catch(
+              () => undefined,
+            );
           }
 
           if (!rollbackResult.ok) {

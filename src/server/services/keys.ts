@@ -14,6 +14,7 @@ export const keys = {
   auditEvent: (subreddit: string, eventId: string) => key(subreddit, `audit:${eventId}`),
   metricsDailyIndex: (subreddit: string) => key(subreddit, 'metrics:daily'),
   metricsDaily: (subreddit: string, date: string) => key(subreddit, `metrics:daily:${date}`),
+  metricsMutation: (subreddit: string) => key(subreddit, 'metrics:mutation'),
   metricsTargetIndex: (subreddit: string) => key(subreddit, 'metrics:targets'),
   metricsTarget: (subreddit: string, targetId: string) => key(subreddit, `metrics:target:${targetId}`),
   runtime: (subreddit: string) => key(subreddit, 'runtime'),

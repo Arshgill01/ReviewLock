@@ -1572,8 +1572,10 @@ Trigger delivery alone does not prove ReviewLock processed the moderation loop.
 Decision:
 
 - Record report and update trigger runtime capabilities as `verified` only
-  after the target resolves and the route reaches a successful no-lock,
-  unchanged, suppression, or reopen outcome.
+- after the target resolves and the route exercises an active-lock path:
+  unchanged active-lock comparison, report suppression, or lock reopen.
+- Do not mark no-lock no-op deliveries as verified because they do not prove
+  the ReviewLock lock/suppress/reopen loop.
 - Do not mark unresolved fail-open deliveries as verified runtime proof.
 - Runtime proof evidence now says `processed for` rather than only delivered.
 
@@ -1651,3 +1653,40 @@ Reason:
 - Internal form callbacks can approve, ignore, unignore, or dismiss moderation
   workflow state. During Devvit context outages, ReviewLock should fail closed
   instead of trusting a client-provided subreddit string.
+
+### D097 - Serialize dashboard metric mutations per subreddit
+
+Daily dashboard metrics are stored as JSON records, and trigger mutexes are
+target-scoped.
+
+Decision:
+
+- Guard metric read-modify-write operations with a short Redis mutex scoped to
+  the subreddit metrics namespace.
+- Keep the existing JSON schema for dashboard/API compatibility.
+- Release the mutex only when the owner token still matches.
+
+Reason:
+
+- High-volume report churn can update different targets concurrently in the
+  same subreddit. Without serialization, two writes can both read the same
+  daily counter and overwrite each other, undercounting ReviewLock's suppressed
+  report evidence.
+
+### D098 - Roll back suppression metrics when success audit persistence fails
+
+The unchanged-report path treats a final success-audit failure as
+`runtime_uncertain` and clears report dedupe for retry.
+
+Decision:
+
+- Track whether suppression metrics were incremented before the success audit.
+- If the success audit write fails, best-effort decrement the daily and target
+  suppressed-report metrics along with restoring the lock record and
+  unignoring reports.
+
+Reason:
+
+- A retryable delivery should not leave visible dashboard metrics claiming a
+  durable suppression. Otherwise a retry can double-count the same report
+  delivery.
