@@ -170,3 +170,4 @@
 - [x] Validate runtime proof timestamps and statuses before render/persist.
 - [x] Validate client API list records before dashboard rendering.
 - [x] Validate moderator action request bodies before route side effects.
+- [x] Validate Devvit menu/report/update target ids and report counts before service calls.

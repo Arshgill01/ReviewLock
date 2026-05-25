@@ -29,6 +29,13 @@ describe('target resolver', () => {
     expect(normalizeTargetId('comment', undefined)).toBeUndefined();
   });
 
+  it('rejects non-string and blank ids before normalization', () => {
+    expect(normalizeTargetId('post', 42)).toBeUndefined();
+    expect(normalizeTargetId('comment', { id: 'comment' })).toBeUndefined();
+    expect(normalizeTargetId('post', '   ')).toBeUndefined();
+    expect(normalizeTargetId('post', ' post ')).toBe('t3_post');
+  });
+
   it('rejects already-prefixed ids that contradict the route target kind', () => {
     expect(normalizeTargetId('post', 't1_comment')).toBeUndefined();
     expect(normalizeTargetId('comment', 't3_post')).toBeUndefined();

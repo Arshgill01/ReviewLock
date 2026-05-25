@@ -15,88 +15,96 @@ interface RouteDeps {
   logger?: TriggerPayloadLogger;
 }
 
-interface TriggerBody {
-  targetId?: string;
-  postId?: string;
-  commentId?: string;
-  id?: string;
-  eventId?: string;
-  timestamp?: string;
-  reportedAt?: string;
-  reportCount?: number;
-  subreddit?: string | { name?: string };
-  post?: {
-    id?: string;
-    subredditName?: string;
-    numberOfReports?: number;
-    numReports?: number;
-  };
-  comment?: {
-    id?: string;
-    subredditName?: string;
-    numberOfReports?: number;
-    numReports?: number;
-  };
-  postReport?: TriggerBody;
-  commentReport?: TriggerBody;
-}
+type TriggerBody = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is TriggerBody =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const readBody = async (context: Context): Promise<TriggerBody> => {
   try {
-    return (await context.req.json()) as TriggerBody;
+    const body = (await context.req.json()) as unknown;
+    return isRecord(body) ? body : {};
   } catch {
     return {};
   }
 };
 
+const nestedRecord = (body: TriggerBody, key: string): TriggerBody | undefined =>
+  isRecord(body[key]) ? body[key] : undefined;
+
 const payloads = (body: TriggerBody): TriggerBody[] => [
   body,
-  ...(body.postReport ? [body.postReport] : []),
-  ...(body.commentReport ? [body.commentReport] : []),
-];
+  nestedRecord(body, 'postReport'),
+  nestedRecord(body, 'commentReport'),
+].filter((payload): payload is TriggerBody => payload !== undefined);
 
 const first = <T>(values: (T | undefined)[]): T | undefined =>
   values.find((value): value is T => value !== undefined);
+
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+const reportCountValue = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 
 const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
   normalizeTargetId(
     kind,
     first(
-      payloads(body).flatMap((payload) =>
-        kind === 'post'
-          ? [payload.targetId, payload.postId, payload.post?.id]
-          : [payload.commentId, payload.comment?.id, payload.targetId],
-      ),
+      payloads(body).flatMap((payload) => {
+        const post = nestedRecord(payload, 'post');
+        const comment = nestedRecord(payload, 'comment');
+
+        return kind === 'post'
+          ? [payload.targetId, payload.postId, post?.id]
+          : [payload.commentId, comment?.id, payload.targetId];
+      }),
     ),
   );
 
-const eventId = (body: TriggerBody): string | undefined => body.eventId ?? body.id;
+const eventId = (body: TriggerBody): string | undefined =>
+  stringValue(body.eventId) ?? stringValue(body.id);
+
+const subredditFromPayload = (payload: TriggerBody): string | undefined => {
+  const subreddit = payload.subreddit;
+  const post = nestedRecord(payload, 'post');
+  const comment = nestedRecord(payload, 'comment');
+
+  return first([
+    stringValue(subreddit),
+    isRecord(subreddit) ? stringValue(subreddit.name) : undefined,
+    stringValue(post?.subredditName),
+    stringValue(comment?.subredditName),
+  ]);
+};
 
 const subreddit = (body: TriggerBody): string | undefined =>
-  first(
-    payloads(body).flatMap((payload) => [
-      typeof payload.subreddit === 'string' ? payload.subreddit : payload.subreddit?.name,
-      payload.post?.subredditName,
-      payload.comment?.subredditName,
-    ]),
-  );
+  first(payloads(body).map((payload) => subredditFromPayload(payload)));
 
 const reportCount = (body: TriggerBody, kind: TargetKind): number | undefined =>
   first(
-    payloads(body).flatMap((payload) =>
-      kind === 'post'
-        ? [payload.reportCount, payload.post?.numberOfReports, payload.post?.numReports]
+    payloads(body).flatMap((payload) => {
+      const post = nestedRecord(payload, 'post');
+      const comment = nestedRecord(payload, 'comment');
+
+      return kind === 'post'
+        ? [
+            reportCountValue(payload.reportCount),
+            reportCountValue(post?.numberOfReports),
+            reportCountValue(post?.numReports),
+          ]
         : [
-            payload.comment?.numberOfReports,
-            payload.comment?.numReports,
-            payload.reportCount,
-            payload.post?.numberOfReports,
-            payload.post?.numReports,
-          ],
-    ),
+            reportCountValue(comment?.numberOfReports),
+            reportCountValue(comment?.numReports),
+            reportCountValue(payload.reportCount),
+            reportCountValue(post?.numberOfReports),
+            reportCountValue(post?.numReports),
+          ];
+    }),
   );
 
-const reportedAt = (body: TriggerBody): string | undefined => body.reportedAt ?? body.timestamp;
+const reportedAt = (body: TriggerBody): string | undefined =>
+  stringValue(body.reportedAt) ?? stringValue(body.timestamp);
 
 export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();

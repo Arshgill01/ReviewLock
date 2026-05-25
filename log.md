@@ -2515,3 +2515,32 @@
   some platform trigger capabilities are still unverified.
 - No live report submission, post edit, comment edit, unlock, dismiss, or
   destructive moderation action was performed in this recheck.
+
+## 2026-05-26 02:23 IST - Devvit route payload validation hardening
+
+- Tightened menu, report-trigger, and update-trigger route body readers so
+  JSON bodies are treated as unknown records before field-level validation.
+- `normalizeTargetId()` now rejects non-string and blank ids, trims accepted
+  strings, and still rejects wrong-kind prefixed ids at endpoint boundaries.
+- Report/update route wrappers now only include nested payloads when they are
+  objects, only accept event/subreddit/timestamp fields when they are non-empty
+  strings, and only accept report counts when they are safe non-negative
+  integers.
+- Added regressions for malformed menu target ids, malformed report/update
+  target ids, and malformed report counts falling back to the refetched target
+  count.
+- Focused validation:
+  - `npm run test -- src/server/services/targetResolver.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts src/routes/menu.test.ts --reporter verbose`
+  - PASS, 4 test files and 56 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 365 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

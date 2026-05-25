@@ -122,6 +122,26 @@ describe('menu routes', () => {
     });
   });
 
+  it('rejects malformed non-string menu target ids without resolving content', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createMenuRouter({
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: { id: 't3_post' } }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'Unsupported target id: missing',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
   it('returns neutral unlock response when no lock exists', async () => {
     const router = createMenuRouter({
       reddit: new FakeRedditAdapter([target()]),

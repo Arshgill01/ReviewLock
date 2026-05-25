@@ -2239,3 +2239,25 @@ Reason:
   domain schema on the next read. Moderator action routes should either reject
   malformed required inputs before side effects or normalize optional inputs
   into safe absence.
+
+### D127 - Devvit route payloads stay unknown until field-level validation
+
+Menu, report, and update route payloads are platform-provided JSON and can
+arrive in wrapper shapes that differ between trigger families.
+
+Decision:
+
+- Read Devvit menu/report/update request bodies as unknown records.
+- Accept target ids only when a concrete string exists in the expected target
+  field, and keep rejecting already-prefixed ids for the wrong endpoint kind.
+- Accept report counts only when they are safe non-negative integers.
+- Accept event timestamps, event ids, and subreddit names only when they are
+  concrete non-empty strings.
+- Ignore malformed optional wrapper fields instead of passing them into service
+  calls, Redis keys, audit data, or runtime proof state.
+
+Reason:
+
+- Cast JSON can turn malformed objects, numbers, or arrays into apparently
+  typed route inputs. A malformed platform payload should produce a neutral
+  target-id error or safe fallback, not a 500 or misleading persisted proof.

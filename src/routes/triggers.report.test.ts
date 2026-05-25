@@ -371,6 +371,27 @@ describe('report trigger routes', () => {
     });
   });
 
+  it('rejects malformed non-string target ids without touching reddit', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: { id: 't3_post' }, eventId: 'evt-bad-target' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: 'Report trigger target id is required.',
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
   it('uses comment report counts before parent post report counts on comment reports', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock(commentTarget()));
@@ -392,6 +413,36 @@ describe('report trigger routes', () => {
 
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
     expect(await getActiveLockByTarget(redis, 'alpha', 't1_comment')).toMatchObject({
+      lastReportCount: 5,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'report_suppressed',
+        data: expect.objectContaining({ reportCount: 5 }),
+      }),
+    ]);
+  });
+
+  it('ignores malformed report counts and falls back to the refetched target count', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-malformed-report-count',
+        post: { id: 't3_post', numberOfReports: '99' },
+        reportCount: -1,
+        subreddit: { name: 'alpha' },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
       lastReportCount: 5,
     });
     expect(await listAuditEvents(redis, 'alpha')).toEqual([

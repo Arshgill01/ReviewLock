@@ -24,16 +24,22 @@ export const inferTargetKind = (id: string | undefined): TargetKind | undefined 
   return undefined;
 };
 
-export const normalizeTargetId = (kind: TargetKind, id: string | undefined): string | undefined => {
-  if (!id) {
+export const normalizeTargetId = (kind: TargetKind, id: unknown): string | undefined => {
+  if (typeof id !== 'string') {
     return undefined;
   }
 
-  if (id.startsWith('t1_') || id.startsWith('t3_')) {
-    return inferTargetKind(id) === kind ? id : undefined;
+  const targetId = id.trim();
+
+  if (!targetId) {
+    return undefined;
   }
 
-  return kind === 'post' ? `t3_${id}` : `t1_${id}`;
+  if (targetId.startsWith('t1_') || targetId.startsWith('t3_')) {
+    return inferTargetKind(targetId) === kind ? targetId : undefined;
+  }
+
+  return kind === 'post' ? `t3_${targetId}` : `t1_${targetId}`;
 };
 
 export const resolveTargetById = async (

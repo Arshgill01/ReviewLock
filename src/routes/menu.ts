@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { FormField, MenuItemRequest, UiResponse } from '@devvit/web/shared';
+import type { FormField, UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
@@ -15,21 +15,20 @@ interface RouteDeps {
   clock?: Clock;
 }
 
-type ReviewLockMenuRequest = Partial<MenuItemRequest> & {
-  postId?: string;
-  commentId?: string;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const readMenuBody = async (context: Context): Promise<ReviewLockMenuRequest> => {
+const readMenuBody = async (context: Context): Promise<Record<string, unknown>> => {
   try {
-    return (await context.req.json()) as ReviewLockMenuRequest;
+    const body = (await context.req.json()) as unknown;
+    return isRecord(body) ? body : {};
   } catch {
     return {};
   }
 };
 
 const targetIdFromBody = (
-  body: ReviewLockMenuRequest,
+  body: Record<string, unknown>,
   kind: TargetKind,
 ): string | undefined =>
   normalizeTargetId(
