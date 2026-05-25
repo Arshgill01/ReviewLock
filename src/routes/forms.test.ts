@@ -594,10 +594,10 @@ describe('form routes', () => {
         text: 'ReviewLock recorded the dismissal audit but could not update the reopen queue.',
       },
     });
-    expect(await getReopenEvent(redis, 'alpha', 'reopen-1')).toMatchObject({
-      dismissedAt: '2026-05-24T01:00:00.000Z',
-      dismissedBy: 'mod_test',
-    });
+    expect(await getReopenEvent(redis, 'alpha', 'reopen-1')).not.toHaveProperty('dismissedAt');
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
     expect(await listAuditEvents(redis, 'alpha')).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'reopen_dismissed' }),
       expect.objectContaining({

@@ -46,6 +46,54 @@ describe('reopen queue', () => {
     expect(await getReopenEvent(redis, 'alpha', 'event-1')).toMatchObject({ dismissedBy: 'mod' });
   });
 
+  it('keeps the event open when queue removal fails during dismissal', async () => {
+    class QueueFailingRedisStore extends InMemoryRedisStore {
+      override async zRem(key: string, member: string): Promise<void> {
+        if (key === keys.reopenQueue('alpha') && member === 'event-1') {
+          throw new Error('queue unavailable');
+        }
+
+        await super.zRem(key, member);
+      }
+    }
+
+    const redis = new QueueFailingRedisStore();
+    await enqueueReopenEvent(redis, event());
+
+    await expect(
+      dismissReopenEvent(redis, 'alpha', 'event-1', '2026-05-24T01:00:00.000Z', 'mod'),
+    ).rejects.toThrow('queue unavailable');
+    expect(await getReopenEvent(redis, 'alpha', 'event-1')).not.toHaveProperty('dismissedAt');
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'event-1' }),
+    ]);
+  });
+
+  it('restores queue visibility when dismissed record persistence fails', async () => {
+    class RecordFailingRedisStore extends InMemoryRedisStore {
+      failWrites = false;
+
+      override async set(key: string, value: string): Promise<void> {
+        if (this.failWrites && key === keys.reopenEvent('alpha', 'event-1')) {
+          throw new Error('record unavailable');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const failingRedis = new RecordFailingRedisStore();
+    await enqueueReopenEvent(failingRedis, event());
+    failingRedis.failWrites = true;
+
+    await expect(
+      dismissReopenEvent(failingRedis, 'alpha', 'event-1', '2026-05-24T01:00:00.000Z', 'mod'),
+    ).rejects.toThrow('record unavailable');
+    expect(await listOpenReopenEvents(failingRedis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'event-1' }),
+    ]);
+  });
+
   it('skips malformed reopen event records', async () => {
     const redis = new InMemoryRedisStore();
     await enqueueReopenEvent(redis, event({ id: 'good' }));

@@ -69,8 +69,17 @@ export const dismissReopenEvent = async (
   }
 
   const dismissed = { ...event, dismissedAt, dismissedBy };
-  await redis.set(keys.reopenEvent(subreddit, eventId), JSON.stringify(dismissed));
   await redis.zRem(keys.reopenQueue(subreddit), eventId);
+
+  try {
+    await redis.set(keys.reopenEvent(subreddit, eventId), JSON.stringify(dismissed));
+  } catch (error) {
+    await redis.zAdd(keys.reopenQueue(subreddit), {
+      member: event.id,
+      score: Date.parse(event.createdAt),
+    }).catch(() => undefined);
+    throw error;
+  }
 
   return dismissed;
 };

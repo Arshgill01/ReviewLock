@@ -302,6 +302,11 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Hardened by also writing a namespaced sorted set, reading newest-first
     order, and deleting the smoke key before marking the `redis` capability
     verified.
+- Reopen dismissal previously could mark an event dismissed before queue
+  removal completed.
+  - Hardened by mutating queue visibility before the dismissed record write and
+    restoring queue visibility if the record write fails, so failed dismissals
+    keep reopened items visible.
 
 ## Current Claim Boundary
 

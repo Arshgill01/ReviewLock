@@ -2114,3 +2114,23 @@ Reason:
   behavior. ModMirror's runtime proof matrix caught this as a separate concern;
   ReviewLock should prove the Redis primitive it actually relies on during live
   judging.
+
+### D121 - Failed dismissals keep reopened items visible
+
+Dismissing a reopened item requires both an audit trail and queue mutation.
+
+Decision:
+
+- Write the dismissal audit before mutating the queue.
+- In `dismissReopenEvent`, remove the item from the queue before marking the
+  event record dismissed.
+- If queue removal fails, leave the event record open so the dashboard still
+  shows the item.
+- If the dismissed record write fails after queue removal, re-add the event to
+  the queue before returning failure.
+
+Reason:
+
+- A reopened item should never disappear from moderator view unless ReviewLock
+  persisted the dismissal state. Partial failures must favor visibility over a
+  clean-looking queue.

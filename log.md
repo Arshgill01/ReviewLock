@@ -2051,3 +2051,30 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:37 IST - Reopen dismiss visibility hardening
+
+- Hardened `dismissReopenEvent` so queue removal happens before the event
+  record is marked dismissed.
+- If queue removal fails, the reopened event remains open and visible.
+- If the dismissed record write fails after queue removal, ReviewLock re-adds
+  the event to the queue before returning failure.
+- Updated form-route regression for queue mutation failure to assert the
+  reopened item remains visible.
+- Focused validation:
+  - `npm run test -- src/server/services/reopenQueue.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 3 test files and 35 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 339 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
