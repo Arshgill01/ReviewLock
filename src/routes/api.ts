@@ -125,6 +125,7 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
       smokeSubreddit = subreddit;
       const smokeKey = key(subreddit, `runtime:smoke:${Date.parse(checkedAt)}`);
       const sortedSetSmokeKey = key(subreddit, `runtime:smoke:zset:${Date.parse(checkedAt)}`);
+      const hashSmokeKey = key(subreddit, `runtime:smoke:hash:${Date.parse(checkedAt)}`);
       const value = `reviewlock-smoke:${checkedAt}`;
 
       await deps.redis.set(smokeKey, value);
@@ -150,10 +151,40 @@ export const createApiRouter = (deps: ApiDeps = {}): Hono => {
         await deps.redis.del(sortedSetSmokeKey).catch(() => undefined);
       }
 
+      try {
+        await deps.redis.hset(hashSmokeKey, {
+          lockId: 'lock-smoke',
+          targetId: 't3_smoke',
+        });
+        const observedHash = await deps.redis.hgetall(hashSmokeKey);
+
+        if (
+          observedHash.lockId !== 'lock-smoke' ||
+          observedHash.targetId !== 't3_smoke'
+        ) {
+          throw new Error('Redis hash smoke read did not match the written values.');
+        }
+
+        await deps.redis.hdel(hashSmokeKey, 'targetId');
+        const afterDelete = await deps.redis.hgetall(hashSmokeKey);
+
+        if (afterDelete.targetId !== undefined) {
+          throw new Error('Redis hash smoke delete did not remove the field.');
+        }
+      } finally {
+        await deps.redis.del(hashSmokeKey).catch(() => undefined);
+      }
+
       const result = verifiedSmokeResult(
         'redis',
-        'POST /api/smoke/redis verified namespaced string and sorted-set operations.',
-        [`key=${smokeKey}`, `zset=${sortedSetSmokeKey}`, 'zRange=newest,middle,oldest'],
+        'POST /api/smoke/redis verified namespaced string, hash, and sorted-set operations.',
+        [
+          `key=${smokeKey}`,
+          `hash=${hashSmokeKey}`,
+          `zset=${sortedSetSmokeKey}`,
+          'hset/hgetall/hdel=ok',
+          'zRange=newest,middle,oldest',
+        ],
         checkedAt,
       );
       await recordCapabilityStatus(

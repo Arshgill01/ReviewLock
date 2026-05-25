@@ -2204,3 +2204,30 @@
   `postSpoilerUpdateTrigger` unverified.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 01:50 IST - Redis hash smoke hardening
+
+- Used ModMirror's broader runtime health approach as a reference for Redis
+  smoke coverage.
+- Expanded `/api/smoke/redis` to verify namespaced hash operations with
+  `hset`, `hgetall`, and `hdel` in addition to string and sorted-set checks.
+- The smoke route cleans up the hash key in a `finally` block and records the
+  `redis` runtime proof row as failed if hash readback or field deletion is
+  wrong.
+- Focused validation:
+  - `npm run test -- src/routes/api.contract.test.ts src/server/adapters/redis.test.ts --reporter verbose`
+  - PASS, 2 test files and 16 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 347 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

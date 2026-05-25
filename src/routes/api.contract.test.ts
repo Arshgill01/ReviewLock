@@ -211,6 +211,48 @@ describe('API/client route contract', () => {
     });
   });
 
+  it('records failed Redis smoke proof when hash readback is wrong', async () => {
+    class HashMismatchRedisStore extends InMemoryRedisStore {
+      override async hgetall(key: string): Promise<Record<string, string>> {
+        if (key.includes(':runtime:smoke:hash:')) {
+          return { lockId: 'unexpected-lock', targetId: 't3_smoke' };
+        }
+
+        return super.hgetall(key);
+      }
+    }
+
+    const redis = new HashMismatchRedisStore();
+    const app = createApp({
+      redis,
+      reddit: new FakeRedditAdapter(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      getCurrentSubredditName: () => 'alpha',
+    });
+
+    const response = await app.request('/api/smoke/redis?subreddit=alpha', { method: 'POST' });
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      capability: 'redis',
+      status: 'failed',
+      error: 'Redis hash smoke read did not match the written values.',
+    });
+    expect(await redis.exists('reviewlock:alpha:runtime:smoke:hash:1779552000000')).toBe(false);
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      overall: 'failed',
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'redis',
+          status: 'failed',
+          evidence:
+            'POST /api/smoke/redis could not complete the namespaced Redis operation check.',
+        }),
+      ]),
+    });
+  });
+
   it('records failed Reddit smoke proof when Reddit context cannot return a username', async () => {
     class MissingUsernameRedditAdapter extends FakeRedditAdapter {
       override async getCurrentUsername(): Promise<string | undefined> {
