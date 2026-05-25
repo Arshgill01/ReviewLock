@@ -194,6 +194,12 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   replacement `ignoreReports()` call worked.
   - Hardened by calling `unignoreReports()` before reopening the stale lock and
     attempting the replacement lock.
+- Stale-lock relock could still remove the old active lock if stale
+  `unignoreReports()` failed before a replacement lock attempt.
+  - Hardened by treating stale `unignoreReports()` failure as a blocking
+    runtime failure: ReviewLock keeps the stale lock active with warnings,
+    records runtime proof/audit, and does not attempt replacement lock writes
+    until reports can be returned to normal handling.
 - Older proof docs previously contradicted the controlled post-target
   moderation proof boundary.
   - Hardened by reconciling historical docs to point at this file for current

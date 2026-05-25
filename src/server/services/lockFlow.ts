@@ -164,6 +164,41 @@ export const lockReviewedContent = async (
     const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
     await recordRuntimeProof(deps, existingLock.subreddit, staleUnignoreResult, now);
 
+    if (!staleUnignoreResult.ok) {
+      const updatedLock = await updateLock(deps.redis, {
+        ...existingLock,
+        lastKnownEdited: resolution.target.edited,
+        lastReportCount: resolution.target.reportCount,
+        runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
+      });
+      await appendAuditEvent(deps.redis, {
+        id: `audit-${existingLock.id}-stale-unignore-failed-${Date.parse(now)}`,
+        kind: 'runtime_failure',
+        subreddit: existingLock.subreddit,
+        targetId: existingLock.targetId,
+        targetKind: existingLock.targetKind,
+        lockId: existingLock.id,
+        actor: input.actor,
+        createdAt: now,
+        message:
+          'Lock review found changed content, but unignoreReports failed; lock remains active for retry.',
+        data: {
+          operation: 'unignoreReports',
+          error: staleUnignoreResult.errorMessage,
+          source: 'stale_lock_relock',
+        },
+        demo: existingLock.demo,
+      });
+
+      return {
+        ok: false,
+        lock: updatedLock,
+        message:
+          'ReviewLock found changed content but could not return reports to normal handling; the stale lock remains active for retry.',
+        warnings: staleUnignoreResult.warnings,
+      };
+    }
+
     const reopenEvent = {
       ...buildReopenEventForStaleLock(existingLock, fingerprint.hash, now),
       runtimeWarnings: staleUnignoreResult.warnings,

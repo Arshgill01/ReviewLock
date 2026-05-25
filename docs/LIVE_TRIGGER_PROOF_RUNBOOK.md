@@ -1,6 +1,6 @@
 # Live Trigger Proof Runbook
 
-Last updated: 2026-05-25 15:12 IST.
+Last updated: 2026-05-25 15:25 IST.
 
 This runbook is for Wave 33 controlled report/edit trigger proof. It must be
 executed only in `r/reviewlock_dev` unless a different moderated test subreddit
@@ -17,7 +17,7 @@ is explicitly selected.
   `v0.0.2.84`, with target `post:1tmmeo6`, author `u/BrightyBrainiac`,
   reason `reviewed policy compliant`, and `0` reports suppressed before any
   controlled report event.
-- Current playtest reached `v0.0.2.84`.
+- Current playtest reached `v0.0.2.85` after stale-relock hardening.
 - Trigger routes now emit sanitized payload-shape logs from the live bootstrap
   path. These logs intentionally record only route name, target kind, and
   boolean/object-shape flags, not raw target ids, content text, reporter names,
@@ -57,9 +57,11 @@ If logs report `listen EADDRINUSE: address already in use :::5678` while
 playtest is running, record the warning, stop playtest after the browser action,
 and retry log capture immediately.
 
-## S01 Proof Sequence
+## S01 Active Lock Baseline
 
-S01 proves unchanged post report suppression.
+S01 proves the live lock baseline for a controlled post authored by the logged-in
+developer account. It cannot prove report delivery from the same session because
+Reddit does not expose a `Report` action to the author.
 
 1. Confirm the posted S01 post in Zen is still:
    `[ReviewLock proof S01] Reviewed unchanged policy context`.
@@ -75,14 +77,32 @@ S01 proves unchanged post report suppression.
    `ignoreReports()`, and writes ReviewLock state.
 7. Open the ReviewLock dashboard and verify S01 appears as an active lock.
 8. Capture runtime status before reports.
-9. Submit one controlled report against S01 only after action-time
-    confirmation.
-10. Capture Devvit logs and dashboard after the report.
+9. Do not attempt same-account report proof against S01. Use a second
+   account/session or the dashboard-post candidate below.
+
+Expected proof:
+
+- S01 appears as an active lock in the dashboard.
+- Runtime panel keeps report and update triggers unverified until a report/edit
+  event is generated and observed.
+
+## Dashboard Post Report Candidate
+
+The already locked dashboard post `t3_1tm8nak` is the current executable
+unchanged-report proof candidate from this logged-in session.
+
+1. Confirm the ReviewLock dashboard post is active in the dashboard:
+   `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
+2. Confirm the target is `t3_1tm8nak`, authored by `u/reviewlock`, with
+   suppressed count recorded before the report.
+3. Submit one controlled report against `t3_1tm8nak` only after action-time
+   confirmation.
+4. Capture Devvit logs and dashboard after the report.
 
 Expected proof:
 
 - `PostReport` delivery reaches `/internal/triggers/on-post-report`.
-- Active lock is loaded for the S01 thing id.
+- Active lock is loaded for target `t3_1tm8nak`.
 - Fingerprint matches the stored lock fingerprint.
 - `ignoreReports()` is called for the unchanged target.
 - `suppressedReportCount` increments.

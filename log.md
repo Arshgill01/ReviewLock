@@ -1344,3 +1344,34 @@
   - No live trigger delivery has been generated yet in this pass.
   - The next controlled report target is `t3_1tm8nak`, not S01, because S01 is a
     self-authored post for the logged-in account.
+
+## 2026-05-25 - Wave 33 stale relock unignore failure hardening
+
+- Integrated reviewer finding on stale-lock relock failure ordering.
+- Hardened `lockReviewedContent()` so changed-content relock stops immediately
+  when stale `unignoreReports()` fails:
+  - existing lock remains active and retryable;
+  - runtime warning is persisted on the lock;
+  - runtime proof records the failed moderation operation;
+  - audit records a `runtime_failure`;
+  - replacement `approve()` / `ignoreReports()` are not attempted.
+- Added a regression that sets up edited current content, failed stale
+  `unignoreReports()`, and failed replacement `ignoreReports()`; the test proves
+  the replacement calls are not reached and the stale lock remains active.
+- Reconciled live trigger proof docs so S01 is only the active-lock baseline
+  from this same-account session, while `t3_1tm8nak` is the executable
+  unchanged-report candidate.
+- Commands run:
+  - `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg "TODO" src || true`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+- Pass/fail status: PASS for targeted lock-flow regression, type-check, lint,
+  full test suite, build, and diff whitespace check.
+- Open risks:
+  - Forbidden-copy scan matched only guardrail tests and documentation references.
+  - Controlled live report and edit trigger events remain pending.

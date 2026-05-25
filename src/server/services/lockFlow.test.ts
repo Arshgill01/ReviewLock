@@ -3,6 +3,7 @@ import { fixedClock } from '../adapters/clock';
 import { InMemoryRedisStore } from '../adapters/redis';
 import { FakeRedditAdapter } from '../adapters/reddit';
 import type { ReviewLockTarget } from '../../shared/schema';
+import { listAuditEvents } from './audit';
 import { getActiveLockByTarget, getLock, listActiveLocks } from './locks';
 import { lockReviewedContent } from './lockFlow';
 import { getDailyMetrics, getTargetMetrics } from './metrics';
@@ -222,6 +223,67 @@ describe('lockReviewedContent', () => {
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([
       expect.objectContaining({ lockId: first.lock?.id, reason: 'content_changed' }),
     ]);
+  });
+
+  it('keeps the stale lock active when stale unignore fails before replacement', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const times = ['2026-05-24T00:00:00.000Z', '2026-05-24T00:05:00.000Z'];
+    const dependencies = {
+      reddit,
+      redis: new InMemoryRedisStore(),
+      clock: { now: () => times.shift() ?? '2026-05-24T00:10:00.000Z' },
+    };
+    const input = {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant' as const,
+    };
+
+    const first = await lockReviewedContent(dependencies, input);
+    reddit.setTarget(target({ body: 'Edited body', edited: true, reportCount: 6 }));
+    reddit.failOperation('unignoreReports', 'stale unignore denied');
+    reddit.failOperation('ignoreReports', 'replacement ignore denied');
+    const second = await lockReviewedContent(dependencies, input);
+
+    expect(second).toMatchObject({
+      ok: false,
+      lock: { id: first.lock?.id, status: 'active' },
+      message:
+        'ReviewLock found changed content but could not return reports to normal handling; the stale lock remains active for retry.',
+      warnings: ['unignoreReports failed for t3_post'],
+    });
+    expect(reddit.calls).toEqual([
+      'approve:t3_post',
+      'ignoreReports:t3_post',
+      'unignoreReports:t3_post',
+    ]);
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      id: first.lock?.id,
+      status: 'active',
+      lastKnownEdited: true,
+      lastReportCount: 6,
+      runtimeWarnings: ['unignoreReports failed for t3_post'],
+    });
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([]);
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'lock_created' }),
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message:
+          'Lock review found changed content, but unignoreReports failed; lock remains active for retry.',
+        data: expect.objectContaining({
+          operation: 'unignoreReports',
+          error: 'stale unignore denied',
+          source: 'stale_lock_relock',
+        }),
+      }),
+    ]));
+    await expect(loadRuntimeProofStatus(dependencies.redis, 'alpha')).resolves.toMatchObject({
+      overall: 'failed',
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'unignoreReports', status: 'failed' }),
+      ]),
+    });
   });
 
   it('rolls back ignore reports if Redis persistence fails', async () => {

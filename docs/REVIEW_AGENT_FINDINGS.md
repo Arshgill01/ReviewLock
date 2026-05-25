@@ -483,3 +483,42 @@
 - Area: Proof-boundary documentation consistency
 - Result: Resolved in the current worktree.
 - Evidence: `docs/FULL_SCENARIO_WALKTHROUGH.md`, `docs/PRODUCTION_TRUST_AUDIT.md`, and `docs/REDIS_RACE_PROOF.md` now distinguish historical/local wave status from the current claim boundary and point to `docs/RUNTIME_PROOF.md`. The boundary is consistent: controlled post-target `approve()`, `ignoreReports()`, and `unignoreReports()` are verified; comment-target moderation methods and live report/update trigger delivery remain unverified.
+
+## 2026-05-25 15:22 IST - Finding
+
+- Severity: high
+- Area: Stale-lock relock when stale `unignoreReports()` fails
+- Evidence: The stale-lock relock path detects changed current content, calls `unignoreReportsForReviewLock()` on the old active lock, records runtime proof, but then continues regardless of `staleUnignoreResult.ok` (`src/server/services/lockFlow.ts:164-196`). It reopens the old lock and removes active indexes via `markLockReopenedAfterQueue()`, then attempts replacement `approve()` / `ignoreReports()` (`src/server/services/lockFlow.ts:198-199`). If replacement `ignoreReports()` fails, it writes a separate `failed` lock and returns without restoring the previous active lock or otherwise ensuring Reddit reports are no longer ignored (`src/server/services/lockFlow.ts:202-234`). The regression `unignores reports before stale relock replacement failure can leave reports suppressed` only covers replacement `ignoreReports()` failure after successful stale `unignoreReports()` (`src/server/services/lockFlow.test.ts:183-225`); there is no case where stale `unignoreReports()` and replacement `ignoreReports()` both fail.
+- Why it matters: This can leave changed content with no active ReviewLock lock while Reddit may still be ignoring reports from the old lock. That is the unsafe state the relock hardening was meant to prevent: reports can stay suppressed without an active reviewed-content lock that can reopen later.
+- Suggested fix: Treat stale `unignoreReports()` failure as a blocking fail-open condition before removing the old active lock, or keep a visible retryable active/failed state until Reddit confirms reports are back to normal handling. Add a regression where the second lock attempt sees edited content, `unignoreReports()` fails, and replacement `ignoreReports()` also fails; assert ReviewLock does not end with `getActiveLockByTarget()` empty while the moderation rollback may have failed.
+- Files reviewed: `src/server/services/lockFlow.ts`, `src/server/services/lockFlow.test.ts`, `src/server/services/locks.ts`, `src/server/adapters/reddit.ts`, `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-25 15:23 IST - Finding
+
+- Severity: medium
+- Area: Live trigger proof runbook contradicts the available report target
+- Evidence: `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md:28-32` says S01 is authored by the logged-in dev account and Reddit does not expose a `Report` action for S01, so the first unchanged-report proof candidate is the already locked dashboard post `t3_1tm8nak`. The same runbook still labels the next section "S01 Proof Sequence" and instructs the operator to open S01, verify `t3_1tmmeo6`, and "Submit one controlled report against S01" (`docs/LIVE_TRIGGER_PROOF_RUNBOOK.md:60-80`). `docs/LIVE_SCENARIO_CONTENT.md:52-55` also lists the S01 proof action as submitting a controlled repeat report against S01 despite the current-account reporting blocker.
+- Why it matters: Wave 33's next open gate is live report trigger generation. Following the current runbook can send the operator back to an unreportable-from-this-session post, delaying the proof pass or causing inconsistent evidence between S01 and the dashboard-post fallback target.
+- Suggested fix: Split the runbook into "S01 active lock baseline" and a separate "Dashboard post unchanged-report candidate" sequence, or update S01 steps to require a second account/session before attempting the report. Make the expected proof target id explicit for whichever path is actually executable.
+- Files reviewed: `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`, `docs/LIVE_SCENARIO_CONTENT.md`, `TODO.md`, `docs/PLAYTEST_CHECKLIST.md`
+
+## 2026-05-25 15:25 IST - Recheck
+
+- Area: Stale-lock relock when stale `unignoreReports()` fails
+- Result: Resolved in the current worktree.
+- Evidence: `lockReviewedContent()` now treats stale `unignoreReports()` failure as a blocking runtime failure before reopening the stale lock or attempting replacement moderation writes. The existing lock remains `active`, receives the `unignoreReports failed for t3_post` runtime warning, records runtime proof and a `runtime_failure` audit event, and the replacement `approve()` / `ignoreReports()` calls are not attempted. `src/server/services/lockFlow.test.ts` includes `keeps the stale lock active when stale unignore fails before replacement`, covering simultaneous stale-unignore and replacement-ignore failure setup. `npm run test -- src/server/services/lockFlow.test.ts --reporter verbose` passes.
+
+## 2026-05-25 15:25 IST - Recheck
+
+- Area: Live trigger proof runbook target split
+- Result: Resolved in the current worktree.
+- Evidence: `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md` now separates the S01 active-lock baseline from the executable dashboard-post report candidate `t3_1tm8nak`. `docs/LIVE_SCENARIO_CONTENT.md` marks S01 same-account report proof as blocked, adds the dashboard post candidate details, and removes the stale manual preflight text that said S01 had not been posted.
+
+## 2026-05-25 15:27 IST - Finding
+
+- Severity: low
+- Area: Live scenario content duplicates the dashboard-post report candidate
+- Evidence: `docs/LIVE_SCENARIO_CONTENT.md` now contains two `## Live Report Candidate - Dashboard Post` sections for the same target `t3_1tm8nak`: the first at `docs/LIVE_SCENARIO_CONTENT.md:63-86` includes the expected report-suppression proof steps, and the second at `docs/LIVE_SCENARIO_CONTENT.md:118-129` repeats the same permalink and thing id in shorter form after S02.
+- Why it matters: The live proof pass depends on following exact scenario instructions and recording evidence against the right target. Duplicating the same candidate in two places is easy to read as two separate proof items or as a stale copy of the current candidate, which can muddy the evidence log for the next report-trigger run.
+- Suggested fix: Keep one dashboard-post candidate section near the S01 blocker note and remove or merge the later duplicate so the scenario sequence has a single source of truth for `t3_1tm8nak`.
+- Files reviewed: `docs/LIVE_SCENARIO_CONTENT.md`, `docs/LIVE_TRIGGER_PROOF_RUNBOOK.md`, `docs/REVIEW_AGENT_FINDINGS.md`

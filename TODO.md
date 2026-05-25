@@ -75,6 +75,7 @@
 - [x] Compare current fingerprints before treating active lock submissions as duplicates.
 - [x] Keep seeded demo dashboard actions read-only.
 - [x] Unignore stale locks before attempting replacement relock writes.
+- [x] Keep stale relocks retryable when stale `unignoreReports()` fails.
 - [x] Reconcile proof-boundary docs after controlled post-target moderation proof.
 - [x] Remove controlled test subreddit fallbacks from runtime subreddit normalization and dashboard launch writes.
 - [x] Send explicit dashboard subreddit scope with inline unlock actions.

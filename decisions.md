@@ -1073,3 +1073,25 @@ Reason:
 - The proof run must compare real runtime payload structure with local route
   fixtures, but ReviewLock's safety boundary forbids collecting reporter
   identities or unnecessary content details in logs.
+
+### D067 - Keep stale relock retryable when stale unignore fails
+
+Stale-lock relock can discover that the current target fingerprint differs from
+the stored lock, which means the old reviewed-content lock is stale. Before
+creating a replacement lock, ReviewLock must return reports to normal handling
+for the stale lock.
+
+Decision:
+
+- Treat stale `unignoreReports()` failure as a blocking runtime failure.
+- Keep the existing stale lock active and visible with runtime warnings.
+- Record the failed `unignoreReports()` result in runtime proof and audit.
+- Do not create a replacement lock until the stale lock can be unignored and
+  reopened.
+
+Reason:
+
+- Removing the active lock after `unignoreReports()` fails can leave Reddit
+  still ignoring reports with no ReviewLock retry surface. Keeping the active
+  lock visible is the stronger moderator-useful state because later report,
+  update, unlock, or relock attempts can retry the fail-open transition.
