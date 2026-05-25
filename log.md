@@ -1421,3 +1421,31 @@
 - Open risks:
   - Comment report triggers remain unverified.
   - Update/edit trigger delivery remains unverified.
+
+## 2026-05-25 - Wave 33 reviewer hardening pass: fail-open refetch and menu/demo fixes
+
+- Integrated fresh reviewer findings before continuing live edit proof.
+- Hardened `resolveTargetById()` so thrown Reddit refetch errors become
+  structured uncertainty instead of bypassing report/update trigger fail-open
+  handling.
+- Made comment lock/unlock menu fallback extraction prefer `commentId` over a
+  sibling parent `postId`, matching the trigger-route fix.
+- Kept demo-mode exit retryable by deferring the client state switch until
+  server-side demo disable succeeds.
+- Rendered escaped audit target, lock, operation, reason, and error details so
+  runtime-failure warning examples are visible in the dashboard audit surface.
+- Commands run:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/menu.test.ts src/client/state/store.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg "TODO" src || true`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md || true`
+- Pass/fail status: PASS for focused regression tests, type-check, lint, full
+  test suite, build, and diff whitespace check.
+- Open risks:
+  - Forbidden-copy scan matched only guardrail tests and documentation
+    references.
+  - Controlled live edit/update trigger proof remains pending.

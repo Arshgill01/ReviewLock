@@ -18,6 +18,17 @@ const target = (): ReviewLockTarget => ({
   reportCount: 4,
 });
 
+const commentTarget = (): ReviewLockTarget => ({
+  id: 't1_comment',
+  kind: 'comment',
+  subreddit: 'alpha',
+  authorName: 'u_commenter',
+  permalink: '/r/alpha/comments/post/-/comment',
+  body: 'Reviewed comment',
+  edited: false,
+  reportCount: 2,
+});
+
 describe('menu routes', () => {
   it('builds lock review form fields with target context', () => {
     expect(buildLockReviewForm(target())).toMatchObject({
@@ -65,6 +76,28 @@ describe('menu routes', () => {
         form: {
           fields: expect.arrayContaining([
             expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
+          ]),
+        },
+      },
+    });
+  });
+
+  it('prefers comment ids for comment lock menu payload fallbacks', async () => {
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target(), commentTarget()]),
+      redis: new InMemoryRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-comment', {
+      method: 'POST',
+      body: JSON.stringify({ postId: 'post', commentId: 'comment' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        form: {
+          fields: expect.arrayContaining([
+            expect.objectContaining({ name: 'targetId', defaultValue: 't1_comment' }),
           ]),
         },
       },
@@ -129,6 +162,52 @@ describe('menu routes', () => {
             expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
             expect.objectContaining({ name: 'lockId', defaultValue: 'lock-1' }),
             expect.objectContaining({ name: 'formToken' }),
+          ]),
+        },
+      },
+    });
+  });
+
+  it('prefers comment ids for comment unlock menu payload fallbacks', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, {
+      id: 'lock-comment',
+      subreddit: 'alpha',
+      targetId: 't1_comment',
+      targetKind: 'comment',
+      targetAuthor: 'u_commenter',
+      permalink: '/r/alpha/comments/post/-/comment',
+      contentPreview: 'Reviewed comment',
+      contentHash: 'hash',
+      fingerprintVersion: 'content-v1',
+      lockedBy: 'mod',
+      lockedAt: '2026-05-24T00:00:00.000Z',
+      lockReason: 'reviewed_policy_compliant',
+      status: 'active',
+      lastKnownEdited: false,
+      lastReportCount: 2,
+      suppressedReportCount: 0,
+      runtimeWarnings: [],
+      demo: false,
+    });
+
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target(), commentTarget()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/unlock-comment', {
+      method: 'POST',
+      body: JSON.stringify({ postId: 'post', commentId: 'comment' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        name: 'unlockReview',
+        form: {
+          fields: expect.arrayContaining([
+            expect.objectContaining({ name: 'targetId', defaultValue: 't1_comment' }),
+            expect.objectContaining({ name: 'lockId', defaultValue: 'lock-comment' }),
           ]),
         },
       },

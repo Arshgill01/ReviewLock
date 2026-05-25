@@ -103,3 +103,7 @@
 - [x] Surface item-level runtime warnings on reopened dashboard items.
 - [x] Record granular trigger delivery capabilities in runtime proof.
 - [x] Prefer comment ids over sibling post ids in comment report/update trigger payloads.
+- [x] Prefer comment ids over sibling post ids in comment lock/unlock menu payloads.
+- [x] Fail open when Reddit target refetch throws during report/update trigger handling.
+- [x] Keep demo-mode exit retryable when server-side demo disable fails.
+- [x] Surface runtime-failure audit target, lock, operation, reason, and error details.

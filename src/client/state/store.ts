@@ -223,9 +223,9 @@ export class ReviewLockStore {
         this.subreddit = status.subreddit;
       } else {
         const demoSubreddit = this.subreddit;
+        await this.api.disableDemoMode(demoSubreddit);
         this.demo = false;
         this.subreddit = this.liveSubreddit;
-        await this.api.disableDemoMode(demoSubreddit);
       }
 
       await this.fetchState();

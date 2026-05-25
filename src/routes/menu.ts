@@ -31,7 +31,8 @@ const readMenuBody = async (context: Context): Promise<ReviewLockMenuRequest> =>
 const targetIdFromBody = (
   body: ReviewLockMenuRequest,
   kind: TargetKind,
-): string | undefined => normalizeTargetId(kind, body.targetId ?? body.postId ?? body.commentId);
+): string | undefined =>
+  normalizeTargetId(kind, kind === 'post' ? body.targetId ?? body.postId : body.targetId ?? body.commentId);
 
 const targetSummary = (target: {
   id: string;

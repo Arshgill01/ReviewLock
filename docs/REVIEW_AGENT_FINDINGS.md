@@ -628,3 +628,153 @@
   `post.id` plus `comment.id`, including a wrapped comment update payload, and
   prove the route calls `unignoreReports:t1_comment` or
   `ignoreReports:t1_comment`.
+
+## 2026-05-25 15:47 IST - Finding
+
+- Severity: medium
+- Area: Comment menu fallback target extraction can choose the parent post id
+- Evidence: `src/routes/menu.ts:18-34` extends the Devvit `MenuItemRequest`
+  body with optional `postId` and `commentId`, but `targetIdFromBody()` always
+  falls back through `body.targetId ?? body.postId ?? body.commentId` before
+  applying the endpoint kind. On `/lock-comment` or `/unlock-comment`, a
+  context-shaped body with both `postId: "t3_parent"` and
+  `commentId: "t1_comment"` but no `targetId` will normalize the parent post id
+  as `t3_parent`, allowing the comment endpoint to resolve the parent post
+  instead of the actual comment. The
+  installed official `MenuItemRequest` type does provide exact `targetId`
+  (`node_modules/@devvit/shared/types/menu-item.d.ts:2-12`), but Devvit context
+  types also expose both `postId` and `commentId`
+  (`node_modules/@devvit/public-api/types/context.d.ts:27-52`), and the route
+  already added those fallback fields. Existing menu tests only cover post menu
+  payloads and target-level open actions (`src/routes/menu.test.ts:33-151`);
+  there is no lock/unlock regression for comment payloads with both ids.
+- Why it matters: Comment lock and unlock proof is still pending, and comment
+  menu availability is called out as a current live-proof gap. If the Web server
+  sends a BaseContext-style body or a future test harness omits `targetId`, the
+  comment menu action can fail before ReviewLock creates or unlocks the reviewed
+  comment lock.
+- Suggested fix: Make menu target extraction kind-aware, matching the trigger
+  route fix: post endpoints should prefer `targetId`, `postId`; comment
+  endpoints should prefer `targetId`, `commentId` and only inspect post ids for
+  post routes. Add `/lock-comment` and `/unlock-comment` route tests with both
+  `postId` and `commentId` present and no `targetId`.
+- Files reviewed: `src/routes/menu.ts`, `src/routes/menu.test.ts`,
+  `node_modules/@devvit/shared/types/menu-item.d.ts`,
+  `node_modules/@devvit/public-api/types/context.d.ts`
+
+## 2026-05-25 15:50 IST - Finding
+
+- Severity: low
+- Area: Demo-mode exit mutates client state before disable succeeds
+- Evidence: `ReviewLockStore.setDemo(false)` captures the demo subreddit, then
+  immediately sets `this.demo = false` and `this.subreddit = this.liveSubreddit`
+  before awaiting `this.api.disableDemoMode(demoSubreddit)`
+  (`src/client/state/store.ts:224-229`). If the disable request rejects, the
+  catch block records the error but does not restore the prior demo state
+  (`src/client/state/store.ts:231-235`). A subsequent call to
+  `setDemo(false)` sees `demo === this.demo` and only fetches state without
+  retrying `disableDemoMode()` (`src/client/state/store.ts:209-212`). Existing
+  store tests cover only successful demo disable paths
+  (`src/client/state/store.test.ts:205-232`), not a rejected disable request.
+- Why it matters: Demo mode is a required, visibly labeled story. A transient
+  API/Redis failure while exiting demo can leave the browser in live-mode state
+  even though the demo disable operation never completed, and the same control
+  path cannot retry the server-side disable because the client already believes
+  it has exited demo.
+- Suggested fix: Defer mutating `this.demo` and `this.subreddit` until
+  `disableDemoMode()` succeeds, or snapshot and restore the previous demo state
+  in the catch path. Add a store regression where `disableDemoMode()` rejects,
+  asserting the store remains in `reviewlock_demo` with `demo === true` and a
+  later `setDemo(false)` retries the disable call.
+- Files reviewed: `src/client/state/store.ts`, `src/client/state/store.test.ts`,
+  `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-25 15:52 IST - Finding
+
+- Severity: high
+- Area: Thrown Reddit refetch errors bypass trigger fail-open reopen handling
+- Evidence: `resolveTargetById()` awaits `reddit.getPostById()` /
+  `reddit.getCommentById()` directly and only returns a structured
+  `{ ok: false }` result when the adapter returns `undefined`
+  (`src/server/services/targetResolver.ts:39-64`). Both report and update
+  trigger services call it before their main `try` blocks
+  (`src/server/services/reportTriggers.ts:178-188`,
+  `src/server/services/reopenFlow.ts:96-124`). The fail-open paths that reopen a
+  known active lock as `runtime_uncertain` only run after a structured
+  unresolved result reaches those blocks (`src/server/services/reportTriggers.ts:199-230`,
+  `src/server/services/reopenFlow.ts:124-170`). Existing regressions cover a
+  missing target returned by `FakeRedditAdapter` (`src/server/services/reportTriggers.test.ts:410-437`,
+  `src/server/services/reopenFlow.test.ts:114-120`), but there is no regression
+  where `getPostById()` or `getCommentById()` rejects.
+- Why it matters: Devvit/Reddit refetch can fail transiently during the exact
+  report/update trigger pass where ReviewLock must avoid suppressing changed or
+  uncertain content. If the refetch throws, the service rejects before it can
+  acquire the target lock, queue a `runtime_uncertain` reopen, clear dedupe, or
+  write an audit/runtime warning. That can leave a known active lock in place
+  after an edit/update delivery instead of failing open.
+- Suggested fix: Catch adapter errors inside `resolveTargetById()` and return
+  `{ ok: false, targetKind, error }`, or move resolution inside the trigger
+  service `try` blocks and map thrown errors to the existing runtime-uncertain
+  path. Add report and update trigger regressions with a Reddit adapter whose
+  refetch method rejects while an active lock and subreddit scope are present,
+  asserting the lock reopens with `runtime_uncertain` and warnings are visible.
+- Files reviewed: `src/server/services/targetResolver.ts`,
+  `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/reopenFlow.test.ts`
+
+## 2026-05-25 15:57 IST - Finding
+
+- Severity: medium
+- Area: Seeded demo warning example is not shown in the main dashboard lists
+- Evidence: The required seeded warning case is created as a failed lock:
+  `failedLock()` sets `status: 'failed'` and preserves `runtimeWarnings`
+  (`src/shared/demoScenario.ts:85-89`), and `warningInput` is included in
+  `demoLocks` (`src/shared/demoScenario.ts:386-406`). The demo summary counts
+  this warning from all scenario locks (`src/server/services/demoData.ts:6-13`),
+  but dashboard data only loads `listActiveLocks()` for the locks response
+  (`src/server/services/dashboard.ts:66-87`,
+  `src/routes/api.dashboard.ts:230-235`), and `listActiveLocks()` filters to
+  `lock?.status === 'active'` (`src/server/services/locks.ts:103-111`). The
+  client table repeats that active-only filter (`src/client/components/LockTable.ts:60-66`).
+  The audit timeline does include the seeded `runtime_failure`, but renders only
+  kind, timestamp, actor, and message, not the affected target, lock id, or
+  warning detail (`src/shared/demoScenario.ts:477-485`,
+  `src/client/components/AuditTimeline.ts:6-33`).
+- Why it matters: Demo mode is mandatory and must visibly show one
+  failure/warning example. In the current dashboard, the explicit warning lock
+  is hidden from the active-lock and reopen-queue surfaces, so the demo mostly
+  shows the happy edit-break loop plus a generic audit sentence. That makes the
+  safety/recovery story weaker and can make the fixture-level warning coverage
+  look present in tests while absent from the moderator-facing dashboard.
+- Suggested fix: Add a small "Needs attention" dashboard list for failed locks
+  or include failed warning locks in the locks endpoint/table as a distinct
+  non-actionable row. At minimum, render target id/lock id and warning detail in
+  the audit timeline for runtime failures. Add a dashboard/render regression
+  that seeds `DEMO_SCENARIO` and asserts the runtime warning example target or
+  warning text is visible in the main dashboard HTML.
+- Files reviewed: `src/shared/demoScenario.ts`,
+  `src/server/services/demoData.ts`, `src/server/services/dashboard.ts`,
+  `src/server/services/locks.ts`, `src/routes/api.dashboard.ts`,
+  `src/client/components/LockTable.ts`, `src/client/components/AuditTimeline.ts`
+
+## 2026-05-25 22:38 IST - Resolution
+
+- Resolved comment menu fallback extraction by making `src/routes/menu.ts`
+  endpoint-kind-aware; comment lock/unlock routes now prefer `commentId` over a
+  sibling parent `postId`.
+- Added `/lock-comment` and `/unlock-comment` regressions with both ids present
+  and no `targetId`.
+- Resolved thrown Reddit refetch failures by catching adapter exceptions in
+  `resolveTargetById()` and returning structured uncertainty to the existing
+  report/update fail-open paths.
+- Added report and update regressions proving a known active lock reopens as
+  `runtime_uncertain` when refetch throws.
+- Resolved demo exit retry drift by mutating client demo state only after
+  `disableDemoMode()` succeeds, with a retry regression.
+- Improved seeded warning visibility by rendering escaped audit target, lock,
+  operation, reason, and error details; added render coverage for runtime
+  failure audit details.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/menu.test.ts src/client/state/store.test.ts src/client/render.test.ts --reporter verbose`
+  - `npm run type-check`

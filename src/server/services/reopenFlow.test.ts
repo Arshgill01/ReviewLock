@@ -64,6 +64,12 @@ const deps = async (currentTarget: ReviewLockTarget | null = target()) => {
   };
 };
 
+class RefetchFailingRedditAdapter extends FakeRedditAdapter {
+  override async getPostById(): Promise<ReviewLockTarget | undefined> {
+    throw new Error('reddit unavailable');
+  }
+}
+
 describe('breakLockForChangedContent', () => {
   it('leaves unchanged content locked', async () => {
     const dependencies = await deps();
@@ -120,6 +126,36 @@ describe('breakLockForChangedContent', () => {
 
     expect(result.action).toBe('runtime_uncertain');
     expect(result.event).toMatchObject({ reason: 'runtime_uncertain' });
+  });
+
+  it('fails open to runtime uncertain when Reddit refetch throws', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+
+    const result = await breakLockForChangedContent(
+      {
+        redis,
+        reddit: new RefetchFailingRedditAdapter(),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      {
+        targetId: 't3_post',
+        subreddit: 'alpha',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        reason: 'runtime_uncertain',
+        runtimeWarnings: ['target_resolution_failed'],
+      }),
+    ]);
   });
 
   it('does not enqueue duplicates after lock is no longer active', async () => {

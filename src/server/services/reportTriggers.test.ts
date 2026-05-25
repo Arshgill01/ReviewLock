@@ -72,6 +72,16 @@ const deps = async (currentTarget = target()) => {
   };
 };
 
+class RefetchFailingRedditAdapter extends FakeRedditAdapter {
+  override async getPostById(): Promise<ReviewLockTarget | undefined> {
+    throw new Error('reddit unavailable');
+  }
+
+  override async getCommentById(): Promise<ReviewLockTarget | undefined> {
+    throw new Error('reddit unavailable');
+  }
+}
+
 describe('handleReportTrigger', () => {
   it('does nothing when no lock exists', async () => {
     const redis = new InMemoryRedisStore();
@@ -194,6 +204,33 @@ describe('handleReportTrigger', () => {
       reportsSuppressed: 0,
     });
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
+  });
+
+  it('fails open when Reddit refetch throws while a locked report target is known', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit: new RefetchFailingRedditAdapter(),
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', subreddit: 'alpha', eventId: 'evt-refetch-fails' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        reason: 'runtime_uncertain',
+        runtimeWarnings: ['target_resolution_failed'],
+      }),
+    ]);
   });
 
   it('uses report count to avoid undercounting distinct no-id report deliveries', async () => {

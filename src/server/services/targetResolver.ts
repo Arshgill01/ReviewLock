@@ -49,8 +49,22 @@ export const resolveTargetById = async (
     };
   }
 
-  const target =
-    targetKind === 'post' ? await reddit.getPostById(targetId) : await reddit.getCommentById(targetId);
+  let target: ReviewLockTarget | undefined;
+  try {
+    target =
+      targetKind === 'post'
+        ? await reddit.getPostById(targetId)
+        : await reddit.getCommentById(targetId);
+  } catch (error) {
+    return {
+      ok: false,
+      targetKind,
+      error:
+        error instanceof Error
+          ? `Target refetch failed: ${error.message}`
+          : 'Target refetch failed.',
+    };
+  }
 
   if (!target) {
     return {

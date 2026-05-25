@@ -1176,3 +1176,58 @@ Reason:
 - The app must reopen or suppress the reviewed comment lock, not a normalized
   version of the parent post id. Kind-aware extraction is the least surprising
   route-boundary behavior and matches the Devvit payload model.
+
+### D072 - Make menu fallback target extraction kind-aware
+
+Devvit menu requests normally include an exact `targetId`, but context-shaped
+payloads can expose both `postId` and `commentId` for comment surfaces.
+
+Decision:
+
+- On post menu endpoints, normalize `targetId` or `postId`.
+- On comment menu endpoints, normalize `targetId` or `commentId`.
+- Do not allow a sibling parent post id to satisfy a comment lock/unlock menu
+  route.
+
+Reason:
+
+- Comment menu proof is still pending, and the safest fallback behavior is to
+  keep the route boundary aligned with the requested target kind. Locking or
+  unlocking the parent post when the moderator selected a comment would violate
+  the reviewed-content ledger.
+
+### D073 - Treat thrown Reddit refetch failures as structured uncertainty
+
+Reddit target refetch can fail transiently during report and update triggers.
+
+Decision:
+
+- Catch refetch exceptions in the shared target resolver and return a structured
+  unresolved result with the inferred target kind.
+- Let existing report/update trigger fail-open paths reopen a known active lock
+  as `runtime_uncertain` when subreddit scope is available.
+- Keep missing subreddit scope as a runtime failure without claiming a reopen.
+
+Reason:
+
+- Throwing before trigger fail-open logic can leave an active lock suppressing
+  reports after ReviewLock failed to verify current content. Structured
+  uncertainty keeps the stronger product invariant: when content integrity
+  cannot be proven, the lock should not silently continue.
+
+### D074 - Keep failed demo exit retryable in client state
+
+Demo mode exit is server-backed because seeded Redis state must be removed.
+
+Decision:
+
+- Do not mutate the client from demo mode to live mode until
+  `disableDemoMode()` succeeds.
+- If demo disable fails, keep `demo === true` and `subreddit ===
+  reviewlock_demo` so the moderator can retry the same action.
+
+Reason:
+
+- A browser-only state flip would make demo mode appear exited while server
+  cleanup failed. Keeping the old state visible is more honest and keeps the
+  retry path available.

@@ -240,6 +240,27 @@ describe('client render helpers', () => {
     const html = renderAuditTimeline([audit()]);
     expect(html).toContain('Audit timeline');
     expect(html).toContain('Repeat report suppressed');
+    expect(html).toContain('Target post t3_reviewed');
+    expect(html).toContain('Lock lock-1');
+    expectSafeCopy(html);
+  });
+
+  it('renders runtime failure audit details for the seeded warning example', () => {
+    const html = renderAuditTimeline([
+      {
+        ...audit(),
+        kind: 'runtime_failure',
+        targetId: 't3_warning',
+        lockId: 'lock-warning',
+        message: 'Demo runtime warning recorded for capability transparency.',
+        data: { operation: 'ignoreReports', ok: false, error: 'permission denied' },
+      },
+    ]);
+
+    expect(html).toContain('t3_warning');
+    expect(html).toContain('lock-warning');
+    expect(html).toContain('Operation ignoreReports');
+    expect(html).toContain('Error permission denied');
     expectSafeCopy(html);
   });
 

@@ -230,4 +230,30 @@ describe('ReviewLockStore', () => {
     expect(store.subreddit).toBe('reviewlock_dev');
     expect(apiClient.fetchOverview).toHaveBeenLastCalledWith('reviewlock_dev', false);
   });
+
+  it('keeps demo exit retryable when disabling demo mode fails', async () => {
+    store.updateSubredditContext('reviewlock_dev');
+    await store.setDemo(true);
+    vi.mocked(apiClient.disableDemoMode)
+      .mockRejectedValueOnce(new Error('Redis unavailable'))
+      .mockResolvedValueOnce({
+        subreddit: 'reviewlock_demo',
+        enabled: false,
+        demo: true,
+        lockCount: 0,
+        reopenEventCount: 0,
+      });
+
+    await store.setDemo(false);
+
+    expect(store.demo).toBe(true);
+    expect(store.subreddit).toBe('reviewlock_demo');
+    expect(store.error).toBe('Redis unavailable');
+
+    await store.setDemo(false);
+
+    expect(apiClient.disableDemoMode).toHaveBeenCalledTimes(2);
+    expect(store.demo).toBe(false);
+    expect(store.subreddit).toBe('reviewlock_dev');
+  });
 });

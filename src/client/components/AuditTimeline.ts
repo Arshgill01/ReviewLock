@@ -3,6 +3,22 @@ import type { AuditEvent } from '../../shared/schema';
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
+const renderAuditDetails = (event: AuditEvent): string => {
+  const details = [
+    event.targetId ? `Target ${event.targetKind ?? 'target'} ${event.targetId}` : undefined,
+    event.lockId ? `Lock ${event.lockId}` : undefined,
+    event.data.operation ? `Operation ${String(event.data.operation)}` : undefined,
+    event.data.error ? `Error ${String(event.data.error)}` : undefined,
+    event.data.reason ? `Reason ${String(event.data.reason)}` : undefined,
+  ].filter((detail): detail is string => Boolean(detail));
+
+  if (details.length === 0) {
+    return '';
+  }
+
+  return `<p class="audit-details">${text(details.join(' · '))}</p>`;
+};
+
 export const renderAuditTimeline = (events: AuditEvent[]): string => {
   const rows = events
     .map(
@@ -13,6 +29,7 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
             <span>${new Date(event.createdAt).toLocaleString()} · <strong>${text(event.actor)}</strong></span>
           </div>
           <p>${text(event.message)}</p>
+          ${renderAuditDetails(event)}
         </li>
       `,
     )
