@@ -2344,3 +2344,25 @@
   rows stayed correctly unverified.
 - No live report submission, post edit, comment edit, unlock, or dismiss action
   was performed in this recheck.
+
+## 2026-05-26 02:03 IST - Client target-link hardening
+
+- Added `noopener` alongside `noreferrer` on active-lock target links that open
+  in a new tab.
+- Added a render regression proving new-tab target links keep
+  `rel="noopener noreferrer"`.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+  - PASS, 1 test file and 17 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 351 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

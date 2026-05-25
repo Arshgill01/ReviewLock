@@ -69,7 +69,7 @@ export const renderLockTable = (
       (lock) => `
         <tr>
           <td>
-            <a href="${attr(lock.permalink)}" target="_blank" rel="noreferrer">
+            <a href="${attr(lock.permalink)}" target="_blank" rel="noopener noreferrer">
               <code>${lock.targetKind}:${text(lock.targetId.replace('t1_', '').replace('t3_', ''))}</code>
             </a>
           </td>
