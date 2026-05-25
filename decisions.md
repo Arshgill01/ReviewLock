@@ -2306,3 +2306,23 @@ Reason:
   trusted runtime scope for live data, but the client should not render or fetch
   against malformed subreddit identifiers while waiting for that server-side
   rejection.
+
+### D130 - Audit timeline rows use a vertical layout in the embedded dashboard
+
+The Reddit Devvit WebView can render the dashboard in a narrow iframe inside a
+wide Reddit page.
+
+Decision:
+
+- Render audit rows as vertical timeline entries instead of reusing the
+  queue/churn horizontal row layout.
+- Keep the audit kind, timestamp, and actor together as wrapping metadata.
+- Let messages and lock/target detail strings wrap with long-id-safe breaking.
+
+Reason:
+
+- Audit entries contain long target ids, lock ids, timestamps, and messages.
+  In the embedded WebView, forcing those fields into a horizontal flex row
+  overlaps text and makes the proof ledger unreadable. The audit ledger is
+  central runtime evidence, so readability is a product requirement, not just
+  polish.

@@ -3,6 +3,9 @@ import type { AuditEvent } from '../../shared/schema';
 const text = (value: string | undefined): string =>
   (value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
+const attr = (value: string | undefined): string =>
+  text(value).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+
 const renderAuditDetails = (event: AuditEvent): string => {
   const details = [
     event.targetId ? `Target ${event.targetKind ?? 'target'} ${event.targetId}` : undefined,
@@ -21,18 +24,23 @@ const renderAuditDetails = (event: AuditEvent): string => {
 
 export const renderAuditTimeline = (events: AuditEvent[]): string => {
   const rows = events
-    .map(
-      (event) => `
+    .map((event) => {
+      const createdAt = new Date(event.createdAt);
+
+      return `
         <li class="audit-row">
-          <div>
+          <div class="audit-row-header">
             <strong class="audit-kind">${event.kind.replace(/_/g, ' ')}</strong>
-            <span>${new Date(event.createdAt).toLocaleString()} · <strong>${text(event.actor)}</strong></span>
+            <span class="audit-meta">
+              <time datetime="${attr(event.createdAt)}">${createdAt.toLocaleString()}</time>
+              <span>${text(event.actor)}</span>
+            </span>
           </div>
-          <p>${text(event.message)}</p>
+          <p class="audit-message">${text(event.message)}</p>
           ${renderAuditDetails(event)}
         </li>
-      `,
-    )
+      `;
+    })
     .join('');
 
   return `

@@ -2638,3 +2638,56 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 02:33 IST - Live WebView client runtime-context validation recheck
+
+- Rechecked the live Reddit Devvit WebView in Zen after client runtime-context
+  validation landed.
+- Existing dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account: `u/BrightyBrainiac`.
+- Playtest version observed in WebView links: `v0.0.2.302`.
+- Live dashboard rendered under `r/reviewlock_dev` with 2 active locks, 1
+  report suppressed, 2 reopened after edit, latest edit-break target
+  `comment:ontlx1k`, and 9 audit timeline entries.
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime proof/status remained honestly scoped as `unverified` overall because
+  some platform trigger capabilities are still unverified.
+- No live report submission, post edit, comment edit, unlock, dismiss, or
+  destructive moderation action was performed in this recheck.
+
+## 2026-05-26 02:34 IST - Embedded audit timeline layout hardening
+
+- Fixed the audit timeline layout after live Zen screenshots showed audit
+  timestamps, messages, and lock details overlapping inside the Reddit embedded
+  WebView.
+- Split audit rows out of the shared horizontal queue/churn row CSS and made
+  them vertical timeline entries.
+- Added wrapping audit metadata, semantic `<time>` output, explicit timestamp
+  attribute escaping, and long-id-safe wrapping for audit message/details text.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+  - PASS, 1 test file and 17 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 42 test files / 370 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+- Live/visual verification:
+  - Reloaded the Reddit Devvit WebView in Zen; playtest links showed
+    `v0.0.2.306`.
+  - Built a temporary audit timeline preview with the real `src/client/styles.css`
+    and representative long target/lock ids, served it locally, and captured a
+    Playwright screenshot.
+  - Visual preview confirmed audit kind, timestamp, actor, message, and long
+    lock/target details now wrap vertically without overlap.
