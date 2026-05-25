@@ -145,6 +145,26 @@ describe('breakLockForChangedContent', () => {
     });
   });
 
+  it('stores update trigger proof capability on reopen audit data', async () => {
+    const dependencies = await deps(target({ body: 'Edited body', edited: true }));
+    const result = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      reasonHint: 'flair_changed',
+      triggerCapabilityName: 'postFlairUpdateTrigger',
+    });
+
+    expect(result.action).toBe('reopened');
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'lock_reopened',
+        data: expect.objectContaining({
+          reason: 'flair_changed',
+          triggerCapabilityName: 'postFlairUpdateTrigger',
+        }),
+      }),
+    ]);
+  });
+
   it('records unignore failure but still shows reopened item', async () => {
     const dependencies = await deps(target({ body: 'Edited body', edited: true }));
     dependencies.reddit.failOperation('unignoreReports', 'permission denied');

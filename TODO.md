@@ -151,3 +151,6 @@
 - [x] Record runtime-failure audits when reopen metrics fail after visible reopen state changes.
 - [x] Enforce seeded demo dashboard read-only behavior at the server mutation boundary.
 - [x] Reconcile live report-trigger runtime proof from durable non-demo suppression audits.
+- [x] Reconcile update-trigger runtime proof from durable reopen audits with strict reason matching.
+- [x] Preserve live subreddit context when reloaded demo URLs use the demo namespace.
+- [x] Require update-trigger runtime proof audits to match the trigger target kind.

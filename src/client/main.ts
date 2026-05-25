@@ -3,22 +3,26 @@ import { renderDashboardPage } from './pages/DashboardPage';
 import { ReviewLockApiClient } from './state/api';
 import { inferEmbeddedSubreddit } from './state/runtimeContext';
 import { ReviewLockStore } from './state/store';
+import { DEMO_SUBREDDIT } from '../shared/constants';
 
 const app = document.querySelector<HTMLDivElement>('#app');
 const params = new URLSearchParams(window.location.search);
 const api = new ReviewLockApiClient();
 const requestedSubreddit = params.get('subreddit');
-const embeddedSubreddit = requestedSubreddit
-  ? undefined
-  : inferEmbeddedSubreddit(
+const initialDemo = params.get('demo') === 'true';
+const shouldInferEmbeddedSubreddit =
+  !requestedSubreddit || (initialDemo && requestedSubreddit === DEMO_SUBREDDIT);
+const embeddedSubreddit = shouldInferEmbeddedSubreddit
+  ? inferEmbeddedSubreddit(
       window.location.href,
       document.referrer,
       (globalThis as { devvit?: unknown }).devvit,
-    );
+    )
+  : undefined;
 const store = new ReviewLockStore(
   api,
   requestedSubreddit ?? embeddedSubreddit ?? '',
-  params.get('demo') === 'true',
+  initialDemo,
 );
 
 const render = (): void => {
@@ -82,7 +86,7 @@ app?.addEventListener('click', (event) => {
     const url = new URL(window.location.href);
     url.searchParams.set('demo', demo ? 'true' : 'false');
     if (demo) {
-      url.searchParams.set('subreddit', 'reviewlock_demo');
+      url.searchParams.set('subreddit', DEMO_SUBREDDIT);
     } else if (store.getLiveSubreddit()) {
       url.searchParams.set('subreddit', store.getLiveSubreddit());
     } else {
@@ -103,7 +107,7 @@ app?.addEventListener('click', (event) => {
 
 render();
 void (async () => {
-  if (!requestedSubreddit) {
+  if (shouldInferEmbeddedSubreddit) {
     if (embeddedSubreddit) {
       store.updateSubredditContext(embeddedSubreddit);
     }

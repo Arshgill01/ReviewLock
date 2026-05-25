@@ -1899,3 +1899,59 @@ Reason:
   capability row for the same live namespace. The dashboard should surface that
   proof without weakening failure visibility or confusing demo fixtures with
   live runtime behavior.
+
+### D110 - Update-trigger proof reconciliation requires concrete reason match
+
+Update-trigger runtime proof rows can also be missing even when the reopen audit
+was written durably.
+
+Decision:
+
+- Store `triggerCapabilityName` in update-trigger `lock_reopened` audit data.
+- Reconcile unverified update-trigger proof from non-demo reopen audits only
+  when the audit contains a known update capability name and the expected
+  concrete reopen reason for that capability.
+- Do not reconcile `runtime_uncertain`, unknown, mismatched, or demo reopen
+  audits into verified update-trigger proof.
+
+Reason:
+
+- A durable reopen audit can prove an update-trigger path only when it includes
+  both the trigger identity and the material change class. A failed refetch
+  proves fail-open behavior, not content-change trigger verification.
+
+### D111 - Reloaded demo URLs still resolve live subreddit context
+
+Demo mode writes `reviewlock_demo` into the URL so seeded reads remain
+isolated. A reloaded embedded WebView can therefore boot with
+`demo=true&subreddit=reviewlock_demo`.
+
+Decision:
+
+- When the dashboard boots in demo mode with the deterministic demo namespace,
+  still infer or fetch the embedded runtime subreddit before the first state
+  fetch.
+- Preserve the runtime subreddit as the live exit target while continuing to
+  read seeded demo data from `reviewlock_demo`.
+
+Reason:
+
+- Demo mode must be isolated, but exiting demo should return moderators to the
+  current installed subreddit rather than a hardcoded fallback namespace.
+
+### D112 - Update-trigger proof requires matching target kind
+
+Update-trigger reopen audits are schema-valid even when `targetKind` is absent.
+
+Decision:
+
+- Reconcile update-trigger proof only when `targetKind` matches the trigger
+  family: post capabilities require `post`, and `commentUpdateTrigger`
+  requires `comment`.
+- Keep missing-kind and mismatched-kind reopen audits as audit evidence only,
+  not runtime proof upgrades.
+
+Reason:
+
+- Post-only runtime rows such as flair, NSFW, and spoiler updates must not be
+  verified by partial legacy audits or comment-target reopen records.

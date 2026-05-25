@@ -204,7 +204,11 @@ export const breakLockForChangedContent = async (
           actor: 'reviewlock',
           createdAt: now,
           message: 'Lock reopened after reviewed content changed or became uncertain.',
-          data: { reason, unignoreReportsOk: unignoreResult?.ok ?? false },
+          data: {
+            reason,
+            triggerCapabilityName: input.triggerCapabilityName,
+            unignoreReportsOk: unignoreResult?.ok ?? false,
+          },
           demo: lock.demo,
         });
       } catch (error) {

@@ -1855,3 +1855,48 @@
   after edit.
 - No report submission, post edit, comment edit, unlock, dismiss, remove, or
   approval action was performed in this recheck.
+
+## 2026-05-26 01:06 IST - Runtime proof hardening
+
+- Update-trigger `lock_reopened` audits now include
+  `triggerCapabilityName`.
+- Runtime proof loading now reconciles unverified update-trigger rows from
+  durable non-demo reopen audits only when the audit capability name is known
+  and its concrete reopen reason matches the trigger type.
+- The failed-refetch `runtime_uncertain` path remains unverified, so fail-open
+  behavior cannot be mistaken for live content-change trigger proof.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 29 tests.
+- Integrated reviewer finding: update-trigger proof reconciliation now also
+  requires a target kind matching the trigger family, so post-only update proof
+  cannot be verified by missing-kind or comment-target reopen audits.
+- Additional focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 test files and 29 tests.
+- Full validation:
+  - Completed with demo reload hardening below.
+
+## 2026-05-26 01:10 IST - Demo reload context hardening
+
+- Demo dashboard boot now still infers or fetches embedded runtime context when
+  the URL contains `demo=true&subreddit=reviewlock_demo`.
+- Seeded demo reads stay in the deterministic demo namespace, while the live
+  runtime subreddit is preserved as the exit target for returning to live mode.
+- Integrated reviewer finding: reloaded demo URLs no longer fall back to the
+  hardcoded `reviewlock` live namespace after demo exit.
+- Focused validation:
+  - `npm run test -- src/client/state/store.test.ts --reporter verbose`
+  - PASS, 1 test file and 16 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 40 test files / 319 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

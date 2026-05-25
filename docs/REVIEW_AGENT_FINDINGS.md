@@ -2555,3 +2555,75 @@
   - `rg -n "TODO" src` returned no source TODOs.
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
+
+## 2026-05-26 01:04 IST - Finding
+
+- Severity: medium
+- Area: Reloaded demo URLs can lose the live subreddit needed to exit demo mode.
+- Evidence:
+  - `main.ts` treats any `subreddit` query param as authoritative and skips embedded/runtime context inference when it is present: `src/client/main.ts:10-22` and `src/client/main.ts:105-122`.
+  - The demo toggle writes `subreddit=reviewlock_demo` into the URL: `src/client/main.ts:80-92`.
+  - `ReviewLockStore` initializes `liveSubreddit` to hardcoded `reviewlock` when `initialSubreddit === 'reviewlock_demo'`: `src/client/state/store.ts:44-52`.
+  - Existing store tests cover `new ReviewLockStore(apiClient, 'reviewlock_dev', true)`, not the actual reloaded URL shape `new ReviewLockStore(apiClient, 'reviewlock_demo', true)`: `src/client/state/store.test.ts:226-254`.
+- Why it matters: if a moderator reloads or shares a demo URL containing `?demo=true&subreddit=reviewlock_demo`, exiting demo mode can send the dashboard back to `r/reviewlock` instead of the real Devvit runtime subreddit such as `r/reviewlock_dev`. The server will then reject live reads for scope mismatch, making demo exit look broken in the WebView.
+- Suggested fix: when `demo=true`, still fetch `/api/context` or infer the embedded subreddit even if the query subreddit is `reviewlock_demo`, then call `store.updateSubredditContext(runtimeSubreddit)` before the first fetch. Add a client/store regression that boots from `reviewlock_demo` demo mode, receives runtime context `reviewlock_dev`, exits demo, and fetches `reviewlock_dev` live data.
+- Files reviewed: `src/client/main.ts`, `src/client/state/store.ts`, `src/client/state/store.test.ts`, `src/client/state/runtimeContext.ts`.
+
+## 2026-05-26 01:05 IST - Finding
+
+- Severity: medium
+- Area: Update-trigger audit reconciliation verifies runtime-uncertain refetch failures.
+- Evidence:
+  - `breakLockForChangedContent()` writes `triggerCapabilityName` into every `lock_reopened` audit whenever the input has one, even when the reopen reason is `runtime_uncertain` and the target could not be refetched: `src/server/services/reopenFlow.ts:168-210`.
+  - `capabilityFromUpdateAudit()` verifies any non-demo `lock_reopened` audit with a known `triggerCapabilityName` without checking `event.data.reason`, target resolution, or whether `unignoreReports()` actually ran: `src/server/services/runtimeProof.ts:175-192`.
+  - Existing regression `fails open to runtime uncertain when Reddit refetch throws` expects `postUpdateTrigger` to remain unverified after a refetch failure: `src/server/services/reopenFlow.test.ts:198-231`.
+  - Focused validation failed after the current diff: `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts --reporter verbose` failed because `postUpdateTrigger` became `verified` from `lock_reopened audit audit-update-reopened-1779584400000-lock-1`.
+- Why it matters: runtime proof rows are supposed to turn green only after successful target resolution and route processing. A fail-open reopen is good product behavior, but treating it as verified update-trigger proof overclaims the exact Devvit/runtime evidence judges will inspect.
+- Suggested fix: only include or reconcile `triggerCapabilityName` for update audits when `resolution.target` exists and the comparison was a real material change, not `runtime_uncertain`. Alternatively, have `capabilityFromUpdateAudit()` require `event.data.reason !== 'runtime_uncertain'` plus a valid `targetKind`/target id before deriving proof. Keep the failing `reopenFlow.test.ts` expectation green and add a direct `runtimeProof.test.ts` regression for runtime-uncertain update audits.
+- Files reviewed: `src/server/services/reopenFlow.ts`, `src/server/services/runtimeProof.ts`, `src/server/services/reopenFlow.test.ts`, `src/server/services/runtimeProof.test.ts`.
+
+## 2026-05-26 01:10 IST - Finding
+
+- Severity: medium
+- Area: Update-trigger audit reconciliation does not require target kind to match the verified trigger.
+- Evidence:
+  - `capabilityFromUpdateAudit()` now requires a known `triggerCapabilityName` and matching reopen `reason`, but it does not inspect `event.targetKind` before returning a verified capability: `src/server/services/runtimeProof.ts:183-205`.
+  - `AuditEvent.targetKind` is optional in the shared type: `src/shared/schema.ts:95-105`.
+  - The audit schema guard accepts missing `targetKind` or either valid target kind: `src/shared/schema.ts:291-302`.
+  - The current update-proof tests cover a valid post-flair audit, unknown trigger names, demo audits, and mismatched reasons, but not missing target kind or a mismatched target kind such as `targetKind: 'comment'` with `triggerCapabilityName: 'postFlairUpdateTrigger'`: `src/server/services/runtimeProof.test.ts:230-312`.
+- Why it matters: post NSFW/spoiler/flair trigger proof is still an explicit live-proof gap. A schema-valid legacy or malformed `lock_reopened` audit with `reason: 'flair_changed'` and `triggerCapabilityName: 'postFlairUpdateTrigger'` can mark the post-flair proof row verified even if the audit is missing target kind or points at a comment. Runtime proof rows should require the durable audit evidence to match the concrete trigger family being claimed.
+- Suggested fix: require update-proof audit records to have a target kind consistent with the capability before reconciling: `post*` capabilities require `event.targetKind === 'post'`, `commentUpdateTrigger` requires `event.targetKind === 'comment'`, and missing or mismatched kinds return `undefined`. Add runtime proof regressions for missing `targetKind` and mismatched comment/post target kinds.
+- Files reviewed: `src/server/services/runtimeProof.ts`, `src/server/services/runtimeProof.test.ts`, `src/shared/schema.ts`.
+
+## 2026-05-26 01:12 IST - Integration Status
+
+- Resolved medium finding added at 01:04: reloaded demo URLs now still infer or
+  fetch the embedded runtime subreddit when the URL uses
+  `demo=true&subreddit=reviewlock_demo`, preserving the live subreddit for demo
+  exit while seeded demo reads stay isolated in `reviewlock_demo`.
+- Regression added in `src/client/state/store.test.ts` for the actual reloaded
+  demo URL state: boot from `reviewlock_demo`, receive runtime context
+  `reviewlock_dev`, exit demo, and fetch live `reviewlock_dev`.
+- Resolved medium finding added at 01:05: update-trigger proof reconciliation
+  now requires a known trigger capability, concrete matching reopen reason, and
+  no longer upgrades `runtime_uncertain` failed-refetch reopen audits.
+- Resolved medium finding added at 01:10: update-trigger proof reconciliation
+  now requires `targetKind` to match the trigger family, so post update proof
+  cannot be verified by missing-kind or comment-target reopen audits.
+- Regressions added in `src/server/services/runtimeProof.test.ts` and
+  `src/server/services/reopenFlow.test.ts` for strict reason matching,
+  failed-refetch runtime uncertainty, and missing/mismatched target kinds.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 2 files / 29 tests.
+  - `npm run test -- src/client/state/store.test.ts --reporter verbose`
+    PASS, 1 file / 16 tests.
+- Full validation:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 40 files / 319 tests.
+  - `npm run build` PASS.
+  - `git diff --check` PASS.
+  - `rg -n "TODO" src` returned no source TODOs.
+  - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+    proof checklists; no production UI copy match was found.

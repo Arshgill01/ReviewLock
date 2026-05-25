@@ -25,6 +25,30 @@ const defaultCapabilityNames = [
   'postFlairUpdateTrigger',
 ];
 
+const updateTriggerCapabilityNames = new Set([
+  'postUpdateTrigger',
+  'commentUpdateTrigger',
+  'postNsfwUpdateTrigger',
+  'postSpoilerUpdateTrigger',
+  'postFlairUpdateTrigger',
+]);
+
+const updateTriggerReasons: Record<string, string> = {
+  postUpdateTrigger: 'content_changed',
+  commentUpdateTrigger: 'content_changed',
+  postNsfwUpdateTrigger: 'nsfw_changed',
+  postSpoilerUpdateTrigger: 'spoiler_changed',
+  postFlairUpdateTrigger: 'flair_changed',
+};
+
+const updateTriggerTargetKinds: Record<string, 'post' | 'comment'> = {
+  postUpdateTrigger: 'post',
+  commentUpdateTrigger: 'comment',
+  postNsfwUpdateTrigger: 'post',
+  postSpoilerUpdateTrigger: 'post',
+  postFlairUpdateTrigger: 'post',
+};
+
 const parseJson = <T>(value: string | undefined): T | undefined => {
   if (value === undefined) {
     return undefined;
@@ -164,6 +188,35 @@ const capabilityFromReportAudit = (event: AuditEvent): RuntimeProofCapability | 
   };
 };
 
+const capabilityFromUpdateAudit = (event: AuditEvent): RuntimeProofCapability | undefined => {
+  if (event.kind !== 'lock_reopened' || event.demo || !isRecord(event.data)) {
+    return undefined;
+  }
+
+  const capabilityName = event.data.triggerCapabilityName;
+  const reason = event.data.reason;
+
+  if (typeof capabilityName !== 'string' || !updateTriggerCapabilityNames.has(capabilityName)) {
+    return undefined;
+  }
+
+  if (reason !== updateTriggerReasons[capabilityName]) {
+    return undefined;
+  }
+
+  if (event.targetKind !== updateTriggerTargetKinds[capabilityName]) {
+    return undefined;
+  }
+
+  return {
+    name: capabilityName,
+    status: 'verified',
+    checkedAt: event.createdAt,
+    evidence: `lock_reopened audit ${event.id}`,
+    notes: [`${capabilityName} verified by durable reopen audit for ${event.targetId}.`],
+  };
+};
+
 const reconcileAuditEvidence = async (
   redis: RedisStore,
   subreddit: string,
@@ -180,7 +233,7 @@ const reconcileAuditEvidence = async (
   const derived = new Map<string, RuntimeProofCapability>();
 
   for (const event of events) {
-    const capability = capabilityFromReportAudit(event);
+    const capability = capabilityFromReportAudit(event) ?? capabilityFromUpdateAudit(event);
 
     if (capability && !derived.has(capability.name)) {
       derived.set(capability.name, capability);

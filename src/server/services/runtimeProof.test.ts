@@ -223,6 +223,127 @@ describe('runtime proof status', () => {
     );
   });
 
+  it('reconciles unverified update trigger proof from durable reopen audit evidence', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-1',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      lockId: 'lock-1',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:00:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+      },
+      demo: false,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'postFlairUpdateTrigger',
+          status: 'verified',
+          checkedAt: '2026-05-24T01:00:00.000Z',
+          evidence: 'lock_reopened audit audit-update-reopened-1',
+        }),
+        expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
+      ]),
+    );
+  });
+
+  it('does not reconcile update trigger proof from unknown or demo reopen audits', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-unknown',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      lockId: 'lock-1',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:00:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: { triggerCapabilityName: 'unknownTrigger' },
+      demo: false,
+    });
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-demo',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_demo',
+      targetKind: 'post',
+      lockId: 'lock-demo',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:01:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: { triggerCapabilityName: 'postSpoilerUpdateTrigger' },
+      demo: true,
+    });
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-mismatched-reason',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_mismatch',
+      targetKind: 'post',
+      lockId: 'lock-mismatch',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:02:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'content_changed',
+        triggerCapabilityName: 'postNsfwUpdateTrigger',
+      },
+      demo: false,
+    });
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-missing-kind',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_missing_kind',
+      lockId: 'lock-missing-kind',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:03:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+      },
+      demo: false,
+    });
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-mismatched-kind',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't1_comment',
+      targetKind: 'comment',
+      lockId: 'lock-mismatched-kind',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:04:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+      },
+      demo: false,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'postFlairUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postNsfwUpdateTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'postSpoilerUpdateTrigger', status: 'unverified' }),
+      ]),
+    );
+  });
+
   it('can verify all granular trigger capabilities without a stale broad trigger row', async () => {
     const redis = new InMemoryRedisStore();
     const triggerCapabilities = [
