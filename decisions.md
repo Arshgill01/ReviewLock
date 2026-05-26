@@ -2453,3 +2453,27 @@ Reason:
   is stale and makes the dashboard look unresolved. Clearing only the resolved
   target-refetch warning keeps moderator attention focused on real remaining
   recovery work.
+
+### D137 - Dashboard launch reuses the subreddit dashboard post
+
+The `Open ReviewLock dashboard` menu action creates a visible Reddit custom
+post for the dashboard.
+
+Decision:
+
+- Store the created dashboard permalink under the subreddit Redis namespace.
+- Reuse that stored permalink on later dashboard launches instead of creating a
+  new visible post.
+- Guard first-time creation with a short Redis NX lease so concurrent launches
+  do not create duplicate dashboard posts.
+- If ReviewLock cannot read or reserve the launch record, fail closed before
+  creating a post.
+- If post creation succeeds but the reuse record cannot be saved, navigate to
+  the created post with a neutral warning that future reuse is not guaranteed.
+
+Reason:
+
+- The dashboard post should be a stable mod-tool entry point, not a source of
+  subreddit clutter.
+- Creating an untracked duplicate post on every launch would undermine polish
+  and make live proof harder to interpret.

@@ -4,6 +4,7 @@ import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import { listAuditEvents } from '../server/services/audit';
 import { createFormBinding } from '../server/services/formBindings';
+import { keys } from '../server/services/keys';
 import { getActiveLockByTarget, saveLock } from '../server/services/locks';
 import {
   enqueueReopenEvent,
@@ -315,10 +316,122 @@ describe('form routes', () => {
     expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
   });
 
-  it('creates a dashboard post and navigates to it', async () => {
+  it('creates one dashboard post and reuses it for later launches', async () => {
+    const reddit = new FakeRedditAdapter([target()]);
+    const redis = new InMemoryRedisStore();
     const router = createFormsRouter({
-      reddit: new FakeRedditAdapter([target()]),
-      redis: new InMemoryRedisStore(),
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+    const secondResponse = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+      showToast: {
+        text: 'Opening ReviewLock dashboard',
+      },
+    });
+    expect(await secondResponse.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+      showToast: {
+        text: 'Opening ReviewLock dashboard',
+      },
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+    expect(await redis.get(keys.dashboardPost('alpha'))).toBe(
+      JSON.stringify({
+        permalink: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+        createdAt: '2026-05-24T00:00:00.000Z',
+      }),
+    );
+  });
+
+  it('does not create duplicate dashboard posts while creation is already leased', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.dashboardPostCreation('alpha'), 'other-launch');
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock dashboard creation is already in progress. Try again in a moment.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
+  it('does not create a dashboard post when the launch record cannot be read', async () => {
+    class DashboardReadFailingRedisStore extends InMemoryRedisStore {
+      override async get(key: string): Promise<string | undefined> {
+        if (key === keys.dashboardPost('alpha')) {
+          throw new Error('dashboard record read failed');
+        }
+
+        return super.get(key);
+      }
+    }
+
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis: new DashboardReadFailingRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not load the dashboard launch record. Try again.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
+  it('opens a created dashboard post honestly when the reuse record cannot be saved', async () => {
+    class DashboardRecordWriteFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key === keys.dashboardPost('alpha')) {
+          throw new Error('dashboard record write failed');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new DashboardRecordWriteFailingRedisStore();
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+      showToast: {
+        text: 'Opening ReviewLock dashboard; reuse record could not be saved.',
+        appearance: 'neutral',
+      },
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+    expect(await redis.get(keys.dashboardPostCreation('alpha'))).toBeUndefined();
+  });
+
+  it('ignores malformed dashboard launch records and replaces them with a valid permalink', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(keys.dashboardPost('alpha'), '{');
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
       clock: fixedClock('2026-05-24T00:00:00.000Z'),
     });
     const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
@@ -329,6 +442,7 @@ describe('form routes', () => {
         text: 'Opening ReviewLock dashboard',
       },
     });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
   });
 
   it('does not create a dashboard post when runtime subreddit context is missing', async () => {

@@ -8,6 +8,7 @@ import { isIsoTimestamp, type LockReasonPreset } from '../shared/schema';
 import { LOCK_REASON_PRESETS } from '../shared/constants';
 import { appendAuditEvent } from '../server/services/audit';
 import { consumeFormBinding } from '../server/services/formBindings';
+import { keys } from '../server/services/keys';
 import { lockReviewedContent } from '../server/services/lockFlow';
 import { dismissReopenEvent, getReopenEvent } from '../server/services/reopenQueue';
 import { normalizeRuntimeSubreddit } from '../server/services/runtimeHardening';
@@ -44,6 +45,13 @@ interface ReopenActionBody {
   subreddit?: unknown;
 }
 
+interface DashboardPostRecord {
+  permalink: string;
+  createdAt: string;
+}
+
+const DASHBOARD_POST_CREATION_GUARD_SECONDS = 30;
+
 const readJson = async <T>(context: Context): Promise<T> => {
   try {
     return (await context.req.json()) as T;
@@ -76,6 +84,37 @@ const selectedLockReason = (value: unknown): LockReasonPreset | undefined => {
 
 const validLockReason = (value: string | undefined): value is LockReasonPreset =>
   LOCK_REASON_PRESETS.includes(value as LockReasonPreset);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const parseDashboardPostRecord = (value: string | undefined): DashboardPostRecord | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!isRecord(parsed)) {
+      return undefined;
+    }
+
+    const permalink = stringValue(parsed.permalink)?.trim();
+    const createdAt = stringValue(parsed.createdAt)?.trim();
+
+    if (!permalink || !createdAt || !isIsoTimestamp(createdAt)) {
+      return undefined;
+    }
+
+    return { permalink, createdAt };
+  } catch {
+    return undefined;
+  }
+};
+
+const absoluteRedditPermalink = (permalink: string): string =>
+  permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
 
 const currentSubredditFromReddit = async (reddit: RedditAdapter): Promise<string | undefined> => {
   try {
@@ -239,19 +278,13 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
   router.post('/dashboard-launch-submit', async (context) => {
     await readJson(context);
 
-    if (!deps.reddit?.submitDashboardPost) {
+    if (!deps.reddit?.submitDashboardPost || !deps.redis || !deps.clock) {
       return context.json<UiResponse>(
         uiToast('ReviewLock dashboard launch is not available in this runtime.'),
       );
     }
 
-    let subredditName: string | undefined;
-
-    try {
-      subredditName = await deps.reddit.getCurrentSubredditName();
-    } catch {
-      subredditName = undefined;
-    }
+    const subredditName = await scopedFormSubreddit(deps.reddit);
 
     if (!subredditName) {
       return context.json<UiResponse>(
@@ -259,21 +292,114 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const post = await deps.reddit.submitDashboardPost({
-      subredditName,
-      title: 'ReviewLock dashboard',
-    });
-    const permalink = post.permalink.startsWith('http')
-      ? post.permalink
-      : `https://www.reddit.com${post.permalink}`;
+    const dashboardKey = keys.dashboardPost(subredditName);
+    let existingRecord: DashboardPostRecord | undefined;
 
-    return context.json<UiResponse>({
-      navigateTo: permalink,
-      showToast: {
-        text: 'Opening ReviewLock dashboard',
-        appearance: 'success',
-      },
-    });
+    try {
+      existingRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey));
+    } catch {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not load the dashboard launch record. Try again.'),
+      );
+    }
+
+    if (existingRecord) {
+      return context.json<UiResponse>({
+        navigateTo: absoluteRedditPermalink(existingRecord.permalink),
+        showToast: {
+          text: 'Opening ReviewLock dashboard',
+          appearance: 'success',
+        },
+      });
+    }
+
+    const guardKey = keys.dashboardPostCreation(subredditName);
+    const guardToken = `${deps.clock.now()}:${subredditName}:dashboard`;
+    let guardAcquired = false;
+
+    try {
+      guardAcquired = await deps.redis.setIfNotExists(guardKey, guardToken);
+    } catch {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not reserve dashboard creation. Try again.'),
+      );
+    }
+
+    if (!guardAcquired) {
+      let inFlightRecord: DashboardPostRecord | undefined;
+
+      try {
+        inFlightRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey));
+      } catch {
+        return context.json<UiResponse>(
+          uiToast('ReviewLock dashboard creation is already in progress. Try again in a moment.'),
+        );
+      }
+
+      if (inFlightRecord) {
+        return context.json<UiResponse>({
+          navigateTo: absoluteRedditPermalink(inFlightRecord.permalink),
+          showToast: {
+            text: 'Opening ReviewLock dashboard',
+            appearance: 'success',
+          },
+        });
+      }
+
+      return context.json<UiResponse>(
+        uiToast('ReviewLock dashboard creation is already in progress. Try again in a moment.'),
+      );
+    }
+
+    try {
+      await deps.redis.expire(guardKey, DASHBOARD_POST_CREATION_GUARD_SECONDS);
+    } catch {
+      if ((await deps.redis.get(guardKey).catch(() => undefined)) === guardToken) {
+        await deps.redis.del(guardKey).catch(() => undefined);
+      }
+
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not reserve dashboard creation. Try again.'),
+      );
+    }
+
+    try {
+      const post = await deps.reddit.submitDashboardPost({
+        subredditName,
+        title: 'ReviewLock dashboard',
+      });
+      const permalink = absoluteRedditPermalink(post.permalink);
+
+      try {
+        await deps.redis.set(
+          dashboardKey,
+          JSON.stringify({
+            permalink,
+            createdAt: deps.clock.now(),
+          } satisfies DashboardPostRecord),
+        );
+      } catch {
+        return context.json<UiResponse>({
+          navigateTo: permalink,
+          showToast: {
+            text: 'Opening ReviewLock dashboard; reuse record could not be saved.',
+            appearance: 'neutral',
+          },
+        });
+      }
+
+      return context.json<UiResponse>({
+        navigateTo: permalink,
+        showToast: {
+          text: 'Opening ReviewLock dashboard',
+          appearance: 'success',
+        },
+      });
+    } finally {
+      if ((await deps.redis.get(guardKey).catch(() => undefined)) === guardToken) {
+        await deps.redis.del(guardKey).catch(() => undefined);
+      }
+    }
   });
   router.post('/reopen-action-submit', async (context) => {
     if (!deps.reddit || !deps.redis || !deps.clock) {

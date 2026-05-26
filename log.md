@@ -2892,3 +2892,31 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:45 IST - Dashboard launch idempotency hardening
+
+- Stored the created ReviewLock dashboard custom-post permalink under the
+  subreddit namespace and reused it on later dashboard launches.
+- Added a short Redis creation lease for first-time dashboard post creation so
+  concurrent menu submits do not create duplicate visible posts.
+- Failed closed before post creation when the launch record cannot be read or
+  the creation lease cannot be reserved.
+- Returned a neutral warning when a post is created but the reuse record cannot
+  be saved, instead of silently claiming durable reuse.
+- Focused validation:
+  - `npm run test -- src/routes/forms.test.ts src/server/services/keys.test.ts --reporter verbose`
+  - PASS, 2 files and 27 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 383 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

@@ -19,4 +19,6 @@ export const keys = {
   metricsTarget: (subreddit: string, targetId: string) => key(subreddit, `metrics:target:${targetId}`),
   runtime: (subreddit: string) => key(subreddit, 'runtime'),
   demo: (subreddit: string) => key(subreddit, 'demo'),
+  dashboardPost: (subreddit: string) => key(subreddit, 'dashboard:post'),
+  dashboardPostCreation: (subreddit: string) => key(subreddit, 'dashboard:post:create'),
 };

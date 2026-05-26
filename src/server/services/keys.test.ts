@@ -26,9 +26,11 @@ describe('reviewlock redis keys', () => {
       keys.metricsTarget(subreddit, 't3_abc'),
       keys.runtime(subreddit),
       keys.demo(subreddit),
+      keys.dashboardPost(subreddit),
+      keys.dashboardPostCreation(subreddit),
     ];
 
-    expect(generatedKeys).toHaveLength(15);
+    expect(generatedKeys).toHaveLength(17);
     for (const generatedKey of generatedKeys) {
       expect(generatedKey).toMatch(/^reviewlock:alpha:/);
     }

@@ -3658,3 +3658,313 @@
   the earlier reopen wording.
 - Files reviewed: `TODO.md`, `decisions.md`, `docs/RUNTIME_PROOF.md`,
   `docs/TRIGGER_PROOF.md`.
+
+## 2026-05-26 13:40 IST - Finding
+
+- Severity: low
+- Area: Changed-content retry warning cleanup lacks direct regression coverage.
+- Evidence:
+  - Decision `D136` explicitly says `target_resolution_failed` should also be
+    cleared from changed-content reopen records once the target has been
+    successfully refetched, while preserving any new `unignoreReports()`
+    warning: `decisions.md:2442-2447`.
+  - The implementation appears to do this by passing `recoveredLock` into the
+    changed-report reopen path and changed-update reopen path:
+    `src/server/services/reportTriggers.ts:391-408` and
+    `src/server/services/reopenFlow.ts:227-245`.
+  - Current dirty tests cover successful unchanged retry cleanup:
+    `src/server/services/reportTriggers.test.ts:871-886` and
+    `src/server/services/reopenFlow.test.ts:225-250`.
+  - Existing changed-content tests cover ordinary reopen and unignore failure,
+    but not the sequence `target refetch failure -> active lock warning ->
+    later changed-content retry -> reopened record does not carry stale
+    target_resolution_failed`: `src/server/services/reportTriggers.test.ts:623-760`
+    and `src/server/services/reopenFlow.test.ts:137-186`.
+- Why it matters: The changed-content path is the core demo story. A regression
+  here would make reopened items show stale target-resolution warnings, or worse
+  drop a real `unignoreReports()` warning while clearing the transient one. The
+  implementation looks intentional, but D136's changed-content clause should be
+  locked down before submission hardening.
+- Suggested fix: Add one focused report-trigger test and one update-trigger test
+  that first create `target_resolution_failed` on an active lock, then retry
+  with changed content. Assert the final reopened lock/event omit
+  `target_resolution_failed` while preserving any newly simulated
+  `unignoreReports failed ...` warning.
+- Files reviewed: `decisions.md`, `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/server/services/reopenFlow.ts`,
+  `src/server/services/reopenFlow.test.ts`.
+
+## 2026-05-26 13:43 IST - Honorable Mention Execution Protocol
+
+- Area: Final app hardening, submission hardening, and Devvit launch readiness.
+- External requirements checked:
+  - Devpost official rules require the project to be built with Reddit's
+    Developer Platform, function as described, include a text feature/function
+    description, list all participant Reddit usernames, include the unique app
+    listing link `developers.reddit.com/apps/{app-name}`, describe project
+    impact for 1-3 communities, and provide judge testing access through a
+    Reddit post running the app in a public subreddit with fewer than 200
+    members.
+  - Devpost says the optional demo video should be under one minute, publicly
+    visible, and show the project functioning on its intended platform.
+  - Current Devvit launch docs say launch readiness includes stable UX, mobile
+    and web testing, multiple-account testing where permissions differ, and a
+    user-friendly `README.md` before `npx devvit publish`.
+  - Current Devvit listing docs say public App Directory listing requires a
+    detailed `README.md` with comprehensive overview, installer instructions,
+    and major-update changelog before `npx devvit publish --public`.
+- Current repo state:
+  - `README.md` is still a development stub, not a judge/App Directory landing
+    page.
+  - `docs/DEVPOST_SUBMISSION.md`, `docs/APP_LISTING.md`,
+    `docs/LAUNCH_CHECKLIST.md`, and root `SUBMISSION.md` are still absent.
+  - Existing app listing identity should be preserved:
+    `https://developers.reddit.com/apps/reviewlock`.
+  - `package.json` intentionally blocks accidental public launch through
+    `npm run launch`; final publish must be an explicit owner-approved CLI
+    action.
+- Required execution order for the main agent:
+  1. Fix or consciously defer app risks that can undermine publishability:
+     - duplicate dashboard custom-post creation on repeated dashboard launch;
+     - moderator config modeled but not surfaced/applied, or remove config
+       claims from all submission copy;
+     - stale TODO wording about target-resolution uncertainty;
+     - changed-content retry warning cleanup regression coverage;
+     - update-wrapper alias route-test coverage listed below.
+  2. Run the full local gate after those changes:
+     - `npm run type-check`
+     - `npm run lint`
+     - `npm run test`
+     - `npm run build`
+     - `git diff --check`
+     - forbidden-claim scan over `README.md`, `docs`, `src`, `package.json`,
+       and `devvit.json`.
+  3. Rewrite `README.md` as the App Directory and judge landing page:
+     - first line/section must make `Lock reviewed content until it changes`
+       obvious;
+     - include moderator workflow, capabilities, install/setup, permissions,
+       data stored, safety boundaries, verified runtime matrix, known
+       limitations, and changelog;
+     - cite only verified runtime behavior from `docs/RUNTIME_PROOF.md` and
+       `docs/TRIGGER_PROOF.md`.
+  4. Create `docs/DEVPOST_SUBMISSION.md` with paste-ready fields:
+     - category: Best New Mod Tool;
+     - app listing URL: `https://developers.reddit.com/apps/reviewlock`;
+     - participant Reddit username slots;
+     - tool overview;
+     - project impact for 1-3 community types;
+     - conservative time-savings model;
+     - under-one-minute video script;
+     - testing instructions with public subreddit/post URL placeholder;
+     - known limitations and proof boundaries;
+     - explicit `Not a ported project` note.
+  5. Create `docs/APP_LISTING.md` with developer.reddit.com copy:
+     - short description, full listing description, permission rationale,
+       moderator install/use steps, data/privacy notes, screenshots/captions,
+       support/known limitations, and changelog.
+  6. Create `docs/LAUNCH_CHECKLIST.md`:
+     - local validation gate;
+     - public test subreddit under 200 members;
+     - Reddit post running ReviewLock for judge testing;
+     - final `npx devvit upload`/version capture;
+     - owner approval checkpoint for `npx devvit publish`;
+     - separate owner approval checkpoint for `npx devvit publish --public`;
+     - final Devpost freeze checklist before the May 27, 2026 6:00 PM PDT
+       deadline.
+  7. Capture final screenshots/video only after the app and docs agree:
+     - lock form;
+     - active lock dashboard;
+     - reports suppressed metric/audit;
+     - reopened-after-edit queue;
+     - demo banner if seeded data is shown.
+- Honorable Mention scoring target:
+  - Community Impact: 8/10 by narrowing to high false-report-churn communities
+    and quantifying saved repeat reviews.
+  - Polish: 8-9/10 by making README, app listing, Devpost copy, screenshots,
+    and launch checklist coherent and proof-bound.
+  - Reliable UX: 8/10 by eliminating duplicate dashboard posts, documenting
+    install/testing clearly, and avoiding unimplemented config claims.
+  - Ecosystem Impact: 8/10 by framing ReviewLock as an integrity-bound review
+    ledger and edit-break loop, not as native `ignoreReports()` with a UI.
+- Acceptance gate for this lane:
+  - A judge can understand the product and proof state from only `README.md`
+    and `docs/DEVPOST_SUBMISSION.md`.
+  - No submission artifact says users cannot report content, reports are
+    disabled, content is unreportable, AI decides moderation, or locks last
+    permanently.
+  - All claims about live suppression/reopen behavior are either verified with
+    exact runtime proof or labeled as implemented/local-test-only.
+
+## 2026-05-26 13:43 IST - Finding
+
+- Severity: low
+- Area: Update-trigger wrapper alias coverage is incomplete.
+- Evidence:
+  - The update trigger route accepts both local wrapper names and alternate
+    method-style names:
+    `src/routes/triggers.update.ts:36-43`.
+  - `docs/TRIGGER_PROOF.md:12-17` documents accepted Devvit-shaped nested
+    update wrappers including `nsfwPostUpdate` and `spoilerPostUpdate`.
+  - Current route tests named `accepts method-named wrapped NSFW update
+    payloads` and `accepts method-named wrapped spoiler update payloads` still
+    use `postNsfwUpdate` and `postSpoilerUpdate` payload keys:
+    `src/routes/triggers.update.test.ts:577-615`.
+  - `rg -n "nsfwPostUpdate|spoilerPostUpdate" src/routes/triggers.update.test.ts`
+    finds no direct test of the alternate aliases even though production code
+    accepts them.
+- Why it matters: NSFW/spoiler update variants remain live-proof gaps. The
+  route code appears correct, but before submission copy says wrapper handling
+  is hardened, the local tests should directly prove every documented alias.
+- Suggested fix: Add two small route tests:
+  - `POST /on-post-nsfw-update` with `{ nsfwPostUpdate: { post: { id },
+    subreddit: { name } } }`.
+  - `POST /on-post-spoiler-update` with `{ spoilerPostUpdate: { post: { id },
+    subreddit: { name } } }`.
+  Keep runtime wording as local-test-only unless Reddit payload logs verify
+  those exact wrappers in playtest.
+- Files reviewed: `src/routes/triggers.update.ts`,
+  `src/routes/triggers.update.test.ts`, `docs/TRIGGER_PROOF.md`, `TODO.md`.
+
+## 2026-05-26 13:45 IST - Integration Status
+
+- The duplicate dashboard custom-post launch finding is addressed in the
+  current dirty implementation worktree.
+- Implementation observed:
+  - `/internal/form/dashboard-launch-submit` now requires Reddit, Redis, and
+    clock dependencies before launch.
+  - The route stores a per-subreddit dashboard post record at
+    `keys.dashboardPost(subredditName)` and reuses the stored permalink on
+    later launches.
+  - The route uses `keys.dashboardPostCreation(subredditName)` with
+    `setIfNotExists()` and a short expiry as a creation guard, so concurrent
+    launch submits do not create duplicate dashboard posts.
+  - The key helper and namespace test now include `dashboard:post` and
+    `dashboard:post:create`.
+  - `src/routes/forms.test.ts` now covers reuse, in-flight creation guard, and
+    malformed stored dashboard records.
+- Focused validation:
+  - `npm run test -- src/routes/forms.test.ts src/server/services/keys.test.ts --reporter verbose`
+    PASS, 2 files / 25 tests.
+  - `npm run type-check` PASS.
+  - `git diff --check` PASS.
+- Remaining app-hardening items before submission copy:
+  - Moderator config is still modeled but not surfaced/applied, unless the
+    main agent has a newer unreviewed patch.
+  - Stale TODO wording about target-resolution uncertainty still needs cleanup,
+    unless already addressed after this review.
+  - Changed-content retry warning cleanup needs direct regression coverage.
+  - Update-trigger `nsfwPostUpdate` / `spoilerPostUpdate` aliases need direct
+    route tests.
+  - Full validation gate still needs to run after all implementation patches.
+
+## 2026-05-26 13:46 IST - Codex Resolution Notes
+
+- Addressed duplicate dashboard custom-post creation by persisting the created
+  dashboard permalink at `keys.dashboardPost(subreddit)` and reusing it for
+  later launch submissions.
+- Added `keys.dashboardPostCreation(subreddit)` with Redis `setIfNotExists()`
+  and a 30-second expiry to prevent concurrent first-launch submissions from
+  creating duplicate visible posts.
+- Hardened Redis failure behavior so ReviewLock fails closed before creating a
+  dashboard post when it cannot read the launch record or reserve the creation
+  lease.
+- Kept post-creation persistence failure honest by navigating to the created
+  dashboard post with a neutral warning that the reuse record could not be
+  saved.
+- Focused validation:
+  - `npm run test -- src/routes/forms.test.ts src/server/services/keys.test.ts --reporter verbose`
+    PASS, 2 files / 27 tests.
+  - `npm run type-check` PASS.
+
+## 2026-05-26 13:45 IST - Finding
+
+- Severity: medium
+- Area: Cached dashboard launch permalinks are not constrained to Reddit or the
+  current subreddit.
+- Evidence:
+  - Dashboard launch reuse now loads a Redis-backed dashboard post record and
+    navigates directly to its `permalink`: `src/routes/forms.ts:295-313` and
+    `src/routes/forms.ts:328-346`.
+  - `parseDashboardPostRecord()` validates only that `permalink` is a
+    non-empty string and `createdAt` is an ISO timestamp:
+    `src/routes/forms.ts:91-110`.
+  - `absoluteRedditPermalink()` trusts any string starting with `http` as an
+    absolute URL instead of requiring `https://www.reddit.com/...`:
+    `src/routes/forms.ts:116-117`.
+  - Current dashboard launch tests cover good records, malformed JSON, read
+    failure, write failure, and creation leasing, but do not cover a persisted
+    record with `permalink: "https://example.com/phish"` or a cross-subreddit
+    Reddit permalink: `src/routes/forms.test.ts:319-445`.
+- Why it matters: The new duplicate-dashboard-post fix introduces a persisted
+  navigation record. If that Redis record is malformed, stale, or corrupted,
+  ReviewLock can return a Devvit `navigateTo` outside Reddit or outside the
+  current subreddit while showing the success toast `Opening ReviewLock
+  dashboard`. Earlier hardening has consistently treated Redis-backed records
+  as untrusted at read boundaries; this route should follow that standard
+  before it becomes part of the public install story.
+- Suggested fix: Validate cached dashboard permalinks before reuse. Accept only
+  relative `/r/{currentSubreddit}/comments/...` paths or canonical
+  `https://www.reddit.com/r/{currentSubreddit}/comments/...` URLs, normalize the
+  stored value to one canonical form, and ignore/replace any other record. Add
+  regression tests for an external absolute URL and a Reddit permalink for the
+  wrong subreddit.
+- Files reviewed: `src/routes/forms.ts`, `src/routes/forms.test.ts`,
+  `src/server/adapters/reddit.ts`, `src/server/services/keys.ts`.
+
+## 2026-05-26 13:47 IST - Finding
+
+- Severity: low
+- Area: Redis namespace documentation is stale after adding dashboard launch
+  keys.
+- Evidence:
+  - The current dirty implementation adds `keys.dashboardPost()` and
+    `keys.dashboardPostCreation()` in `src/server/services/keys.ts:22-23`.
+  - `src/server/services/keys.test.ts:15-34` now includes both helpers in the
+    namespace coverage test.
+  - The project bible's core Redis key list still ends at
+    `reviewlock:{subreddit}:demo` and does not mention the new
+    `reviewlock:{subreddit}:dashboard:post` or
+    `reviewlock:{subreddit}:dashboard:post:create` keys: `AGENTS.md:234-250`.
+  - `docs/DATA_NAMESPACE_AUDIT.md:13-24` says the key test enumerates every
+    declared helper, but its dynamic-key note and malformed-record reader list
+    do not mention the new dashboard-post record: `docs/DATA_NAMESPACE_AUDIT.md:42-54`.
+- Why it matters: Submission hardening is about consolidating proof. The new
+  dashboard reuse feature is a publishability improvement, but stale namespace
+  docs make it look unaccounted for in the data model and malformed-record
+  hardening story. That is especially relevant because cached dashboard post
+  records are now persisted and reused by a moderator-facing launch route.
+- Suggested fix: After the dashboard launch patch settles, update the key list
+  and data namespace audit to include `dashboard:post` and
+  `dashboard:post:create`, describe malformed/unsafe cached dashboard record
+  behavior, and record the exact validation command that covers the new keys.
+- Files reviewed: `AGENTS.md`, `docs/DATA_NAMESPACE_AUDIT.md`,
+  `src/server/services/keys.ts`, `src/server/services/keys.test.ts`.
+
+## 2026-05-26 13:48 IST - Finding
+
+- Severity: low
+- Area: Dashboard launch form copy is stale after adding dashboard-post reuse.
+- Evidence:
+  - The current dirty forms route reuses an existing per-subreddit dashboard
+    post when `keys.dashboardPost(subredditName)` exists, and only creates a
+    post on first launch or malformed-record replacement:
+    `src/routes/forms.ts:295-313` and `src/routes/forms.ts:328-346`.
+  - The subreddit menu form still tells moderators `This creates a visible
+    ReviewLock dashboard custom post in this subreddit...` and the accept
+    button still says `Create dashboard post`: `src/routes/menu.ts:172-188`.
+  - `devvit.json` still describes the subreddit action as `Create and open the
+    ReviewLock dashboard for this subreddit`: `devvit.json:61-65`.
+- Why it matters: The implementation now has the right publishability shape:
+  one stable dashboard post per subreddit. But the user-facing copy still
+  implies every launch creates visible subreddit content. During judge testing
+  or App Directory review, that makes ReviewLock feel noisier and less polished
+  than the actual behavior, and it can discourage moderators from reopening the
+  dashboard.
+- Suggested fix: Update the menu and manifest copy to match the new behavior.
+  For example: `Open the ReviewLock dashboard. ReviewLock creates a dashboard
+  post the first time, then reuses it for future launches.` Use an accept label
+  like `Open dashboard` instead of `Create dashboard post`. Add/update a menu
+  route test if one asserts the old copy.
+- Files reviewed: `src/routes/menu.ts`, `devvit.json`,
+  `src/routes/forms.ts`, `src/routes/forms.test.ts`.
