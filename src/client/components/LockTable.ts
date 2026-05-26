@@ -6,6 +6,7 @@ import {
   escapeText,
   formatLocalDate,
   labelFromToken,
+  safeRedditPermalinkHref,
 } from '../utils/format';
 
 const renderRuntimeWarnings = (warnings: string[]): string => {
@@ -56,6 +57,17 @@ const renderUnlockAction = (
   `;
 };
 
+const renderTargetLink = (lock: ReviewLockRecord): string => {
+  const label = `<code>${lock.targetKind}:${escapeText(displayThingId(lock.targetId))}</code>`;
+  const href = safeRedditPermalinkHref(lock.permalink);
+
+  if (!href) {
+    return label;
+  }
+
+  return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+};
+
 export const renderLockTable = (
   locks: ReviewLockRecord[],
   confirmation: DashboardConfirmation | null = null,
@@ -68,9 +80,7 @@ export const renderLockTable = (
       (lock) => `
         <tr>
           <td>
-            <a href="${escapeAttr(lock.permalink)}" target="_blank" rel="noopener noreferrer">
-              <code>${lock.targetKind}:${escapeText(displayThingId(lock.targetId))}</code>
-            </a>
+            ${renderTargetLink(lock)}
           </td>
           <td>
             <span class="target-author">u/${escapeText(lock.targetAuthor)}</span>

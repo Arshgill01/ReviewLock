@@ -6325,3 +6325,32 @@
     were added/validated. `docs/LAUNCH_CHECKLIST.md` now requires browser/WebView
     recheck after any dashboard/UI/client change and before final screenshot or
     submission proof refresh.
+
+## 2026-05-26 15:43 IST - Resolution
+
+- Addressed finding: client dashboard target links accepted any permalink string
+  after HTML attribute escaping.
+- Change:
+  - Added `safeRedditPermalinkHref()` in `src/client/utils/format.ts`.
+  - Updated `src/client/components/LockTable.ts` so active lock targets render
+    as links only when the stored permalink is a safe Reddit comment path or
+    recognized HTTPS Reddit host.
+  - Unsafe protocols, protocol-relative URLs, external hosts, and non-comment
+    Reddit paths now render as plain target text instead of clickable links.
+- Tests added:
+  - `src/client/utils/format.test.ts` covers accepted Reddit permalinks and
+    rejected `javascript:`, `data:`, external-host, protocol-relative, and
+    non-comment paths.
+  - `src/client/render.test.ts` covers that unsafe lock permalinks do not render
+    target links.
+- Targeted validation:
+  - `npm run test -- src/client/utils/format.test.ts src/client/render.test.ts --reporter verbose`
+  - PASS, 2 files / 23 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+- Browser note:
+  - No browser run for this patch yet. The behavior is an HTML-output/security
+    guard with focused render tests, not a layout change. Final submission still
+    needs a WebView/browser pass before screenshots or public judging.

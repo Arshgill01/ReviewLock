@@ -166,6 +166,20 @@ describe('client render helpers', () => {
     expect(html).not.toContain('onclick="alert');
   });
 
+  it('does not render unsafe target permalink protocols or external hosts', () => {
+    const html = [
+      renderLockTable([lock({ permalink: 'javascript:alert(1)' })]),
+      renderLockTable([lock({ permalink: 'data:text/html,<script>alert(1)</script>' })]),
+      renderLockTable([lock({ permalink: 'https://reddit.example/r/reviewlock/comments/abc123' })]),
+    ].join('');
+
+    expect(html).not.toContain('javascript:');
+    expect(html).not.toContain('data:text/html');
+    expect(html).not.toContain('reddit.example');
+    expect(html).not.toContain('target="_blank" rel="noopener noreferrer"');
+    expect(html).toContain('<code>post:reviewed</code>');
+  });
+
   it('escapes dynamic reason labels before rendering', () => {
     const html = [
       renderLockTable([
