@@ -4,6 +4,7 @@ import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockTarget } from '../shared/schema';
 import { defaultConfig, saveConfig } from '../server/services/config';
+import { keys } from '../server/services/keys';
 import { saveLock } from '../server/services/locks';
 import { buildLockReviewForm, createMenuRouter } from './menu';
 
@@ -113,6 +114,58 @@ describe('menu routes', () => {
         },
       },
     });
+  });
+
+  it('falls back to default lock reasons when config cannot be read', async () => {
+    class ConfigReadFailingRedisStore extends InMemoryRedisStore {
+      override async get(key: string): Promise<string | undefined> {
+        if (key === keys.config('alpha')) {
+          throw new Error('config read failed');
+        }
+
+        return super.get(key);
+      }
+    }
+
+    const redis = new ConfigReadFailingRedisStore();
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+    const body = (await response.json()) as {
+      showForm?: {
+        form?: {
+          fields?: Array<{
+            name?: string;
+            defaultValue?: string | string[];
+            options?: Array<{ value?: string }>;
+          }>;
+        };
+      };
+    };
+    const fields = body.showForm?.form?.fields ?? [];
+    const token = fields.find((field) => field.name === 'formToken')?.defaultValue;
+
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'lockReason',
+          defaultValue: ['reviewed_policy_compliant'],
+          options: expect.arrayContaining([
+            expect.objectContaining({ value: 'reviewed_policy_compliant' }),
+            expect.objectContaining({ value: 'custom' }),
+          ]),
+        }),
+      ]),
+    );
+    expect(typeof token).toBe('string');
+    expect(await redis.exists(`reviewlock:alpha:form:${typeof token === 'string' ? token : ''}`))
+      .toBe(true);
   });
 
   it('normalizes bare post ids from Devvit menu payloads', async () => {

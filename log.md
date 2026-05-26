@@ -2976,3 +2976,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 14:03 IST - Config read failure hardening
+
+- Loaded config before creating lock form bindings and fell back to default
+  reason presets when the config read fails.
+- Returned a clear retry toast when config cannot be read during lock submit,
+  before consuming the form token or calling Reddit moderation methods.
+- Added regressions for both menu-time config read failure and submit-time
+  config read failure.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+  - PASS, 3 files and 46 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 392 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

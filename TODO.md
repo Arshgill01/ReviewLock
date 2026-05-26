@@ -187,3 +187,5 @@
 - [x] Add changed-content retry regressions for clearing stale target-resolution warnings.
 - [x] Add direct route coverage for `nsfwPostUpdate` and `spoilerPostUpdate` wrappers.
 - [x] Apply subreddit config reason presets to lock forms and submissions.
+- [x] Keep lock menu usable when subreddit config cannot be read.
+- [x] Keep lock form submit retryable when subreddit config cannot be read.

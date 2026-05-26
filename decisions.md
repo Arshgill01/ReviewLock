@@ -2489,6 +2489,10 @@ Decision:
 - Build the form reason select from configured `reasonPresets`.
 - Reject lock submissions for reasons that are valid globally but disabled by
   the current subreddit config.
+- Fall back to default reason presets when config cannot be read while opening
+  the lock menu.
+- Fail closed with a retryable toast when config cannot be read during lock
+  form submission, before consuming the form token or calling Reddit.
 - Do not render or claim configurable lock expiry until an expiry enforcement
   path exists.
 

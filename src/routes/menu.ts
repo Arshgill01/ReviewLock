@@ -4,7 +4,7 @@ import type { FormField, UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
-import { loadConfig } from '../server/services/config';
+import { defaultConfig, loadConfig } from '../server/services/config';
 import { createFormBinding } from '../server/services/formBindings';
 import { getActiveLockByTarget } from '../server/services/locks';
 import { normalizeTargetId, resolveTargetById } from '../server/services/targetResolver';
@@ -68,6 +68,18 @@ const lockReasonLabels: Record<LockReasonPreset, string> = {
 
 const configuredReasonPresets = (config?: ReviewLockConfig): LockReasonPreset[] =>
   config?.reasonPresets.length ? config.reasonPresets : [...LOCK_REASON_PRESETS];
+
+const safeLoadConfig = async (
+  redis: RedisStore,
+  subreddit: string,
+  now: string,
+): Promise<ReviewLockConfig> => {
+  try {
+    return await loadConfig(redis, subreddit);
+  } catch {
+    return defaultConfig(subreddit, now);
+  }
+};
 
 export const buildLockReviewForm = (
   target: Parameters<typeof targetSummary>[0],
@@ -227,13 +239,14 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       });
     }
 
+    const now = deps.clock.now();
+    const config = await safeLoadConfig(deps.redis, resolution.target.subreddit, now);
     const binding = await createFormBinding(
       deps.redis,
       'lock',
       resolution.target,
-      deps.clock.now(),
+      now,
     );
-    const config = await loadConfig(deps.redis, resolution.target.subreddit);
 
     return context.json<UiResponse>({
       showForm: {

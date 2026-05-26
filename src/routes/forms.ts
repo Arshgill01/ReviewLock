@@ -192,7 +192,15 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const allowedReasons = await configuredLockReasons(deps.redis, subreddit);
+    let allowedReasons: readonly LockReasonPreset[];
+
+    try {
+      allowedReasons = await configuredLockReasons(deps.redis, subreddit);
+    } catch {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock could not load subreddit lock settings. Reopen the menu and try again.'),
+      );
+    }
 
     if (!allowedReasons.includes(lockReason)) {
       return context.json<UiResponse>(

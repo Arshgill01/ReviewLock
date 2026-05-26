@@ -287,6 +287,44 @@ describe('form routes', () => {
     expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
   });
 
+  it('keeps lock form submissions retryable when config cannot be read', async () => {
+    class ConfigReadFailingRedisStore extends InMemoryRedisStore {
+      override async get(key: string): Promise<string | undefined> {
+        if (key === keys.config('alpha')) {
+          throw new Error('config read failed');
+        }
+
+        return super.get(key);
+      }
+    }
+
+    const redis = new ConfigReadFailingRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not load subreddit lock settings. Reopen the menu and try again.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
+  });
+
   it('rejects lock form submissions outside the current runtime subreddit before moderation', async () => {
     const redis = new InMemoryRedisStore();
     const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');

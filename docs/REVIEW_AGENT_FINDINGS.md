@@ -4360,3 +4360,100 @@
   close the still-open reviewer findings around unsafe cached dashboard
   permalink reuse, stale dashboard launch copy, launch/submission artifacts, or
   the lock-menu config read failure fallback.
+
+## 2026-05-26 14:02 IST - Finding
+
+- Severity: medium
+- Area: Lock form submit config read failures are unhandled instead of
+  retryable.
+- Evidence:
+  - Current dirty `src/routes/forms.ts:195-201` calls
+    `configuredLockReasons(deps.redis, subreddit)` before consuming the form
+    binding.
+  - `configuredLockReasons()` calls `loadConfig()` directly:
+    `src/routes/forms.ts:89-95`.
+  - `loadConfig()` does not catch Redis `get()` exceptions:
+    `src/server/services/config.ts:29-35`.
+  - If Redis config read fails, the route throws before
+    `consumeFormBinding()`, so the token remains retryable, but the moderator
+    receives an unhandled route failure rather than a clear
+    `UiResponse`/toast.
+  - Current form tests cover configured rejection and unknown global reasons,
+    but not config-read failure on submit: `src/routes/forms.test.ts:232-287`.
+- Why it matters: The submit path already has careful retryability behavior for
+  stale forms, subreddit mismatch, and disabled reasons. A transient config read
+  failure should match that posture: fail closed with a clear retry message and
+  preserve the token, or deliberately fall back to default reasons with a test
+  proving the chosen behavior. Raw form endpoint failures are risky in Devvit
+  because moderators may not know whether a moderation action happened.
+- Suggested fix: Wrap `configuredLockReasons()` in the form submit route. For
+  the safest behavior, return a neutral toast such as `ReviewLock could not
+  load subreddit lock settings. Reopen the menu and try again.`, assert no
+  Reddit moderation calls, and assert the form binding still exists. If the
+  product decision is to fall back to shared defaults instead, record that in
+  `decisions.md` and add a regression proving the fallback does not consume the
+  token before later validation.
+- Files reviewed: `src/routes/forms.ts`, `src/routes/forms.test.ts`,
+  `src/server/services/config.ts`.
+
+## 2026-05-26 14:04 IST - Codex Resolution Notes
+
+- Addressed lock-menu config read failures by loading config before creating a
+  form binding and falling back to default reason presets when the config record
+  cannot be read.
+- Addressed lock-submit config read failures by returning
+  `ReviewLock could not load subreddit lock settings. Reopen the menu and try again.`
+  before consuming the form token or calling Reddit moderation methods.
+- Added regressions:
+  - menu-time config read failure still returns a lock form with default reason
+    presets and a valid single form binding;
+  - submit-time config read failure makes no Reddit calls and leaves the form
+    binding retryable.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+    PASS, 3 files / 46 tests.
+  - `npm run type-check` PASS.
+
+## 2026-05-26 14:02 IST - Integration Status
+
+- The lock-menu config read failure finding from 14:00 is addressed in the
+  current dirty worktree.
+- Evidence:
+  - `src/routes/menu.ts` now has `safeLoadConfig()` and loads config before
+    creating the form binding, falling back to `defaultConfig()` on read
+    failure.
+  - `src/routes/menu.test.ts` adds
+    `falls back to default lock reasons when config cannot be read`, asserting
+    default options are shown and the form binding exists.
+- The lock-form submit config read failure finding from 14:02 is code-addressed
+  but not yet test-addressed.
+  - `src/routes/forms.ts` now catches `configuredLockReasons()` failures and
+    returns `ReviewLock could not load subreddit lock settings. Reopen the menu
+    and try again.`
+  - `src/routes/forms.test.ts` still has no regression for config read failure
+    on submit; it covers disabled configured reasons but not a throwing config
+    `get()`.
+- Focused validation:
+  - `npm run lint` PASS.
+  - `npm run type-check` PASS.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+    PASS, 3 files / 45 tests.
+
+## 2026-05-26 14:03 IST - Integration Status
+
+- The lock-form submit config read failure finding from 14:02 is now addressed
+  in the current dirty worktree.
+- Evidence:
+  - `src/routes/forms.test.ts` adds
+    `keeps lock form submissions retryable when config cannot be read`.
+  - The regression uses a Redis store whose `get(keys.config('alpha'))` throws,
+    expects the retryable settings-load toast, asserts no Reddit moderation
+    calls, and asserts the form binding still exists.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+    PASS, 3 files / 46 tests.
+  - `npm run lint` PASS.
+  - `npm run type-check` PASS.
+  - `npm run build` PASS.
+  - `npm run test` PASS, 43 files / 392 tests.
+  - `git diff --check` PASS.
