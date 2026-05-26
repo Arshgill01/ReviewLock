@@ -5949,6 +5949,23 @@ post. Try again.` while preserving the existing guard cleanup. Add a focused
   - PASS, 43 files and 417 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-26 18:35 IST - Finding
+
+- Severity: medium
+- Area: Selected final Devpost screenshots include visible text overlap/clipping in the dashboard audit area.
+- Evidence:
+  - `docs/SCREENSHOTS.md:12-18` maps `output/submission/03-local-dashboard-active-locks.png`, `output/submission/04-local-reopened-after-edit.png`, and `output/submission/05-local-demo-mode.png` into the final Devpost screenshot set.
+  - Visual review of `output/submission/03-local-dashboard-active-locks.png` shows the audit timeline text at bottom right overlapping around the `Report Suppressed` timestamp/message area.
+  - Visual review of `output/submission/04-local-reopened-after-edit.png` shows the same overlap.
+  - Visual review of `output/submission/05-local-demo-mode.png` shows the same audit timeline overlap, and the active-lock table is horizontally clipped at the right edge of the screenshot.
+- Why it matters: These are judge-facing assets. Even if the underlying dashboard is locally tested, final Devpost screenshots with visible text collision or clipped columns weaken the polish score and distract from the core lock -> suppress -> reopen story.
+- Suggested fix: Recapture cleaner submission screenshots after hiding/cropping the lower audit timeline area, scrolling to focus the intended section, or using the newer audit-timeline-fixed artifacts where the timestamp layout is readable. Keep the manifest captions honest about local versus live source, and visually re-open each final PNG before submission.
+- Files reviewed:
+  - `docs/SCREENSHOTS.md`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/04-local-reopened-after-edit.png`
+  - `output/submission/05-local-demo-mode.png`
   - `git diff --check`
   - PASS.
   - `rg -n "TODO" src`
@@ -7010,3 +7027,141 @@ desktop/mobile browser screenshots` complete.
   - PASS.
 - Boundary:
   - This verifies uploaded `version.about`. It does not populate app-level Developer Portal metadata fields; `app.description`, `marketingInfo`, `privacyPolicy`, and `termsAndConditions` were still empty in the CLI response.
+
+## 2026-05-26 18:18 IST - Finding
+
+- Severity: medium
+- Area: Devpost accomplishments copy compresses two separate controlled post proofs into a same-post core-loop claim.
+- Evidence:
+  - `docs/DEVPOST_SUBMISSION.md:181-193` correctly says repeat-report suppression is verified on controlled post target `t3_1tm8nak`, while post body edit reopening is verified on controlled post target `t3_1tnfgqf`.
+  - `docs/RUNTIME_PROOF.md:72-79` records the same split: post report proof on `t3_1tm8nak`, then post body edit proof on S02 `t3_1tnfgqf`.
+  - `docs/CLAIM_COPY_AUDIT.md:20-22` also keeps lock creation/report suppression/edit reopening as separate proof claims with separate controlled targets.
+  - `docs/DEVPOST_SUBMISSION.md:232-233` says, "Proved the core loop in controlled playtest for a locked post: lock, suppress repeat report, edit, reopen."
+- Why it matters: The current accomplishment bullet is stronger than the recorded runtime proof. It can be read as saying one live controlled post went through the entire lock -> suppress -> edit -> reopen sequence, but the durable proof currently demonstrates suppression and edit reopening on different controlled post targets. That is not a product bug, but it is a claim-boundary risk in the primary judge-facing copy.
+- Suggested fix: Reword the accomplishment to avoid same-target implication, for example: "Proved the core post paths in controlled playtest: lock + repeat-report suppression on one controlled post, and edit-triggered reopening on another controlled post." Keep the cleaner four-beat "core loop" language for the demo/seeded scenario unless a same-target live proof pass is captured and recorded.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+
+## 2026-05-26 18:20 IST - Finding
+
+- Severity: low
+- Area: Runtime proof command log has a stale "latest local gate" label.
+- Evidence:
+  - `docs/RUNTIME_PROOF.md:89-90` says `npm run test` was "PASS on latest local gate, 43 files and 419 tests."
+  - `docs/RUNTIME_PROOF.md:95-100` later records `npm run deploy` after form-binding identity and listing-copy hardening; that deploy ran `npm run test` with 43 files and 434 tests before uploading version `0.0.5`.
+  - The recent resolution logged in `docs/REVIEW_AGENT_FINDINGS.md` also records the `npm run deploy` gate as the latest full validation path for upload `0.0.5`.
+- Why it matters: This is not a code or runtime blocker, but the phrase "latest local gate" is stale inside the proof document. A final reviewer or judge-facing summary could misread the older 419-test row as the current full test result even though the newer deploy gate is 434 tests.
+- Suggested fix: Reword the older `npm run test` row as an earlier local gate, or update it to cite the latest deploy gate as the current full test evidence. Keep the exact historical command if desired, but avoid calling it "latest."
+- Files reviewed:
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-26 18:27 IST - Finding
+
+- Severity: low
+- Area: Claim-copy audit docs drift from the current forbidden-copy regression guard.
+- Evidence:
+  - `src/client/render.test.ts:18-29` now rejects the expanded forbidden-copy set: `not reportable`, `disable reports`, `reports disabled`, `blocked reports`, `users cannot report`, `cannot report locked content`, `ai decides`, `automatic removal`, `permanent`, and `forever`.
+  - `docs/CLAIM_COPY_AUDIT.md:47-55` still lists only the older dashboard render-test guard: `not reportable`, `disable reports`, `blocked reports`, `ai decides`, `automatic removal`, `permanent`, and `forever`.
+  - `docs/CLAIM_COPY_AUDIT.md:86-88` says the audit records the current claim boundary and that render tests cover the full forbidden phrase set, but the listed evidence omits `reports disabled`, `users cannot report`, and `cannot report locked content`.
+- Why it matters: This is not a production copy violation, but it weakens the final claim-audit artifact. A reviewer using `docs/CLAIM_COPY_AUDIT.md` as the source for final copy checks would miss three phrases that the product guardrails and current render test explicitly forbid.
+- Suggested fix: Update `docs/CLAIM_COPY_AUDIT.md` to list the same forbidden phrases as `src/client/render.test.ts` and the launch checklist, or point that section at `docs/CLAIM_CHECK.md` / `src/client/render.test.ts` as the current source of truth.
+- Files reviewed:
+  - `src/client/render.test.ts`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `docs/CLAIM_CHECK.md`
+
+## 2026-05-26 18:30 IST - Finding
+
+- Severity: medium
+- Area: Final Devpost screenshot set is specified but not yet mapped to concrete artifacts.
+- Evidence:
+  - `docs/DEVPOST_SUBMISSION.md:255-262` requires screenshots for the lock form, dashboard with `Reports suppressed`, reopen queue after edit, runtime proof panel, and demo banner.
+  - `docs/LAUNCH_CHECKLIST.md:182-188` repeats the same required screenshot set for final submission assets.
+  - `find output -type f | sort` currently lists only Playwright/dashboard/audit/runtime screenshots under `output/playwright/...`; there is no tracked screenshot artifact for the Devvit `Lock review` form, and no manifest or caption file maps the existing screenshots to the five Devpost slots.
+  - `docs/BROWSER_REGRESSION.md:286-287` says the latest live WebView target-link recheck did not capture a screenshot artifact, so the strongest current live WebView proof cannot directly fill the screenshot set.
+- Why it matters: Devpost screenshots are a primary judge-facing polish surface. The app has runtime proof and local browser screenshots, but the final submission still needs a concrete asset set that tells the story in the required order: lock reviewed content, reports suppressed, edit-triggered reopen, proof boundary, and labeled demo mode.
+- Suggested fix: Capture or select the final five screenshots, store them under a stable repo path such as `output/submission/`, and add a short manifest/caption section in `docs/DEVPOST_SUBMISSION.md` or a dedicated `docs/SCREENSHOTS.md` mapping each file to the required Devpost slot. Keep any local/mock screenshots clearly labeled if they are not live Reddit WebView screenshots.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/BROWSER_REGRESSION.md`
+  - `output/playwright/`
+
+## 2026-05-26 18:34 IST - Resolution
+
+- Addressed findings:
+  - Devpost accomplishments copy implied a same-target lock -> suppress -> edit -> reopen proof.
+  - Runtime proof command log used stale "latest local gate" wording.
+  - Claim-copy audit omitted three phrases from the current render-test forbidden-copy guard.
+- Change:
+  - `docs/DEVPOST_SUBMISSION.md` now says controlled playtest proved lock and repeat-report suppression on one post, and edit-triggered reopening on another controlled post.
+  - `docs/RUNTIME_PROOF.md` now labels the 419-test `npm run test` result as an earlier local gate, preserving the later deploy gate as the current upload proof.
+  - `docs/CLAIM_COPY_AUDIT.md` now lists `reports disabled`, `users cannot report`, and `cannot report locked content` in the required scan and production UI guard.
+  - `README.md` and `docs/APP_LISTING.md` now describe the reporting-surface boundary without using the exact "users cannot report" forbidden phrase in product-facing copy.
+- Validation:
+  - `git diff --check`
+  - PASS.
+  - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
+  - PASS.
+  - `rg -n "TODO" src || true`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+  - PASS after manual review: remaining matches are guardrail docs, tests, prompts, historical review notes, proof/audit documents, or fixtures; README and app-listing product copy no longer match the exact "users cannot report" phrase.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 434 tests.
+  - `npm run build`
+  - PASS.
+
+## 2026-05-26 18:35 IST - Finding
+
+- Severity: medium
+- Area: Lock/unlock Devvit forms expose the raw ReviewLock form token in moderator UI and submission screenshots.
+- Evidence:
+  - `output/submission/01-live-lock-form-zen.png` shows a live `Lock review` form with a visible required `Review token` field containing the full raw token value `form-lock-...`.
+  - `src/routes/menu.ts:129-134` defines the lock form token as a normal required `string` field with label `Review token` and `defaultValue: token`.
+  - `src/routes/menu.ts:199-204` defines the unlock form token the same way.
+  - `src/server/services/formBindings.ts:122-127` stores form bindings for 600 seconds, so a newly captured screenshot can briefly expose a live one-use token until it is consumed or expires.
+  - Installed Devvit form typings include `StringField.isSecret?: boolean` in `node_modules/@devvit/shared-types/shared/form.d.ts:42-45`, but the token fields do not use it.
+  - `src/routes/menu.test.ts:48-56`, `src/routes/menu.test.ts:98-124`, and `src/routes/menu.test.ts:322-366` assert that a `formToken` field exists, but they do not assert that the field is masked/secret or otherwise hidden from the moderator-facing form.
+- Why it matters: The token binding is useful server-side hardening, but surfacing the raw token makes the form look like an implementation workaround instead of a polished moderator workflow. It also creates a submission-asset risk: a Devpost screenshot can publish a raw token captured before expiry. The token is short-lived and one-use, so this is not a critical secret leak, but it weakens polish and trust for the exact form screenshot judges will see.
+- Suggested fix: Hide or mask the form token. If Devvit Web forms cannot carry hidden server data, mark the `formToken` fields with `isSecret: true` at minimum and avoid showing raw token values in final screenshots. Also consider deriving the form namespace solely from trusted runtime subreddit context so the visible/editable `subreddit` field can be removed or made non-user-facing. Add menu-form tests that assert token fields are secret/masked and update the final screenshot after the UI no longer exposes the raw token.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/routes/menu.test.ts`
+  - `node_modules/@devvit/shared-types/shared/form.d.ts`
+  - `output/submission/01-live-lock-form-zen.png`
+
+## 2026-05-26 18:40 IST - Resolution
+
+- Addressed finding: Final Devpost screenshot set is specified but not yet mapped to concrete artifacts.
+- Change:
+  - Captured `output/submission/01-live-lock-form-zen.png` from live Reddit in Zen with the Devvit `Lock review` form open and not submitted.
+  - Selected existing browser proof artifacts into `output/submission/02-live-dashboard-runtime-proof.png`, `output/submission/03-local-dashboard-active-locks.png`, `output/submission/04-local-reopened-after-edit.png`, and `output/submission/05-local-demo-mode.png`.
+  - Added `docs/SCREENSHOTS.md` to map each Devpost screenshot slot to a stable file, source type, caption, and proof boundary.
+  - Updated `docs/DEVPOST_SUBMISSION.md` and `docs/LAUNCH_CHECKLIST.md` to point at the screenshot manifest and mark the screenshot set assembled.
+- Validation:
+  - `git diff --check`
+  - PASS.
+  - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
+  - PASS.
+  - `rg -n "TODO" src || true`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+  - PASS after manual review: remaining matches are guardrail docs, tests, prompts, historical review notes, proof/audit documents, or fixtures; README and app-listing product copy no longer match the exact "users cannot report" phrase.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 434 tests.
+  - `npm run build`
+  - PASS.

@@ -179,12 +179,13 @@ subreddit with fewer than 200 members.
 - [ ] App listing copy: `docs/APP_LISTING.md`.
 - [ ] Demo script: `docs/DEMO_SCRIPT.md`.
 - [ ] Claim audit: `docs/CLAIM_CHECK.md`.
-- [ ] Screenshot set:
+- [x] Screenshot set:
   - lock form;
   - dashboard active locks and reports suppressed;
   - reopened-after-edit queue;
   - runtime proof panel;
   - visible demo mode state.
+  - Manifest: `docs/SCREENSHOTS.md`.
 - [ ] Optional video under one minute, publicly visible on an allowed platform.
 
 ## 8. Final Reviewer Signoff

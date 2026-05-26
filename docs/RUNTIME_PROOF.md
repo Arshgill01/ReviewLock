@@ -87,7 +87,7 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
   - Result: PASS, 5 files and 27 tests.
 - `npm run test`
-  - Result: PASS on latest local gate, 43 files and 419 tests.
+  - Result: PASS on earlier local gate, 43 files and 419 tests.
 - `npm run lint`
   - Result: PASS.
 - `npm run build`

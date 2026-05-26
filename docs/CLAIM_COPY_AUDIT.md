@@ -32,7 +32,7 @@ Core phrases preserved:
 Required scan:
 
 ```bash
-rg -n "not reportable|disable reports|blocked reports|AI decides|automatic removal|permanent|forever" README.md docs src || true
+rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|AI decides|automatic removal|permanent|forever" README.md docs src || true
 ```
 
 Manual review result:
@@ -48,7 +48,10 @@ Manual review result:
 
 - `not reportable`
 - `disable reports`
+- `reports disabled`
 - `blocked reports`
+- `users cannot report`
+- `cannot report locked content`
 - `ai decides`
 - `automatic removal`
 - `permanent`

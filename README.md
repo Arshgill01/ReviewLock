@@ -10,8 +10,8 @@ suppressed and counted. If the post or comment changes, ReviewLock breaks the
 lock, returns reports to normal handling when Reddit allows it, and puts the
 item back in the dashboard reopen queue.
 
-ReviewLock is not a promise that users cannot report content. It is an
-edit-aware moderation ledger for reviewed content.
+ReviewLock does not change Reddit's reporting surface. It is an edit-aware
+moderation ledger for reviewed content.
 
 ## App listing summary
 
@@ -121,11 +121,10 @@ ReviewLock is a moderation workflow tool for Reddit communities. Moderators are
 responsible for their moderation decisions and should test the app in a
 controlled subreddit before production use.
 
-ReviewLock does not guarantee that users cannot report content. It attempts to
-suppress repeat reports on unchanged reviewed content using Reddit-provided
-moderation capabilities. If content changes or ReviewLock cannot verify content
-state with confidence, the app is designed to surface the item for moderator
-attention.
+ReviewLock does not change Reddit's reporting surface. It attempts to suppress
+repeat reports on unchanged reviewed content using Reddit-provided moderation
+capabilities. If content changes or ReviewLock cannot verify content state with
+confidence, the app is designed to surface the item for moderator attention.
 
 ## App listing and validation
 

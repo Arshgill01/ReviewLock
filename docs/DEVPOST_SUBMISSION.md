@@ -229,8 +229,9 @@ Technical challenges included:
 
 - Built a complete Devvit Web moderation app with menus, forms, triggers,
   dashboard, Redis persistence, demo mode, metrics, and audit history.
-- Proved the core loop in controlled playtest for a locked post: lock, suppress
-  repeat report, edit, reopen.
+- Proved the core post paths in controlled playtest: lock and repeat-report
+  suppression on one controlled post, and edit-triggered reopening on another
+  controlled post.
 - Proved comment edit reopening in controlled playtest.
 - Hardened app behavior across Redis failures, runtime uncertainty, malformed
   records, duplicate trigger delivery, stale confirmations, cross-subreddit
@@ -260,6 +261,8 @@ Required screenshot set:
 4. Runtime proof panel showing verified rows and clearly labeled unverified
    rows.
 5. Demo mode banner with seeded data, if using demo screenshots.
+
+Stable screenshot manifest: `docs/SCREENSHOTS.md`.
 
 ### Testing instructions for judges
 

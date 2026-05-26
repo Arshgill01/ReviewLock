@@ -112,11 +112,11 @@ ReviewLock is a moderation workflow tool for Reddit communities. Moderators are
 responsible for their own moderation decisions and for using ReviewLock only on
 content they are authorized to moderate.
 
-ReviewLock does not guarantee that users cannot report content. ReviewLock
-tracks reviewed content and attempts to suppress repeat reports on unchanged
-locked content using Reddit-provided moderation capabilities. If content changes
-or ReviewLock cannot verify content state with confidence, the app is designed
-to surface the item for moderator attention rather than silently suppressing it.
+ReviewLock does not change Reddit's reporting surface. ReviewLock tracks
+reviewed content and attempts to suppress repeat reports on unchanged locked
+content using Reddit-provided moderation capabilities. If content changes or
+ReviewLock cannot verify content state with confidence, the app is designed to
+surface the item for moderator attention rather than silently suppressing it.
 
 ReviewLock is provided as a hackathon project and should be tested in a
 controlled subreddit before production use.

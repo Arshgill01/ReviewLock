@@ -3126,3 +3126,72 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 18:34 IST - Reviewer handoff claim-boundary corrections
+
+- Identified reviewer-agent work since the previous Codex pass: launch and
+  submission docs, runtime-proof screenshots, demo/API hardening, target-link
+  canonicalization, form-binding identity checks, and verified Devvit upload
+  state for version `0.0.5`.
+- Applied the current reviewer findings:
+  - Reworded Devpost accomplishments so controlled post suppression and post
+    edit reopening are described as separate controlled targets.
+  - Reworded the older `npm run test` proof row as an earlier local gate.
+  - Updated the claim-copy audit to match the expanded dashboard render-test
+    forbidden phrase set.
+  - Rephrased README and app-listing terms copy so product-facing copy avoids
+    the exact "users cannot report" forbidden phrase while still stating the
+    reporting-surface boundary.
+- Validation:
+  - `git diff --check`
+  - PASS.
+  - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
+  - PASS.
+  - `rg -n "TODO" src || true`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+  - PASS after manual review: remaining matches are guardrail docs, tests,
+    prompts, historical review notes, proof/audit documents, or fixtures;
+    README and app-listing product copy no longer match the exact "users
+    cannot report" phrase.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 434 tests.
+  - `npm run build`
+  - PASS.
+
+## 2026-05-26 18:40 IST - Submission screenshot manifest
+
+- Addressed the reviewer finding that the final Devpost screenshot set had no
+  stable artifact mapping.
+- Captured `output/submission/01-live-lock-form-zen.png` from live Reddit in
+  Zen with the Devvit `Lock review` form open and not submitted.
+- Selected four existing browser proof artifacts into `output/submission/` for
+  runtime proof, active-lock dashboard, reopened-after-edit queue, and demo
+  mode slots.
+- Added `docs/SCREENSHOTS.md` with source labels and captions so local
+  regression artifacts are not presented as live Reddit WebView proof.
+- Updated Devpost and launch checklist docs to reference the manifest.
+- Validation:
+  - `git diff --check`
+  - PASS.
+  - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
+  - PASS.
+  - `rg -n "TODO" src || true`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|AI decides|automatic removal|permanent|forever" README.md docs src || true`
+  - PASS after manual review: remaining matches are guardrail docs, tests,
+    prompts, historical review notes, proof/audit documents, or fixtures;
+    README and app-listing product copy no longer match the exact "users
+    cannot report" phrase.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 434 tests.
+  - `npm run build`
+  - PASS.
