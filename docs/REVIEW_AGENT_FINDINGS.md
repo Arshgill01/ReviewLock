@@ -6518,3 +6518,19 @@
     `npx devvit publish --public` final-approval checklist items.
 - Validation:
   - Documentation-only change after the previous full local gate.
+
+## 2026-05-26 16:13 IST - Finding
+
+- Severity: low
+- Area: Demo API error contract for invalid demo namespace.
+- Evidence:
+  - `src/routes/api.demo.ts:55-60` passes the client-provided `subreddit` query directly into `disableDemoMode()`.
+  - `src/server/services/demoMode.ts:42-45` throws when the subreddit is not exactly `reviewlock_demo`.
+  - `src/routes/api.demo.ts:50-60` does not catch that guard error or convert it to the structured JSON shape used by the other demo dependency failures.
+  - `src/routes/api.demo.test.ts:33-48` covers the default valid disable path, but there is no regression for `/demo/disable?subreddit=alpha`.
+- Why it matters: The write guard itself is safe because live namespaces are rejected before mutation, but the API contract is rough at the boundary. A malformed client request or hand-tested endpoint can produce an unhandled route error instead of the app's normal `{ ok: false, demo: true, error, requestId }` response. This is small, but it weakens final polish around demo/live separation, which judges may inspect.
+- Suggested fix: Wrap `disableDemoMode()` in a try/catch in the route, return a structured 403 or 400 JSON response for non-demo namespaces, and add a route test that `/demo/disable?subreddit=alpha` leaves `reviewlock:alpha:*` untouched while returning the structured error.
+- Files reviewed:
+  - `src/routes/api.demo.ts`
+  - `src/server/services/demoMode.ts`
+  - `src/routes/api.demo.test.ts`
