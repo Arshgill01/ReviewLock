@@ -32,6 +32,31 @@ describe('audit log', () => {
     expect(await getAuditEvent(redis, 'alpha', 'new')).toMatchObject({ message: 'Locked.' });
   });
 
+  it('skips valid-shaped audit records stored under the wrong namespace key', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, event({ id: 'good' }));
+    await redis.set(
+      keys.auditEvent('alpha', 'cross-namespace'),
+      JSON.stringify(event({ id: 'cross-namespace', subreddit: 'beta', targetId: 't3_beta' })),
+    );
+    await redis.set(
+      keys.auditEvent('alpha', 'wrong-id'),
+      JSON.stringify(event({ id: 'other-id', targetId: 't3_wrong_id' })),
+    );
+    await redis.zAdd(keys.audit('alpha'), {
+      member: 'cross-namespace',
+      score: Date.parse('2026-05-24T01:00:00.000Z'),
+    });
+    await redis.zAdd(keys.audit('alpha'), {
+      member: 'wrong-id',
+      score: Date.parse('2026-05-24T02:00:00.000Z'),
+    });
+
+    expect(await getAuditEvent(redis, 'alpha', 'cross-namespace')).toBeUndefined();
+    expect(await getAuditEvent(redis, 'alpha', 'wrong-id')).toBeUndefined();
+    expect((await listAuditEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
+  });
+
   it('skips malformed audit event records', async () => {
     const redis = new InMemoryRedisStore();
     await appendAuditEvent(redis, event({ id: 'good' }));

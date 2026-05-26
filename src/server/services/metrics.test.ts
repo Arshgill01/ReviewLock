@@ -140,6 +140,91 @@ describe('metrics persistence', () => {
     });
   });
 
+  it('skips valid-shaped metric records stored under the wrong namespace key', async () => {
+    const redis = new InMemoryRedisStore();
+    await incrementSuppressedReportMetric(redis, target({ id: 't3_good' }), '2026-05-24T01:00:00.000Z');
+    await redis.set(
+      keys.metricsDaily('alpha', '2026-05-25'),
+      JSON.stringify({
+        subreddit: 'beta',
+        date: '2026-05-25',
+        locksCreated: 9,
+        reportsSuppressed: 9,
+        locksReopened: 9,
+        demo: false,
+      }),
+    );
+    await redis.set(
+      keys.metricsDaily('alpha', '2026-05-26'),
+      JSON.stringify({
+        subreddit: 'alpha',
+        date: '2026-05-27',
+        locksCreated: 9,
+        reportsSuppressed: 9,
+        locksReopened: 9,
+        demo: false,
+      }),
+    );
+    await redis.zAdd(keys.metricsDailyIndex('alpha'), {
+      member: '2026-05-25',
+      score: Date.parse('2026-05-25T00:00:00.000Z'),
+    });
+    await redis.zAdd(keys.metricsDailyIndex('alpha'), {
+      member: '2026-05-26',
+      score: Date.parse('2026-05-26T00:00:00.000Z'),
+    });
+    await redis.set(
+      keys.metricsTarget('alpha', 't3_beta'),
+      JSON.stringify({
+        subreddit: 'beta',
+        targetId: 't3_beta',
+        targetKind: 'post',
+        reportsSuppressed: 9,
+        locksCreated: 9,
+        locksReopened: 9,
+        lastActivityAt: '2026-05-25T00:00:00.000Z',
+        demo: false,
+      }),
+    );
+    await redis.set(
+      keys.metricsTarget('alpha', 't3_wrong_id'),
+      JSON.stringify({
+        subreddit: 'alpha',
+        targetId: 't3_other',
+        targetKind: 'post',
+        reportsSuppressed: 9,
+        locksCreated: 9,
+        locksReopened: 9,
+        lastActivityAt: '2026-05-25T00:00:00.000Z',
+        demo: false,
+      }),
+    );
+    await redis.zAdd(keys.metricsTargetIndex('alpha'), {
+      member: 't3_beta',
+      score: 9,
+    });
+    await redis.zAdd(keys.metricsTargetIndex('alpha'), {
+      member: 't3_wrong_id',
+      score: 9,
+    });
+
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-25')).toBeUndefined();
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-26')).toBeUndefined();
+    expect(await getTargetMetrics(redis, 'alpha', 't3_beta')).toBeUndefined();
+    expect(await getTargetMetrics(redis, 'alpha', 't3_wrong_id')).toBeUndefined();
+    expect((await listDailyMetrics(redis, 'alpha')).map((entry) => entry.date)).toEqual([
+      '2026-05-24',
+    ]);
+    expect((await listTopTargetMetrics(redis, 'alpha')).map((entry) => entry.targetId)).toEqual([
+      't3_good',
+    ]);
+    expect(await sumDailyMetrics(redis, 'alpha')).toEqual({
+      locksCreated: 0,
+      reportsSuppressed: 1,
+      locksReopened: 0,
+    });
+  });
+
   it('skips malformed daily and target metric records', async () => {
     const redis = new InMemoryRedisStore();
     await redis.set(keys.metricsDaily('alpha', '2026-05-24'), '{');

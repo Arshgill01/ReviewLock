@@ -6750,3 +6750,25 @@
   - PASS, 43 files / 423 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-26 16:40 IST - Resolution
+
+- Addressed findings:
+  - Reopen event namespace isolation for persisted records.
+  - Lock record namespace isolation for persisted records.
+  - Audit and metrics namespace isolation for persisted records.
+- Change:
+  - `src/server/services/locks.ts`, `src/server/services/reopenQueue.ts`, `src/server/services/audit.ts`, and `src/server/services/metrics.ts` now reject valid-shaped records whose stored subreddit or record identity does not match the requested Redis key namespace.
+  - Added regressions for valid-shaped cross-namespace and wrong-id lock, reopen event, audit event, daily metric, and target metric records stored under `alpha` keys.
+  - List/count/sum readers now filter those records through the same scoped direct readers, so dashboard inputs remain namespace-bound even under corrupted or hand-seeded Redis state.
+- Validation:
+  - `npm test -- src/server/services/locks.test.ts src/server/services/reopenQueue.test.ts src/server/services/audit.test.ts src/server/services/metrics.test.ts`
+  - PASS, 4 files / 22 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 427 tests.
+  - `npm run build`
+  - PASS.

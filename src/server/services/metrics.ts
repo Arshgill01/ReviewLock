@@ -20,14 +20,32 @@ const parseJson = (value: string | undefined): unknown => {
   }
 };
 
-const parseDailyMetrics = (value: string | undefined): DailyMetrics | undefined => {
+const parseDailyMetrics = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedDate: string,
+): DailyMetrics | undefined => {
   const parsed = parseJson(value);
-  return isDailyMetrics(parsed) ? parsed : undefined;
+  if (!isDailyMetrics(parsed)) {
+    return undefined;
+  }
+
+  return parsed.subreddit === expectedSubreddit && parsed.date === expectedDate ? parsed : undefined;
 };
 
-const parseTargetMetrics = (value: string | undefined): TargetMetrics | undefined => {
+const parseTargetMetrics = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedTargetId: string,
+): TargetMetrics | undefined => {
   const parsed = parseJson(value);
-  return isTargetMetrics(parsed) ? parsed : undefined;
+  if (!isTargetMetrics(parsed)) {
+    return undefined;
+  }
+
+  return parsed.subreddit === expectedSubreddit && parsed.targetId === expectedTargetId
+    ? parsed
+    : undefined;
 };
 
 const emptyDailyMetrics = (subreddit: string, date: string, demo = false): DailyMetrics => ({
@@ -158,7 +176,7 @@ export const getDailyMetrics = async (
   subreddit: string,
   date: string,
 ): Promise<DailyMetrics | undefined> =>
-  parseDailyMetrics(await redis.get(keys.metricsDaily(subreddit, date)));
+  parseDailyMetrics(await redis.get(keys.metricsDaily(subreddit, date)), subreddit, date);
 
 export const listDailyMetrics = async (
   redis: RedisStore,
@@ -202,7 +220,7 @@ export const getTargetMetrics = async (
   subreddit: string,
   targetId: string,
 ): Promise<TargetMetrics | undefined> =>
-  parseTargetMetrics(await redis.get(keys.metricsTarget(subreddit, targetId)));
+  parseTargetMetrics(await redis.get(keys.metricsTarget(subreddit, targetId)), subreddit, targetId);
 
 export const listTopTargetMetrics = async (
   redis: RedisStore,

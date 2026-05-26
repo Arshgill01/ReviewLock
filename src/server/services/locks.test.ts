@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import type { ReviewLockRecord } from '../../shared/schema';
 import {
+  countActiveLocks,
   getActiveLockByTarget,
   getLock,
   listActiveLocks,
@@ -73,6 +74,46 @@ describe('lock persistence', () => {
     await saveLock(redis, lock());
 
     expect(await getActiveLockByTarget(redis, 'beta', 't3_alpha')).toBeUndefined();
+  });
+
+  it('skips valid-shaped lock records stored under the wrong namespace key', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ id: 'lock-good', targetId: 't3_good' }));
+    await redis.set(
+      keys.lock('alpha', 'lock-cross-namespace'),
+      JSON.stringify(
+        lock({
+          id: 'lock-cross-namespace',
+          subreddit: 'beta',
+          targetId: 't3_beta',
+          permalink: '/r/beta/comments/beta',
+        }),
+      ),
+    );
+    await redis.set(
+      keys.lock('alpha', 'lock-wrong-id'),
+      JSON.stringify(lock({ id: 'lock-other-id', targetId: 't3_wrong_id' })),
+    );
+    await redis.set(keys.targetLock('alpha', 't3_beta'), 'lock-cross-namespace');
+    await redis.set(keys.targetLock('alpha', 't3_wrong_id'), 'lock-wrong-id');
+    await redis.zAdd(keys.activeLocks('alpha'), {
+      member: 'lock-cross-namespace',
+      score: Date.parse('2026-05-24T01:00:00.000Z'),
+    });
+    await redis.zAdd(keys.activeLocks('alpha'), {
+      member: 'lock-wrong-id',
+      score: Date.parse('2026-05-24T02:00:00.000Z'),
+    });
+
+    expect(await getLock(redis, 'alpha', 'lock-cross-namespace')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-wrong-id')).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_beta')).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_wrong_id')).toBeUndefined();
+    expect((await listActiveLocks(redis, 'alpha')).map((entry) => entry.id)).toEqual(['lock-good']);
+    expect(await countActiveLocks(redis, 'alpha')).toBe(1);
+    expect(
+      await updateLockStatus(redis, 'alpha', 'lock-cross-namespace', 'reopened'),
+    ).toBeUndefined();
   });
 
   it('degrades safely when a lock record is malformed', async () => {

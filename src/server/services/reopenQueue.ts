@@ -14,9 +14,17 @@ const parseJson = (value: string | undefined): unknown => {
   }
 };
 
-const parseReopenEvent = (value: string | undefined): ReopenEvent | undefined => {
+const parseReopenEvent = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedEventId: string,
+): ReopenEvent | undefined => {
   const parsed = parseJson(value);
-  return isReopenEvent(parsed) ? parsed : undefined;
+  if (!isReopenEvent(parsed)) {
+    return undefined;
+  }
+
+  return parsed.subreddit === expectedSubreddit && parsed.id === expectedEventId ? parsed : undefined;
 };
 
 export const enqueueReopenEvent = async (
@@ -40,7 +48,7 @@ export const getReopenEvent = async (
   subreddit: string,
   eventId: string,
 ): Promise<ReopenEvent | undefined> =>
-  parseReopenEvent(await redis.get(keys.reopenEvent(subreddit, eventId)));
+  parseReopenEvent(await redis.get(keys.reopenEvent(subreddit, eventId)), subreddit, eventId);
 
 export const listOpenReopenEvents = async (
   redis: RedisStore,

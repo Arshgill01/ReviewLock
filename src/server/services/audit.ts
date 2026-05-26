@@ -14,9 +14,17 @@ const parseJson = (value: string | undefined): unknown => {
   }
 };
 
-const parseAuditEvent = (value: string | undefined): AuditEvent | undefined => {
+const parseAuditEvent = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedEventId: string,
+): AuditEvent | undefined => {
   const parsed = parseJson(value);
-  return isAuditEvent(parsed) ? parsed : undefined;
+  if (!isAuditEvent(parsed)) {
+    return undefined;
+  }
+
+  return parsed.subreddit === expectedSubreddit && parsed.id === expectedEventId ? parsed : undefined;
 };
 
 export const appendAuditEvent = async (
@@ -36,7 +44,7 @@ export const getAuditEvent = async (
   subreddit: string,
   eventId: string,
 ): Promise<AuditEvent | undefined> =>
-  parseAuditEvent(await redis.get(keys.auditEvent(subreddit, eventId)));
+  parseAuditEvent(await redis.get(keys.auditEvent(subreddit, eventId)), subreddit, eventId);
 
 export const listAuditEvents = async (
   redis: RedisStore,

@@ -14,9 +14,17 @@ const parseJson = (value: string | undefined): unknown => {
   }
 };
 
-const parseLock = (value: string | undefined): ReviewLockRecord | undefined => {
+const parseLock = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedLockId: string,
+): ReviewLockRecord | undefined => {
   const parsed = parseJson(value);
-  return isReviewLockRecord(parsed) ? parsed : undefined;
+  if (!isReviewLockRecord(parsed)) {
+    return undefined;
+  }
+
+  return parsed.subreddit === expectedSubreddit && parsed.id === expectedLockId ? parsed : undefined;
 };
 
 const scoreFromIso = (value: string | undefined): number =>
@@ -40,7 +48,7 @@ export const getLock = async (
   subreddit: string,
   lockId: string,
 ): Promise<ReviewLockRecord | undefined> =>
-  parseLock(await redis.get(keys.lock(subreddit, lockId)));
+  parseLock(await redis.get(keys.lock(subreddit, lockId)), subreddit, lockId);
 
 export const getActiveLockByTarget = async (
   redis: RedisStore,

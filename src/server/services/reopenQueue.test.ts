@@ -46,6 +46,40 @@ describe('reopen queue', () => {
     expect(await getReopenEvent(redis, 'alpha', 'event-1')).toMatchObject({ dismissedBy: 'mod' });
   });
 
+  it('skips valid-shaped reopen events stored under the wrong namespace key', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, event({ id: 'good' }));
+    await redis.set(
+      keys.reopenEvent('alpha', 'cross-namespace'),
+      JSON.stringify(
+        event({
+          id: 'cross-namespace',
+          subreddit: 'beta',
+          targetId: 't3_beta',
+        }),
+      ),
+    );
+    await redis.set(
+      keys.reopenEvent('alpha', 'wrong-id'),
+      JSON.stringify(event({ id: 'other-id', targetId: 't3_wrong_id' })),
+    );
+    await redis.zAdd(keys.reopenQueue('alpha'), {
+      member: 'cross-namespace',
+      score: Date.parse('2026-05-24T01:00:00.000Z'),
+    });
+    await redis.zAdd(keys.reopenQueue('alpha'), {
+      member: 'wrong-id',
+      score: Date.parse('2026-05-24T02:00:00.000Z'),
+    });
+
+    expect(await getReopenEvent(redis, 'alpha', 'cross-namespace')).toBeUndefined();
+    expect(await getReopenEvent(redis, 'alpha', 'wrong-id')).toBeUndefined();
+    expect((await listOpenReopenEvents(redis, 'alpha')).map((entry) => entry.id)).toEqual(['good']);
+    await expect(
+      dismissReopenEvent(redis, 'alpha', 'cross-namespace', '2026-05-24T03:00:00.000Z', 'mod'),
+    ).resolves.toBeUndefined();
+  });
+
   it('keeps the event open when queue removal fails during dismissal', async () => {
     class QueueFailingRedisStore extends InMemoryRedisStore {
       override async zRem(key: string, member: string): Promise<void> {
