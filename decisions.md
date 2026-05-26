@@ -2431,3 +2431,25 @@ Reason:
   to disappear from the queue would hide the main recovery surface while Reddit
   reports may still be ignored. Blocking dismissal keeps ReviewLock honest until
   a dedicated recovery flow or manual resolution path exists.
+
+### D136 - Resolved target-refetch warnings are cleared on successful retry
+
+`target_resolution_failed` means ReviewLock could not load current content for a
+known active lock during a prior trigger delivery.
+
+Decision:
+
+- Treat `target_resolution_failed` as a transient warning.
+- Clear it when a later report or update trigger successfully refetches the
+  target and proves reviewed content is unchanged.
+- Also clear it from changed-content reopen records once the target has been
+  successfully refetched, while preserving any new `unignoreReports()` warning.
+- Preserve non-transient warnings such as failed moderation operations.
+
+Reason:
+
+- Keeping retryable uncertainty visible is useful while current content cannot
+  be loaded. Once a later delivery proves content integrity again, the warning
+  is stale and makes the dashboard look unresolved. Clearing only the resolved
+  target-refetch warning keeps moderator attention focused on real remaining
+  recovery work.

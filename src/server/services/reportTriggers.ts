@@ -75,6 +75,13 @@ const mergeRuntimeWarnings = (existing: string[], added: string[]): string[] => 
   ...new Set([...existing, ...added]),
 ];
 
+const resolvedTargetWarnings = new Set(['target_resolution_failed']);
+
+const clearResolvedTargetWarnings = (lock: ReviewLockRecord): ReviewLockRecord => ({
+  ...lock,
+  runtimeWarnings: lock.runtimeWarnings.filter((warning) => !resolvedTargetWarnings.has(warning)),
+});
+
 const REPORT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export const buildReopenFromReportDecision = (
@@ -269,6 +276,7 @@ export const handleReportTrigger = async (
       if (decision.action === 'suppress_unchanged') {
         const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
         await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
+        const recoveredLock = clearResolvedTargetWarnings(lock);
 
         if (!ignoreResult.ok) {
           await appendAuditEvent(deps.redis, {
@@ -299,7 +307,7 @@ export const handleReportTrigger = async (
         try {
           await incrementLockSuppression(
             deps.redis,
-            lock,
+            recoveredLock,
             now,
             input.reportCount ?? resolution.target.reportCount,
           );
@@ -381,16 +389,22 @@ export const handleReportTrigger = async (
       }
 
       if (decision.action === 'reopen_changed') {
+        const recoveredLock = clearResolvedTargetWarnings(lock);
         const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
         await recordRuntimeProof(deps, lock.subreddit, unignoreResult, now);
         const warnings = unignoreResult.warnings;
-        const reopenEvent = buildReopenFromReportDecision(lock, resolution.target, now, warnings);
+        const reopenEvent = buildReopenFromReportDecision(
+          recoveredLock,
+          resolution.target,
+          now,
+          warnings,
+        );
         await enqueueReopenEvent(deps.redis, reopenEvent);
-        await markLockReopenedAfterQueue(deps.redis, lock, {
+        await markLockReopenedAfterQueue(deps.redis, recoveredLock, {
           reopenedAt: now,
           reopenReason: 'content_changed',
           reopenEventId: reopenEvent.id,
-          runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
+          runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
         });
         try {
           await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);

@@ -222,6 +222,33 @@ describe('breakLockForChangedContent', () => {
     ]);
   });
 
+  it('clears resolved target-resolution warnings after an unchanged update retry succeeds', async () => {
+    const dependencies = await deps(null);
+
+    await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'alpha',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+
+    dependencies.reddit.setTarget(target());
+    const retry = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'alpha',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+
+    expect(retry).toMatchObject({ ok: true, action: 'unchanged' });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: [],
+    });
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([]);
+  });
+
   it('fails open to runtime uncertain when Reddit refetch throws', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());

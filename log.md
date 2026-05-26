@@ -2864,3 +2864,31 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:38 IST - Transient target warning recovery
+
+- Cleared resolved `target_resolution_failed` warnings when a later report
+  trigger successfully refetches the target and suppresses unchanged content.
+- Cleared resolved `target_resolution_failed` warnings when a later update
+  trigger successfully refetches the target and finds the fingerprint unchanged.
+- Preserved non-transient runtime warnings by clearing only the resolved
+  target-refetch warning.
+- Updated `docs/RUNTIME_PROOF.md` so the primary runtime claim-boundary doc
+  matches the retryable active-lock behavior.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 files and 50 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 379 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

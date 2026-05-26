@@ -85,6 +85,13 @@ const mergeRuntimeWarnings = (existing: string[], added: string[]): string[] => 
   ...new Set([...existing, ...added]),
 ];
 
+const resolvedTargetWarnings = new Set(['target_resolution_failed']);
+
+const clearResolvedTargetWarnings = (lock: ReviewLockRecord): ReviewLockRecord => ({
+  ...lock,
+  runtimeWarnings: lock.runtimeWarnings.filter((warning) => !resolvedTargetWarnings.has(warning)),
+});
+
 const markLockReopenedAfterQueue = async (
   redis: RedisStore,
   lock: ReviewLockRecord,
@@ -192,6 +199,11 @@ export const breakLockForChangedContent = async (
       }
 
       if (comparison === 'unchanged') {
+        const recoveredLock = clearResolvedTargetWarnings(lock);
+        if (recoveredLock.runtimeWarnings.length !== lock.runtimeWarnings.length) {
+          await updateLock(deps.redis, recoveredLock);
+        }
+
         return {
           ok: true,
           action: 'unchanged',
@@ -213,6 +225,7 @@ export const breakLockForChangedContent = async (
       }
 
       const reason = input.reasonHint ?? 'content_changed';
+      const recoveredLock = clearResolvedTargetWarnings(lock);
       const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, currentTarget);
       await recordModerationOperationStatus(
         deps.redis,
@@ -221,14 +234,14 @@ export const breakLockForChangedContent = async (
         now,
       ).catch(() => undefined);
       const warnings = unignoreResult.warnings;
-      const event = buildReopenEvent(lock, currentTarget, reason, now, warnings);
+      const event = buildReopenEvent(recoveredLock, currentTarget, reason, now, warnings);
 
       await enqueueReopenEvent(deps.redis, event);
-      await markLockReopenedAfterQueue(deps.redis, lock, {
+      await markLockReopenedAfterQueue(deps.redis, recoveredLock, {
         reopenedAt: now,
         reopenReason: reason,
         reopenEventId: event.id,
-        runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
+        runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
       });
 
       try {

@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-25 23:07 IST.
+Last updated: 2026-05-26 13:38 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -207,8 +207,16 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     calling Reddit moderation methods.
 - Report-trigger target resolution failure could previously leave a known
   active lock suppressible while returning `runtime_uncertain`.
-  - Hardened by reopening known active locks as `runtime_uncertain` when the
-    target cannot be loaded during report-trigger processing.
+  - Hardened by keeping known active locks retryable with a
+    `target_resolution_failed` warning, clearing report dedupe for retry, and
+    writing `runtime_failure` audit data with `active_lock_retry_required`.
+    ReviewLock no longer queues a `runtime_uncertain` reopen until it can load
+    current content and attempt report restoration.
+- Report/update trigger retries after transient target-refetch failure could
+  previously leave stale `target_resolution_failed` warnings on active locks
+  after later successfully proving unchanged content.
+  - Hardened by clearing resolved `target_resolution_failed` warnings on
+    successful unchanged retry while preserving non-transient runtime warnings.
 - Duplicate-lock idempotency could previously return an old active lock before
   checking whether the current target fingerprint had changed.
   - Hardened by fingerprinting first; changed current content reopens the stale

@@ -880,6 +880,10 @@ describe('handleReportTrigger', () => {
 
     expect(retry).toMatchObject({ ok: true, action: 'suppress_unchanged' });
     expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: [],
+    });
   });
 
   it('does not keep a dedupe marker after target resolution fails without enough scope to find a lock', async () => {

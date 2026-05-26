@@ -3369,3 +3369,292 @@
     `target_resolution_failed` warnings visible on active locks.
   - Dashboard launch still creates a new dashboard custom post on every submit.
   - Submission docs and README rewrite are still absent.
+
+## 2026-05-26 13:32 IST - Honorable Mention Hardening Packet
+
+- Severity: execution-critical
+- Area: Final app hardening, Devvit publishing, and Devpost submission package.
+- External requirement check:
+  - Devpost rules list a May 27, 2026 6:00 PM PDT submission deadline and
+    require a Reddit Developer Platform app, a text description explaining
+    functionality, all participant Reddit usernames, the app listing link
+    `developers.reddit.com/apps/{app-name}`, 1-3 impact communities, and
+    working testing access through a Reddit post running the app.
+  - Devpost says judging uses Community Impact, Polish, Reliable UX, and New
+    Mod Tool Ecosystem Impact for this category; Moderator's Choice uses the
+    same criteria.
+  - Reddit's Devvit launch guide says launch-ready apps should be polished and
+    stable, tested across mobile and web, tested from multiple permission
+    roles where practical, have clear UX flows, and include a user-friendly
+    `README.md` before `npx devvit publish`.
+  - The same guide says public App Directory listing uses
+    `npx devvit publish --public` and requires a detailed `README.md` with a
+    comprehensive overview, installer-facing instructions, and changelogs.
+- Current repo state:
+  - App listing URL is already established by prior upload proof:
+    `https://developers.reddit.com/apps/reviewlock`.
+  - `README.md` is still a development stub and is not launch/listing grade.
+  - No judge-facing single source exists yet for Devpost copy:
+    `docs/DEVPOST_SUBMISSION.md`, `docs/APP_LISTING.md`,
+    `docs/LAUNCH_CHECKLIST.md`, or root `SUBMISSION.md` are absent.
+  - `docs/RUNTIME_PROOF.md` still contains stale wording that report-refetch
+    uncertainty reopens active locks as `runtime_uncertain`; current code and
+    `docs/TRIGGER_PROOF.md` instead keep active locks retryable with
+    `target_resolution_failed`.
+  - Dashboard launch still creates a new visible custom post on every launch
+    submit, which is a publishability/installability risk.
+  - Successful retry after transient report/update target-resolution failure
+    can still leave stale `target_resolution_failed` warnings visible on active
+    locks unless main implementation changes after this note.
+- Honorable mention target rubric:
+  - Community Impact: target 8/10. Submission must quantify repeat-report
+    churn as a time-saving workflow, name 1-3 concrete community types, and
+    avoid claiming universality.
+  - Polish: target 8/10. README, Devpost story, app listing copy, screenshots,
+    video script, proof matrix, and known limitations must all agree and avoid
+    stale/runtime-unverified claims.
+  - Reliable UX: target 8/10. Before docs polish, fix the duplicate dashboard
+    launch behavior or explicitly downgrade it in known limitations; clear
+    resolved transient warnings after successful retries; keep warning-bearing
+    reopens non-dismissable as already implemented.
+  - Ecosystem Impact: target 8/10. Frame ReviewLock as a Devvit-native
+    reviewed-content ledger tied to content integrity, not an `ignoreReports`
+    wrapper or generic modqueue.
+- Required work order for the main agent:
+  1. Close app-risk blockers first:
+     - Update stale `docs/RUNTIME_PROOF.md` wording to match retryable active
+       lock behavior.
+     - Fix or consciously defer duplicate dashboard custom-post launch. The
+       preferred fix is one dashboard post per subreddit, stored in Redis and
+       reused on later launches, with a fallback create path if the stored
+       post is unavailable.
+     - Clear resolved `target_resolution_failed` warnings after successful
+       report-trigger and update-trigger retries, preserving non-transient
+       warnings.
+  2. Run the full local gate after blocker fixes:
+     - `npm run type-check`
+     - `npm run lint`
+     - `npm run test`
+     - `npm run build`
+     - `git diff --check`
+     - copy guardrail scan for forbidden phrasing in production docs/UI.
+  3. Rewrite `README.md` for App Directory review:
+     - opening thesis: `Lock reviewed content until it changes.`
+     - what moderators do: lock, suppress unchanged repeat reports, reopen on
+       edits/material state changes, dismiss clean reopens, inspect audit and
+       metrics.
+     - install/setup: app listing URL, permissions, dashboard launch, demo
+       mode, first lock workflow, expected configuration.
+     - safety boundaries: no permanent report disabling, no AI judgment, no
+       reporter identity storage, non-destructive reopen by default, runtime
+       uncertainties fail open or stay visible.
+     - verified/known limitations: mirror `docs/RUNTIME_PROOF.md` exactly.
+     - changelog section suitable for public listing.
+  4. Create `docs/DEVPOST_SUBMISSION.md` as paste-ready Devpost copy:
+     - category: Best New Mod Tool.
+     - app listing: `https://developers.reddit.com/apps/reviewlock`.
+     - Reddit usernames: leave an obvious `TODO` slot if the final team list
+       is not known.
+     - tool overview with all capabilities.
+     - project impact with 1-3 community examples.
+     - time-savings model with conservative assumptions.
+     - 45-60 second demo script matching the verified loop.
+     - testing instructions and known limitations with no overclaims.
+     - explicit `Not a ported project` note so port-only fields are not
+       accidentally answered.
+  5. Create `docs/APP_LISTING.md`:
+     - short listing title/subtitle.
+     - directory description.
+     - permission explanation for Reddit + Redis.
+     - moderator install/use steps.
+     - support/limitations text.
+     - screenshot captions.
+  6. Create `docs/LAUNCH_CHECKLIST.md`:
+     - pre-publish local gate.
+     - screenshot/video capture checklist.
+     - controlled public test post requirement.
+     - `devvit upload` rehearsal.
+     - final approval checkpoint before `npx devvit publish`.
+     - public listing checkpoint before `npx devvit publish --public`.
+     - post-submit freeze notes: no changing Devpost submission after deadline
+       except allowed Devpost/sponsor correction cases.
+  7. Capture final screenshots/video only after docs and blockers align:
+     - lock form.
+     - active lock dashboard.
+     - reports suppressed metric/audit.
+     - reopened-after-edit queue.
+     - runtime proof/known limitation state if visible.
+- Copy guardrails for every submission artifact:
+  - Prefer: `Lock reviewed content until it changes`, `suppress repeat reports
+    on unchanged reviewed content`, `reopened after edit`, `reports
+    suppressed`, `review state tied to content integrity`.
+  - Avoid: `not reportable`, `reports disabled`, `disable reports`,
+    `unreportable`, `forever`, `permanent`, `AI decides`, or any wording that
+    implies users cannot submit reports.
+- Reviewer acceptance criteria:
+  - A judge can read only `README.md` plus `docs/DEVPOST_SUBMISSION.md` and
+    understand the problem, workflow, proof status, limitations, install path,
+    and impact in under five minutes.
+  - All runtime claims in README/Devpost/app listing are traceable to
+    `docs/RUNTIME_PROOF.md`, `docs/TRIGGER_PROOF.md`, or focused local tests.
+  - The app can be submitted as a new Devvit mod tool without relying on
+    unpublished bug-fix promises.
+
+## 2026-05-26 13:38 IST - Integration Status
+
+- The stale `target_resolution_failed` warning findings are closed.
+- Report-trigger retries now clear resolved target-refetch warnings after
+  successful unchanged suppression while preserving non-transient warnings.
+- Update-trigger retries now clear resolved target-refetch warnings after a
+  successful unchanged fingerprint comparison.
+- `docs/RUNTIME_PROOF.md` now matches `docs/TRIGGER_PROOF.md`: known active
+  locks stay active/retryable on target-refetch uncertainty and no
+  `runtime_uncertain` reopen is queued until current content can be loaded.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 2 files / 50 tests.
+  - `npm run type-check` PASS.
+
+## 2026-05-26 13:32 IST - Blocker Recheck
+
+- Rechecked the current clean implementation state after the hardening packet.
+- Still open:
+  - `docs/RUNTIME_PROOF.md` still says report-trigger target-resolution
+    failure was hardened by reopening active locks as `runtime_uncertain`.
+  - `/internal/form/dashboard-launch-submit` still calls
+    `submitDashboardPost(...)` on every submit with no stored dashboard lookup
+    or reuse path.
+  - Report/update trigger services still add `target_resolution_failed` to
+    active locks, but no reviewed code path clears that warning after a later
+    successful unchanged retry.
+  - No submission artifacts exist outside the current stub `README.md`.
+- Validation:
+  - `git diff --check -- docs/REVIEW_AGENT_FINDINGS.md` PASS.
+- Recommendation: Treat these as the final app-hardening lane before the main
+  agent begins judge-facing copy. The submission docs should not be written
+  around stale proof wording or known UX gaps that can still be closed today.
+
+## 2026-05-26 13:35 IST - Finding
+
+- Severity: medium
+- Area: Moderator configuration is modeled but not surfaced or applied.
+- Evidence:
+  - `src/server/services/config.ts:18-27` defines default configurable
+    `lockExpiryDays`, `demoModeEnabled`, and `reasonPresets`.
+  - The config service supports loading, saving, and merging config records:
+    `src/server/services/config.ts:29-57`.
+  - Production code only uses `updateConfig()` for demo enable/disable paths:
+    `src/server/services/demoMode.ts:100` and
+    `src/server/services/demoMode.ts:135`; `rg` finds no production
+    `loadConfig()` use outside the config service itself.
+  - The lock form hardcodes the reason options instead of reading configured
+    `reasonPresets`: `src/routes/menu.ts:92-104`.
+  - The lock form does not render an expiry field; form submission only accepts
+    an optional `expiresAt` if some caller supplies it:
+    `src/routes/forms.ts:119-137`.
+  - The dashboard UI has no settings/config panel or install-time setup affordance:
+    `src/client/pages/DashboardPage.ts:81-127`.
+- Why it matters: Devpost judges explicitly score Reliable UX, including
+  install/configure ease. Right now ReviewLock has a credible config data model,
+  but moderators cannot see or change it through the app, and normal lock
+  creation does not apply the default expiry setting. That makes the project
+  easier to critique as "no setup story" during App Directory/public listing
+  review, even though the underlying pieces exist.
+- Suggested fix: For the final hardening pass, either surface a minimal
+  moderator settings panel or remove config claims from submission copy. The
+  smallest useful product fix is a dashboard settings section showing lock
+  expiry days and reason presets, plus using the loaded config to build the
+  lock form options/default expiry. Add route/client tests proving the
+  configured presets appear in the lock form and default expiry is applied to
+  new locks. If time is too tight, document config as internal/demo-only and do
+  not present it as a moderator-facing capability.
+- Files reviewed: `src/server/services/config.ts`,
+  `src/server/services/demoMode.ts`, `src/routes/menu.ts`,
+  `src/routes/forms.ts`, `src/client/pages/DashboardPage.ts`.
+
+## 2026-05-26 13:35 IST - Finding
+
+- Severity: high
+- Area: Devpost testing-access requirement is not yet captured as an artifact.
+- Evidence:
+  - `docs/INSTALL_DEPLOY_REHEARSAL.md:5-8` says the deployment rehearsal used
+    the signed-in developer account and controlled test subreddit
+    `r/reviewlock_dev`.
+  - `docs/INSTALL_DEPLOY_REHEARSAL.md:78-97` records `npx devvit upload` only
+    as a private upload and explicitly says no public publish occurred.
+  - `docs/INSTALL_DEPLOY_REHEARSAL.md:125-141` records a playtest URL, not a
+    judge-facing installed/public Reddit post URL.
+  - `docs/PRODUCTION_TRUST_AUDIT.md:18` says the app can upload, install, and
+    reach playtest, but public publish should wait until claim boundaries are
+    resolved.
+  - `rg -n "public subreddit|less than 200|200 members|testing access|judges.*test|judge.*testing|running your app" docs README.md TODO.md log.md`
+    finds no current launch/submission checklist entry outside this review
+    findings file.
+- Why it matters: Devpost's rules require access to a working project for
+  judging/testing by providing a Reddit post running the app in a public
+  subreddit with fewer than 200 members. The current proof is valuable, but a
+  playtest/private-upload URL is not the same artifact. If Wave 14 waits until
+  the last hour to discover this, the project can be technically strong but
+  operationally awkward to submit.
+- Suggested fix: Add this to `docs/LAUNCH_CHECKLIST.md` and
+  `docs/DEVPOST_SUBMISSION.md`: final public/test subreddit name, member-count
+  check, installed app version, public Reddit post URL running ReviewLock,
+  app listing URL, and exact commands used immediately before submission. If
+  public publish/listing approval is still pending, state the approved fallback
+  path clearly and do not present the playtest URL as the required judge access
+  artifact unless Devpost/Reddit explicitly confirms it is acceptable.
+- Files reviewed: `docs/INSTALL_DEPLOY_REHEARSAL.md`,
+  `docs/PRODUCTION_TRUST_AUDIT.md`, `docs/RUNTIME_PROOF.md`, `TODO.md`,
+  `log.md`, `README.md`.
+
+## 2026-05-26 13:37 IST - Integration Status
+
+- The stale `target_resolution_failed` warning findings from 13:39/13:29 are
+  addressed in the current dirty implementation worktree.
+- Implementation observed:
+  - `src/server/services/reportTriggers.ts` now clears
+    `target_resolution_failed` before successful unchanged suppression retries
+    and changed-content reopen processing.
+  - `src/server/services/reopenFlow.ts` now clears
+    `target_resolution_failed` after a recovered unchanged update retry and
+    before changed-content reopen processing.
+  - `src/server/services/reportTriggers.test.ts` now asserts the active lock
+    warning list is empty after a successful report-trigger retry.
+  - `src/server/services/reopenFlow.test.ts` already contains a focused
+    regression named `clears resolved target-resolution warnings after an
+    unchanged update retry succeeds`.
+- Validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 2 files / 50 tests.
+- Still open after this integration check:
+  - `docs/RUNTIME_PROOF.md` stale `runtime_uncertain` reopen wording.
+  - Duplicate dashboard custom-post launch behavior.
+  - Submission docs/README/app listing/launch checklist/testing-access
+    artifacts.
+  - Moderator configuration remains modeled but not surfaced/applied.
+
+## 2026-05-26 13:39 IST - Finding
+
+- Severity: low
+- Area: Stale TODO wording still describes the old refetch-failure behavior.
+- Evidence:
+  - `TODO.md:74` still has a checked item saying
+    `Reopen known active locks when report-trigger target resolution is uncertain.`
+  - Current product/runtime decision `D133` says the opposite: known active
+    locks stay active and retryable with `target_resolution_failed`, and no
+    reopen event is queued until ReviewLock can load current content and safely
+    attempt report restoration.
+  - `docs/RUNTIME_PROOF.md:208-219` has now been corrected to the active-lock
+    retry behavior, and `TODO.md:181` / `TODO.md:185` also describe the newer
+    retry/clear behavior.
+- Why it matters: `TODO.md` is one of the first files agents are instructed to
+  read. During submission hardening, stale checked tracker language can lead to
+  README/Devpost copy or follow-up docs saying ReviewLock reopens locks on
+  target-refetch uncertainty, which is no longer the implemented safety
+  behavior.
+- Suggested fix: Rename the historical checked item to match the current
+  behavior, for example `Keep known active locks retryable when report-trigger
+  target resolution is uncertain`, or add an indented note that D133 superseded
+  the earlier reopen wording.
+- Files reviewed: `TODO.md`, `decisions.md`, `docs/RUNTIME_PROOF.md`,
+  `docs/TRIGGER_PROOF.md`.

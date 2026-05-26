@@ -182,3 +182,4 @@
 - [x] Clear report-trigger dedupe markers when retryable runtime-failure audit persistence fails.
 - [x] Rework audit timeline detail rows and verify desktop/mobile browser screenshots.
 - [x] Block dismissals for reopened items with unresolved runtime warnings.
+- [x] Clear resolved `target_resolution_failed` warnings after successful report/update retries.
