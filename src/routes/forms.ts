@@ -305,6 +305,12 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       return context.json<UiResponse>(uiToast('Reopen event was not found.'));
     }
 
+    if (event.runtimeWarnings.length > 0) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock cannot dismiss this reopened item until runtime warnings are resolved.'),
+      );
+    }
+
     try {
       await appendAuditEvent(deps.redis, {
         id: `audit-reopen-dismissed-${Date.parse(dismissedAt)}-${event.id}`,

@@ -199,6 +199,9 @@ describe('client render helpers', () => {
 
     expect(html).toContain('Needs attention');
     expect(html).toContain('unignoreReports failed for t3_reviewed');
+    expect(html).toContain('Resolve warning first');
+    expect(html).not.toContain('data-action="dismiss-reopen"');
+    expect(html).not.toContain('data-action="confirm-dismiss-reopen"');
     expectSafeCopy(html);
   });
 

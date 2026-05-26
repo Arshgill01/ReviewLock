@@ -3187,6 +3187,21 @@
   `src/server/services/reportTriggers.ts`,
   `src/client/components/ReopenQueue.ts`, `src/routes/api.dashboard.ts`.
 
+## 2026-05-26 13:31 IST - Integration Status
+
+- The warning-bearing reopen dismissal finding is closed with the stricter
+  option: block dismissal until runtime warnings are resolved.
+- Client render change: warned reopen items render `Resolve warning first` and
+  no `dismiss-reopen` / `confirm-dismiss-reopen` action.
+- Dashboard API change: `/api/reopen-queue/dismiss` returns 409 and keeps the
+  queue item visible when `event.runtimeWarnings` is non-empty.
+- Devvit form change: `/internal/form/reopen-action-submit` returns a toast and
+  keeps the queue item visible when `event.runtimeWarnings` is non-empty.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts --reporter verbose`
+    PASS, 3 files / 54 tests.
+  - `npm run type-check` PASS.
+
 ## 2026-05-26 13:31 IST - Finding
 
 - Severity: medium
@@ -3299,3 +3314,58 @@
   `src/server/services/locks.ts`,
   `src/server/services/reportTriggers.test.ts`,
   `src/client/components/LockTable.ts`.
+
+## 2026-05-26 13:29 IST - Finding
+
+- Severity: medium
+- Area: Successful update-trigger retry after transient refetch failure leaves
+  stale active-lock warning.
+- Evidence:
+  - The update-trigger refetch-failure path adds `target_resolution_failed` to
+    the active lock runtime warnings and returns without queueing a reopen:
+    `src/server/services/reopenFlow.ts:160-191`.
+  - When a later update delivery successfully refetches the target and finds the
+    fingerprint unchanged, the unchanged branch returns without updating the
+    lock or clearing resolved transient warnings:
+    `src/server/services/reopenFlow.ts:194-200`.
+  - Current update-trigger tests assert the warning is added on refetch failure,
+    but do not retry with a recovered unchanged target and assert the warning is
+    cleared: `src/server/services/reopenFlow.test.ts:199-258`.
+  - Active locks render runtime warnings as `Needs attention`, so the stale
+    warning remains moderator-visible in the dashboard.
+- Why it matters: A transient Reddit refetch failure can become a permanent
+  item-level warning even after the next update delivery proves the reviewed
+  content is unchanged. That makes the dashboard status noisy and can confuse
+  judges or moderators during the edit-break demo, because the app appears to
+  need attention after the uncertainty has already recovered.
+- Suggested fix: Clear resolved transient warnings such as
+  `target_resolution_failed` when a later update-trigger delivery successfully
+  resolves the target and returns `unchanged`. Preserve non-transient warnings
+  such as failed moderation operations. Add a regression covering failure,
+  recovered unchanged retry, and the final active lock warning list.
+- Files reviewed: `src/server/services/reopenFlow.ts`,
+  `src/server/services/reopenFlow.test.ts`,
+  `src/client/components/LockTable.ts`.
+
+## 2026-05-26 13:30 IST - Integration Status
+
+- The reopened-item runtime-warning dismiss finding from 13:27 is resolved in
+  the current dirty worktree.
+- Implementation now blocks warned reopen dismissals in:
+  - `src/client/components/ReopenQueue.ts`
+  - `src/routes/api.dashboard.ts`
+  - `src/routes/forms.ts`
+- Regression coverage now includes:
+  - Client render proof that warned reopened items show `Resolve warning first`
+    and do not render dismiss action buttons.
+  - Dashboard API proof that warned reopened items return 409, remain visible,
+    and do not write a dismiss audit.
+- Validation:
+  - `npm run test -- src/client/render.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts --reporter verbose`
+    PASS, 3 files / 53 tests.
+- Still open from this reviewer pass:
+  - `docs/RUNTIME_PROOF.md` still has stale report-refetch recovery wording.
+  - Report/update successful retry paths can leave resolved
+    `target_resolution_failed` warnings visible on active locks.
+  - Dashboard launch still creates a new dashboard custom post on every submit.
+  - Submission docs and README rewrite are still absent.

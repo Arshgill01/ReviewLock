@@ -2410,3 +2410,24 @@ Reason:
   while still overlapping in the Reddit embed. Labeled detail rows keep the
   proof ledger scan-friendly and prevent long ids from competing with the
   audit message.
+
+### D135 - Reopen items with runtime warnings cannot be dismissed
+
+Changed-content reopens can carry runtime warnings when ReviewLock could not
+fully restore Reddit report handling, such as a failed `unignoreReports()`.
+
+Decision:
+
+- Hide the normal dismiss action for reopen queue items with runtime warnings.
+- Show `Resolve warning first` beside warning-bearing reopen items.
+- Reject dashboard API and Devvit form dismiss attempts for those events with a
+  moderator-facing message.
+- Leave the reopen event visible and do not write a dismissal audit for rejected
+  warning-bearing dismissals.
+
+Reason:
+
+- A warning-bearing reopen is still an unresolved moderation task. Allowing it
+  to disappear from the queue would hide the main recovery surface while Reddit
+  reports may still be ignored. Blocking dismissal keeps ReviewLock honest until
+  a dedicated recovery flow or manual resolution path exists.

@@ -583,6 +583,39 @@ describe('form routes', () => {
     ]);
   });
 
+  it('rejects form dismissals for reopened items with unresolved runtime warnings', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, {
+      ...reopenEvent(),
+      runtimeWarnings: ['unignoreReports failed for t3_post'],
+    });
+    const router = createFormsRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-action-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        action: 'dismiss',
+        actor: { name: 'bad' },
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock cannot dismiss this reopened item until runtime warnings are resolved.',
+      },
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([]);
+  });
+
   it('keeps reopened items visible when form dismiss audit write fails', async () => {
     class AuditFailingRedisStore extends InMemoryRedisStore {
       override async zAdd(key: string, entry: { member: string; score: number }): Promise<void> {

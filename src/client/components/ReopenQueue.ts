@@ -42,6 +42,10 @@ const renderDismissAction = (
     return '<span class="status status-unverified">Demo read-only</span>';
   }
 
+  if (event.runtimeWarnings.length > 0) {
+    return '<span class="status status-failed">Resolve warning first</span>';
+  }
+
   const isConfirming =
     confirmation?.action === 'dismiss-reopen' && confirmation.eventId === event.id;
 

@@ -181,3 +181,4 @@
 - [x] Keep runtime-uncertain report/update refetch failures retryable with active lock warnings.
 - [x] Clear report-trigger dedupe markers when retryable runtime-failure audit persistence fails.
 - [x] Rework audit timeline detail rows and verify desktop/mobile browser screenshots.
+- [x] Block dismissals for reopened items with unresolved runtime warnings.

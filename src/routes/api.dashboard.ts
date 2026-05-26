@@ -439,6 +439,19 @@ export const createDashboardApiRouter = (deps: RouteDeps = {}): Hono => {
         return context.json({ ok: false, message: 'Reopen event was not found.' });
       }
 
+      if (event.runtimeWarnings.length > 0) {
+        return context.json(
+          {
+            ok: false,
+            message:
+              'ReviewLock cannot dismiss this reopened item until runtime warnings are resolved.',
+            warnings: event.runtimeWarnings,
+            requestId: requestId(),
+          },
+          409,
+        );
+      }
+
       await appendAuditEvent(deps.redis, {
         id: `audit-reopen-dismissed-${Date.parse(dismissedAt)}-${event.id}`,
         kind: 'reopen_dismissed',

@@ -347,6 +347,41 @@ describe('dashboard API routes', () => {
     ]);
   });
 
+  it('rejects dashboard dismissals for reopened items with unresolved runtime warnings', async () => {
+    const redis = new InMemoryRedisStore();
+    await enqueueReopenEvent(redis, {
+      ...reopenEvent(),
+      runtimeWarnings: ['unignoreReports failed for t3_alpha'],
+    });
+    const router = createDashboardApiRouter({
+      reddit: new FakeRedditAdapter([target()], 'dash_mod'),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const response = await router.request('/reopen-queue/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: 'reopen-1',
+        actor: 'client_supplied_actor',
+        subreddit: 'alpha',
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock cannot dismiss this reopened item until runtime warnings are resolved.',
+      warnings: ['unignoreReports failed for t3_alpha'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ id: 'reopen-1' }),
+    ]);
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([]);
+  });
+
   it('rejects demo reopen dismiss mutations before changing state', async () => {
     const demoEvent: ReopenEvent = {
       ...reopenEvent(),

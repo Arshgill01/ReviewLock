@@ -2838,3 +2838,29 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:31 IST - Reopen warning dismissal hardening
+
+- Blocked dashboard and form dismissals for reopen queue items that still carry
+  unresolved runtime warnings.
+- Updated the reopened queue and latest edit-break panel so warned items show
+  `Resolve warning first` instead of a dismiss button.
+- Kept rejected warning-bearing dismissals from writing `reopen_dismissed`
+  audits or removing queue visibility.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts src/routes/api.dashboard.test.ts src/routes/forms.test.ts --reporter verbose`
+  - PASS, 3 files and 54 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 378 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
