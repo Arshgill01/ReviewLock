@@ -6555,3 +6555,116 @@
   - `src/routes/api.dashboard.ts`
   - `src/routes/forms.ts`
   - `docs/DATA_NAMESPACE_AUDIT.md`
+
+## 2026-05-26 16:19 IST - Finding
+
+- Severity: low
+- Area: Lock expiry input boundary before expiry enforcement exists.
+- Evidence:
+  - `decisions.md` D138 says ReviewLock should not render or claim configurable lock expiry until an expiry enforcement path exists.
+  - `src/routes/menu.ts:102-163` builds the `Lock review` form without an expiry field, so moderators cannot intentionally configure expiry through the shipped form UI.
+  - `src/routes/forms.ts:204-221` still accepts an optional `expiresAt` from the submit body and only rejects malformed ISO timestamps.
+  - `src/routes/forms.ts:268-275` passes that valid `expiresAt` through to `lockReviewedContent()`.
+  - `src/server/services/lockFlow.ts:84-113` persists `expiresAt` onto the active lock record.
+  - `src/routes/forms.test.ts:128-156` covers malformed expiry rejection, but there is no regression asserting that valid hidden/crafted expiry input is ignored or rejected while expiry enforcement remains unimplemented.
+- Why it matters: This is not exposed in the normal Devvit form UI, but it leaves a route-level product boundary open: a crafted or stale form submit can create an active lock with an expiry timestamp that ReviewLock never enforces or renders. That can confuse later dashboard/debug review and weakens the proof-bound claim that expiry is future work, not shipped behavior.
+- Suggested fix: Until expiry enforcement ships, ignore or reject any submitted `expiresAt` in `lock-review-submit` and add a regression that a valid ISO `expiresAt` does not persist to the lock. When expiry is implemented, add scheduler/trigger enforcement and dashboard copy in the same wave.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/server/services/lockFlow.ts`
+  - `src/routes/forms.test.ts`
+  - `decisions.md`
+
+## 2026-05-26 16:19 IST - Finding
+
+- Severity: medium
+- Area: Lock record namespace isolation for persisted records.
+- Evidence:
+  - `src/server/services/locks.ts:17-20` validates lock record shape with `isReviewLockRecord()` but does not verify that `lock.subreddit` matches the namespace used to read the Redis key.
+  - `src/server/services/locks.ts:38-43` returns any valid-shaped lock stored under `keys.lock(subreddit, lockId)`, including a record whose own `subreddit` field names another community.
+  - `src/server/services/locks.ts:45-58` and `src/server/services/locks.ts:103-122` accept those valid-shaped cross-namespace records for active-lock lookup, active-lock lists, and active-lock counts.
+  - `src/server/services/dashboard.ts:59-77` feeds `listActiveLocks()` and `countActiveLocks()` directly into the dashboard response for the requested subreddit.
+  - `src/server/services/unlockFlow.ts:92-118` loads the active lock through the target namespace, but records runtime proof using `activeLock.subreddit`; if the lock record was corrupted across namespaces, later unlock/audit/status writes can split across the record namespace rather than the requested target namespace.
+  - `src/server/services/locks.test.ts:71-76` covers normal namespace separation when beta has no alpha keys, and `src/server/services/locks.test.ts:78-126` covers malformed lock records, but neither test covers a valid-shaped beta lock stored under alpha keys.
+- Why it matters: Normal `saveLock()` writes are correctly namespaced, so this is a corrupted-state or hand-seeded-data edge. It still matters for production hardening because Redis records are treated as untrusted elsewhere, and a valid-shaped cross-namespace lock can appear in another subreddit dashboard or drive moderation/audit operations against the wrong namespace. This is the active-lock equivalent of the reopen event namespace finding and should be fixed with the same boundary principle.
+- Suggested fix: Make lock reads enforce the expected namespace, returning `undefined` unless `lock.subreddit === subreddit`. Add regressions for `getLock()`, `getActiveLockByTarget()`, `listActiveLocks()`, `countActiveLocks()`, and one dashboard/unlock path seeded with a valid-shaped beta lock under alpha keys.
+- Files reviewed:
+  - `src/server/services/locks.ts`
+  - `src/server/services/locks.test.ts`
+  - `src/server/services/dashboard.ts`
+  - `src/server/services/unlockFlow.ts`
+
+## 2026-05-26 16:20 IST - Finding
+
+- Severity: low
+- Area: Audit and metrics namespace isolation for persisted records.
+- Evidence:
+  - `src/server/services/audit.ts:17-20` validates audit event shape with `isAuditEvent()` but does not verify that `event.subreddit` matches the namespace used to read the Redis key.
+  - `src/server/services/audit.ts:34-52` returns and lists any valid-shaped audit event stored under the requested namespace keys.
+  - `src/server/services/metrics.ts:23-31` validates daily and target metric shape but does not verify that `metrics.subreddit` matches the namespace used to read the Redis key.
+  - `src/server/services/metrics.ts:156-222` returns, lists, and sums any valid-shaped daily or target metric record stored under the requested namespace keys.
+  - `src/server/services/dashboard.ts:59-77` uses those audit and metrics readers directly for dashboard audit rows, daily metrics, headline suppressed/reopened counts, and top churn targets.
+  - `src/server/services/audit.test.ts:35-64` and `src/server/services/metrics.test.ts:143-245` cover malformed records, but not valid-shaped cross-namespace records stored under the wrong namespace key.
+- Why it matters: Normal app writes use the record's own subreddit and should not create this state. The gap still matters because ReviewLock's hardening docs treat persisted Redis records as untrusted, and a valid-shaped cross-namespace audit or metric record can contaminate another subreddit dashboard or runtime-proof-derived story without being filtered. This is lower risk than active lock contamination because it does not directly invoke Reddit moderation methods, but it weakens namespace isolation and judge-facing metrics trust.
+- Suggested fix: Enforce expected subreddit on audit, daily metric, and target metric reads. Return `undefined` unless the stored record's `subreddit` equals the requested namespace, and add regressions for direct reads, list reads, `sumDailyMetrics()`, and dashboard aggregation seeded with valid-shaped beta records under alpha keys.
+- Files reviewed:
+  - `src/server/services/audit.ts`
+  - `src/server/services/audit.test.ts`
+  - `src/server/services/metrics.ts`
+  - `src/server/services/metrics.test.ts`
+  - `src/server/services/dashboard.ts`
+
+## 2026-05-26 16:21 IST - Finding
+
+- Severity: medium
+- Area: Devpost Project Impact field lacks concrete 1-3 communities.
+- Evidence:
+  - The Devpost rules require Project Impact to "List 1-3 communities that you think would find this app useful and how you see moderators/communities benefiting" and testing access via a Reddit post in a public subreddit with fewer than 200 members: `https://mod-tools-migration.devpost.com/rules`.
+  - `docs/DEVPOST_SUBMISSION.md:8-17` correctly records the requirement for project impact covering 1-3 communities and judging access through a public Reddit post.
+  - `docs/DEVPOST_SUBMISSION.md:131-146` currently lists broad community categories: debate/politics/local news, advice/support/marketplace/fan communities, and report-brigading communities.
+  - The draft does not yet name 1-3 concrete subreddit/community examples or explain the benefit in a way a judge can map to specific moderator workflows.
+- Why it matters: Community Impact is an equally weighted judging criterion and the New Mod Tool honorable mention target depends on making adoption feel concrete. Category-level examples are safer than overclaiming, but they leave judges to infer who would actually install ReviewLock. The submission can be stronger by naming careful examples such as a controlled demo subreddit plus 1-2 archetypal public communities, while avoiding claims that those teams endorsed or tested the app unless they did.
+- Suggested fix: Replace the "Recommended communities to list" placeholder with 1-3 named communities/subreddit examples and one sentence each describing the repeated-report workflow ReviewLock helps. If no external mod team has validated it, phrase them as "would benefit" candidates, not testimonials, and keep the controlled judging subreddit separate from the impact examples unless it is only used for testing access.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - Devpost official rules page
+
+## 2026-05-26 16:23 IST - Finding
+
+- Severity: medium
+- Area: Lock creation guard acquisition failure is not converted to a retryable lock result.
+- Evidence:
+  - `src/server/services/lockFlow.ts:215-220` calls `deps.redis.setIfNotExists(guardKey, guardToken)` before any moderation operation, but the call is not wrapped in a `try/catch`.
+  - `src/server/services/lockFlow.ts:250-263` handles the later `expire()` failure by deleting the owned guard and returning `{ ok: false, warnings: ['redis_write_failed'] }`.
+  - `src/routes/forms.ts:268-281` calls `lockReviewedContent()` from the Devvit form submit route without a route-level `try/catch`, so a thrown Redis acquisition error can escape instead of returning the normal moderator-facing `UiResponse` toast.
+  - `src/server/services/lockFlow.test.ts:217-248` covers TTL failure after guard acquisition, but there is no regression for `setIfNotExists()` throwing before the guard exists.
+  - `src/routes/forms.ts:382-388` already catches dashboard-post creation guard acquisition failures, which shows the repo pattern for this class of Redis lease boundary.
+- Why it matters: This is safe from a moderation side-effect perspective because it happens before `approve()` or `ignoreReports()`, but it is still a reliability/polish gap in a primary moderator workflow. A transient Redis failure on the first guard write can produce an unstructured form failure instead of "ReviewLock could not reserve this lock attempt; try again", and it is not covered by the existing lock creation guard tests.
+- Suggested fix: Wrap the lock creation `setIfNotExists()` call in `try/catch`, return a retryable `LockFlowResult` with `redis_write_failed`, and add a regression proving no Reddit moderation calls occur, no active lock is created, and the form route returns a structured toast when guard acquisition throws.
+- Files reviewed:
+  - `src/server/services/lockFlow.ts`
+  - `src/server/services/lockFlow.test.ts`
+  - `src/routes/forms.ts`
+
+## 2026-05-26 16:26 IST - Finding
+
+- Severity: low
+- Area: Runtime proof dashboard rendering loses target-specific evidence.
+- Evidence:
+  - `src/server/services/runtimeProof.ts:342-363` stores moderation-operation proof with evidence strings such as `ignoreReports on t3_post` and notes that include the concrete target id.
+  - `src/server/services/runtimeProof.ts:179-200` stores report-trigger proof with evidence such as `report_suppressed audit ...` and notes that distinguish post vs comment report-trigger evidence.
+  - `src/server/services/runtimeProof.ts:203-246` stores update-trigger proof with reopen-audit evidence and notes that include the trigger capability and target id.
+  - `src/client/components/RuntimeBanner.ts:27-35` renders only `capability.name` and `capability.status`; it drops `checkedAt`, `evidence`, and `notes`.
+  - `README.md:57-78` and `docs/DEVPOST_SUBMISSION.md:174-198` correctly keep live proof boundaries explicit, including the distinction between verified post-target operations and unverified comment-report delivery.
+  - `docs/DEVPOST_SUBMISSION.md:250-256` asks for a screenshot of the runtime proof panel showing verified and unverified rows, but the current panel cannot show why a row is verified or which target/scope proved it.
+- Why it matters: This is not a correctness bug in the moderation workflow, but it weakens submission hardening. Judges looking only at the app screenshot can see that a capability is "Verified" but cannot see the target-specific evidence that prevents overclaiming, such as post-only report suppression proof versus unverified comment report delivery. The source data already exists, so this is a low-risk polish improvement.
+- Suggested fix: Render a compact secondary line or disclosure per runtime capability with escaped `evidence` and the first note, plus `checkedAt` when present. Keep it dense enough for the dashboard, and add a render test proving Redis-backed evidence/notes are escaped and visible for verified and failed rows.
+- Files reviewed:
+  - `src/server/services/runtimeProof.ts`
+  - `src/server/services/runtimeProof.test.ts`
+  - `src/client/components/RuntimeBanner.ts`
+  - `src/client/render.test.ts`
+  - `README.md`
+  - `docs/DEVPOST_SUBMISSION.md`
