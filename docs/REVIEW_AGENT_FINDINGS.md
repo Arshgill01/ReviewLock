@@ -6534,3 +6534,24 @@
   - `src/routes/api.demo.ts`
   - `src/server/services/demoMode.ts`
   - `src/routes/api.demo.test.ts`
+
+## 2026-05-26 16:17 IST - Finding
+
+- Severity: medium
+- Area: Reopen event namespace isolation for persisted records.
+- Evidence:
+  - `src/server/services/reopenQueue.ts:17-20` validates reopen event shape with `isReopenEvent()` but does not verify that `event.subreddit` matches the namespace used to read the Redis key.
+  - `src/server/services/reopenQueue.ts:38-43` returns any valid-shaped event stored under `keys.reopenEvent(subreddit, eventId)`, including an event whose own `subreddit` field names a different community.
+  - `src/server/services/reopenQueue.ts:45-55` lists open events from a namespace without filtering out valid-shaped cross-namespace records.
+  - `src/routes/api.dashboard.ts:455-469` writes the dismissal audit using `event.subreddit` but dismisses the queue record using `scope.subreddit`, so a corrupted cross-namespace event could produce audit output in a different namespace from the queue mutation.
+  - `src/routes/forms.ts:517-537` has the same split between `event.subreddit` for audit and the scoped form subreddit for dismissal.
+  - `src/server/services/reopenQueue.test.ts:97-123` covers malformed reopen records, but not valid-shaped events stored under the wrong namespace.
+  - `docs/DATA_NAMESPACE_AUDIT.md:3` states Redis persistence is namespaced and malformed persisted records fail closed; this edge case is valid-shaped rather than malformed, so the current guard does not cover it.
+- Why it matters: Normal app writes use `enqueueReopenEvent()` and should store records under the correct namespace, so this is not a common-path bug. It is still an app-hardening gap because corrupted Redis state, a previous bug, or a hand-seeded test record can leak a reopen event into another dashboard and cause dismissal/audit side effects to split across namespaces. Namespace isolation is one of the trust claims judges may inspect.
+- Suggested fix: Make reopen event reads enforce the expected namespace, either by passing the expected subreddit into the parser or checking immediately after parse. Return `undefined` unless `event.subreddit === subreddit`, and add regressions for `getReopenEvent()`, `listOpenReopenEvents()`, dashboard dismiss, and form dismiss with a valid-shaped beta event stored under alpha keys.
+- Files reviewed:
+  - `src/server/services/reopenQueue.ts`
+  - `src/server/services/reopenQueue.test.ts`
+  - `src/routes/api.dashboard.ts`
+  - `src/routes/forms.ts`
+  - `docs/DATA_NAMESPACE_AUDIT.md`
