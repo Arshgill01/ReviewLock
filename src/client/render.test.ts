@@ -231,6 +231,29 @@ describe('client render helpers', () => {
     );
   });
 
+  it('renders runtime proof evidence and checked timestamps', () => {
+    const html = renderRuntimeBanner({
+      overall: 'verified',
+      generatedAt: '2026-05-24T00:00:00.000Z',
+      capabilities: [
+        {
+          name: 'postReportTrigger',
+          status: 'verified',
+          evidence: 'report_suppressed audit audit-report-suppressed-1',
+          checkedAt: '2026-05-24T01:00:00.000Z',
+          notes: ['post report trigger processed for t3_reviewed'],
+        },
+      ],
+      warnings: [],
+    });
+
+    expect(html).toContain('postReportTrigger');
+    expect(html).toContain('report_suppressed audit audit-report-suppressed-1');
+    expect(html).toContain('2026-05-24T01:00:00.000Z');
+    expect(html).toContain('post report trigger processed for t3_reviewed');
+    expectSafeCopy(html);
+  });
+
   it('escapes Redis-backed runtime proof text before rendering', () => {
     const html = renderRuntimeBanner(
       {
@@ -240,7 +263,8 @@ describe('client render helpers', () => {
           {
             name: 'ignoreReports<script>alert(1)</script>',
             status: 'failed',
-            notes: [],
+            evidence: 'ignoreReports <script>alert(1)</script>',
+            notes: ['note <img src=x onerror=alert(1)>'],
           },
         ],
         warnings: ['<img src=x onerror=alert(1)>'],
@@ -249,6 +273,8 @@ describe('client render helpers', () => {
     );
 
     expect(html).toContain('ignoreReports&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('ignoreReports &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('note &lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).toContain('Runtime &lt;script&gt;alert(1)&lt;/script&gt; refreshed.');
     expect(html).not.toContain('<script>');

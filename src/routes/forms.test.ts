@@ -125,7 +125,7 @@ describe('form routes', () => {
     expect(savedLock?.expiresAt).toBeUndefined();
   });
 
-  it('rejects malformed lock expiry strings before consuming the form token', async () => {
+  it('rejects lock expiry strings before consuming the form token', async () => {
     const redis = new InMemoryRedisStore();
     const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
     const reddit = new FakeRedditAdapter([target()]);
@@ -141,13 +141,13 @@ describe('form routes', () => {
         subreddit: 'alpha',
         formToken: binding.token,
         lockReason: 'reviewed_policy_compliant',
-        expiresAt: 'tomorrow',
+        expiresAt: '2026-06-01T00:00:00.000Z',
       }),
     });
 
     expect(await response.json()).toMatchObject({
       showToast: {
-        text: 'ReviewLock lock expiry is not valid.',
+        text: 'ReviewLock lock expiry is not available yet. Reopen the menu and try again.',
       },
     });
     expect(reddit.calls).toEqual([]);

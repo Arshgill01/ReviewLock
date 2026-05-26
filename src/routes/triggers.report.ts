@@ -63,7 +63,7 @@ const targetId = (body: TriggerBody, kind: TargetKind): string | undefined =>
   );
 
 const eventId = (body: TriggerBody): string | undefined =>
-  stringValue(body.eventId) ?? stringValue(body.id);
+  first(payloads(body).map((payload) => stringValue(payload.eventId) ?? stringValue(payload.id)));
 
 const subredditFromPayload = (payload: TriggerBody): string | undefined => {
   const subreddit = payload.subreddit;
@@ -104,7 +104,11 @@ const reportCount = (body: TriggerBody, kind: TargetKind): number | undefined =>
   );
 
 const reportedAt = (body: TriggerBody): string | undefined =>
-  stringValue(body.reportedAt) ?? stringValue(body.timestamp);
+  first(
+    payloads(body).map(
+      (payload) => stringValue(payload.reportedAt) ?? stringValue(payload.timestamp),
+    ),
+  );
 
 export const createReportTriggersRouter = (deps: RouteDeps = {}): Hono => {
   const router = new Hono();

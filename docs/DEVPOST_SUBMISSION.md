@@ -134,16 +134,22 @@ ReviewLock is best suited for communities where already-reviewed content keeps
 returning to the queue because of repeat reports. It is deliberately not pitched
 as a universal modqueue replacement.
 
-Recommended communities to list:
+Communities that could benefit, listed as fit examples rather than endorsements
+or confirmed installs:
 
-1. Large debate, politics, local-news, or issue-discussion communities where
-   controversial but rule-compliant posts attract repeat reports after review.
-2. Advice, support, marketplace, or fan communities where long-lived approved
-   posts keep accumulating duplicate reports while moderators still need edits
-   to reopen attention.
-3. Communities that see report brigading or report-as-disagreement behavior and
-   want an audited, reversible workflow instead of relying on memory to decide
-   whether repeat reports were already reviewed.
+1. `r/politics` or similar high-volume politics/local-news communities:
+   controversial but rule-compliant posts can keep attracting reports after a mod
+   team has already reviewed them. ReviewLock lets the team suppress only repeat
+   reports on the unchanged reviewed version while reopening the item after an
+   edit or material state change.
+2. `r/AmItheAsshole` or similar advice/judgment communities: high-engagement
+   posts and comment threads can continue receiving duplicate reports after a
+   moderation decision. ReviewLock gives mods a shared reviewed-content ledger so
+   another moderator does not have to rediscover the same decision from scratch.
+3. `r/buildapcsales` or similar marketplace/deal communities: approved listing
+   or deal threads can keep drawing reports after checks for title, link, flair,
+   or rule compliance. ReviewLock reduces repeat queue churn while still treating
+   edits and relevant post-state changes as reasons to reopen attention.
 
 Time-savings model:
 

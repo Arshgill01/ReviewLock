@@ -155,6 +155,83 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
   });
 
+  it('uses nested wrapped report event ids for dedupe', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createReportTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+
+    const firstResponse = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        postReport: {
+          id: 'evt-nested-report-a',
+          timestamp: '2026-05-24T01:00:00.000Z',
+          post: { id: 't3_post', numReports: 8 },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+    const secondResponse = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        postReport: {
+          id: 'evt-nested-report-b',
+          timestamp: '2026-05-24T01:00:30.000Z',
+          post: { id: 't3_post', numReports: 8 },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await firstResponse.json()).toMatchObject({
+      ok: true,
+      action: 'suppress_unchanged',
+    });
+    expect(await secondResponse.json()).toMatchObject({
+      ok: true,
+      action: 'suppress_unchanged',
+    });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post', 'ignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      suppressedReportCount: 2,
+    });
+    expect(await listAuditEvents(redis, 'alpha')).toHaveLength(2);
+  });
+
+  it('uses nested wrapped report timestamps for audit time', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const router = createReportTriggersRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-report', {
+      method: 'POST',
+      body: JSON.stringify({
+        postReport: {
+          id: 'evt-nested-report-timestamp',
+          timestamp: '2026-05-23T23:59:00.000Z',
+          post: { id: 't3_post', numReports: 9 },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        createdAt: '2026-05-23T23:59:00.000Z',
+        kind: 'report_suppressed',
+      }),
+    ]);
+  });
+
   it('logs sanitized report payload shape without raw ids, content, or report reasons', async () => {
     const redis = new InMemoryRedisStore();
     const logs: Record<string, unknown>[] = [];

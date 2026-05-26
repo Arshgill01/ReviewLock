@@ -217,8 +217,10 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       return context.json<UiResponse>(uiToast('ReviewLock lock reason is not valid.'));
     }
 
-    if (expiresAt && !isIsoTimestamp(expiresAt)) {
-      return context.json<UiResponse>(uiToast('ReviewLock lock expiry is not valid.'));
+    if (expiresAt) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock lock expiry is not available yet. Reopen the menu and try again.'),
+      );
     }
 
     const subreddit = await scopedFormSubreddit(deps.reddit, subredditInput);
@@ -270,7 +272,6 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       actor: await actorFromReddit(deps.reddit, body.actor),
       lockReason,
       customNote,
-      expiresAt,
       expectedContentHash: binding.reviewedContentHash,
       expectedFingerprintVersion: binding.reviewedFingerprintVersion,
     });

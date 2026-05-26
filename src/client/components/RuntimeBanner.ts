@@ -5,6 +5,22 @@ const statusLabel = (status: RuntimeCapabilityStatus): string => labelFromToken(
 const statusClass = (status: RuntimeCapabilityStatus): string =>
   status.replace(/[^a-zA-Z0-9_-]/g, '');
 
+const capabilityDetails = (capability: RuntimeProofStatus['capabilities'][number]): string => {
+  const details = [
+    capability.evidence
+      ? `<span class="capability-evidence">${escapeText(capability.evidence)}</span>`
+      : '',
+    capability.checkedAt
+      ? `<time class="capability-checked" datetime="${escapeText(capability.checkedAt)}">${escapeText(capability.checkedAt)}</time>`
+      : '',
+    ...capability.notes.map(
+      (note) => `<span class="capability-note">${escapeText(note)}</span>`,
+    ),
+  ].filter(Boolean);
+
+  return details.length ? `<span class="capability-details">${details.join('')}</span>` : '';
+};
+
 export const renderRuntimeBanner = (
   status: RuntimeProofStatus | null,
   verificationMessage: string | null = null,
@@ -28,7 +44,10 @@ export const renderRuntimeBanner = (
     .map(
       (capability) => `
         <li class="capability-row">
-          <span>${escapeText(capability.name)}</span>
+          <span class="capability-main">
+            <span class="capability-name">${escapeText(capability.name)}</span>
+            ${capabilityDetails(capability)}
+          </span>
           <span class="status status-${statusClass(capability.status)}">${escapeText(statusLabel(capability.status))}</span>
         </li>
       `,

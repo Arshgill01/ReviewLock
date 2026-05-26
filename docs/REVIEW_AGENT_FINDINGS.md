@@ -6792,3 +6792,77 @@
   - `src/server/services/reportTriggers.ts`
   - `docs/RUNTIME_PROOF.md`
   - `decisions.md`
+
+## 2026-05-26 16:48 IST - Resolution
+
+- Addressed finding: Wrapped report trigger event ids and timestamps are not extracted from nested report payloads.
+- Change:
+  - `src/routes/triggers.report.ts` now extracts `eventId`/`id` and `reportedAt`/`timestamp` from the same top-level plus nested `postReport`/`commentReport` payload candidates used for target id, subreddit, and report count parsing.
+  - `src/routes/triggers.report.test.ts` now covers two nested-only wrapped report event ids with the same target/report count, proving they are not collapsed as duplicates.
+  - `src/routes/triggers.report.test.ts` now covers nested wrapped report timestamp forwarding into the `report_suppressed` audit timestamp.
+- Validation:
+  - `npm test -- src/routes/triggers.report.test.ts`
+  - PASS, 1 file / 19 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 429 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+
+## 2026-05-26 16:49 IST - Resolution
+
+- Addressed finding: Devpost Project Impact field lacks concrete 1-3 communities.
+- Change:
+  - `docs/DEVPOST_SUBMISSION.md` now lists three concrete fit examples for the required Project Impact field: `r/politics`, `r/AmItheAsshole`, and `r/buildapcsales`.
+  - The copy explicitly frames them as fit examples rather than endorsements or confirmed installs.
+  - Each example ties the community shape back to ReviewLock's core value: repeat report churn on already-reviewed content, shared review memory, and edit/material-state reopen behavior.
+- Validation:
+  - `git diff --check -- docs/DEVPOST_SUBMISSION.md docs/REVIEW_AGENT_FINDINGS.md src/routes/triggers.report.ts src/routes/triggers.report.test.ts`
+  - PASS.
+
+## 2026-05-26 16:50 IST - Resolution
+
+- Addressed finding: Lock expiry input boundary before expiry enforcement exists.
+- Change:
+  - `src/routes/forms.ts` now rejects any submitted lock expiry string with a clear "not available yet" toast before consuming the form token or calling moderation flows.
+  - `src/routes/forms.ts` no longer forwards `expiresAt` into `lockReviewedContent()` from `lock-review-submit`.
+  - `src/routes/forms.test.ts` now covers a valid ISO expiry string submission and proves it is rejected before Reddit calls or form-token consumption.
+- Validation:
+  - `npm test -- src/routes/forms.test.ts`
+  - PASS, 1 file / 33 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 429 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+
+## 2026-05-26 16:52 IST - Resolution
+
+- Addressed finding: Runtime proof dashboard rendering loses target-specific evidence.
+- Change:
+  - `src/client/components/RuntimeBanner.ts` now renders each capability's `evidence`, `checkedAt`, and notes under the capability name instead of showing only name plus status.
+  - `src/client/styles.css` adds compact wrapping styles for runtime proof evidence so long audit ids or target ids do not overflow the panel.
+  - `src/client/render.test.ts` now proves runtime proof evidence, checked timestamps, and notes render, and that Redis-backed evidence/notes are escaped.
+- Validation:
+  - `npm test -- src/client/render.test.ts`
+  - PASS, 1 file / 19 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 430 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.

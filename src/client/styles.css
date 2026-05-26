@@ -766,9 +766,37 @@ td strong {
   color: #31514a;
 }
 
-.capability-row span:first-child {
+.capability-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.capability-name {
   font-family: var(--font-mono);
   font-size: 0.8rem;
+}
+
+.capability-details {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.capability-evidence,
+.capability-note,
+.capability-checked {
+  overflow-wrap: anywhere;
+}
+
+.capability-checked {
+  font-family: var(--font-mono);
 }
 
 .runtime-note {
