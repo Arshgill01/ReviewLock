@@ -6238,3 +6238,90 @@
   timestamp-specific pass.
 - Current source of truth for those two screenshot artifacts is now the "Audit
   Timeline Timestamp Recheck" section.
+
+## 2026-05-26 15:33 IST - Post-Commit Reviewer Handoff
+
+- Current repository state:
+  - `git status --short` returned clean.
+  - Latest commit is `f7b5ede303103ba42e8d62775e8fc7b871b34445`.
+  - Commit subject: `fix: polish audit timeline layout`.
+  - Commit timestamp: `2026-05-26T15:32:40+05:30`.
+- Files included in the commit:
+  - `TODO.md`
+  - `docs/BROWSER_REGRESSION.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+  - `log.md`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `src/client/components/AuditTimeline.ts`
+  - `src/client/render.test.ts`
+  - `src/client/styles.css`
+- Reviewer interpretation:
+  - The audit-timeline screenshot artifact issue from 15:27 is addressed.
+  - The proof-traceability issue from 15:32 is addressed.
+  - The local validation gate for this commit is documented above and was
+    independently rerun by the reviewer.
+- Still open for main agent:
+  - Developer Portal/App Directory listing is still stub-grade until a new
+    upload/listing pass is completed and verified with `npx devvit view --json`.
+  - The refreshed screenshots are styled local browser proof, not live Reddit
+    WebView proof.
+  - Client permalink sanitization remains a previously logged medium finding
+    unless separately fixed in a later commit.
+
+## 2026-05-26 15:34 IST - Finding
+
+- Severity: low
+- Area: Browser proof reproducibility.
+- Evidence:
+  - `docs/BROWSER_REGRESSION.md` documents the timestamp recheck with
+    `python3 -m http.server 8765 --directory /tmp` and then opens
+    `http://127.0.0.1:8765/reviewlock-audit-timeline.html`.
+  - `/tmp/reviewlock-audit-timeline.html` exists on this machine right now, but
+    it is outside the repository and is not listed by `rg` anywhere except the
+    proof command itself.
+  - The committed proof includes the generated PNG artifacts, but the exact HTML
+    fixture used to generate them is not reproducible from repository contents.
+- Why it matters: This is not an app runtime bug. It matters for final audit
+  hygiene: after a reboot or on another machine, an agent can no longer rerun
+  the documented browser proof exactly, even though the docs present exact
+  commands.
+- Suggested fix: Move the audit timeline fixture into a tracked proof fixture
+  path, or document the fixture source/content in `docs/BROWSER_REGRESSION.md`.
+  If the team does not want to keep the fixture, add a note that the current
+  proof is artifact-only and not command-reproducible.
+- Files reviewed:
+  - `docs/BROWSER_REGRESSION.md`
+  - `/tmp/reviewlock-audit-timeline.html`
+
+## 2026-05-26 15:41 IST - Implementation Handoff
+
+- Scope taken over from main agent:
+  - Submission hardening docs and README-linked artifacts.
+  - No app runtime code changed in this pass.
+- Files added:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/DEMO_SCRIPT.md`
+  - `docs/CLAIM_CHECK.md`
+- Existing dirty file adopted for validation:
+  - `README.md` already contained the submission-grade rewrite when this agent
+    resumed implementation. I treated it as part of the current submission docs
+    set because it links to the new files above.
+- Verification notes:
+  - `npx devvit view --json` still shows the Developer Portal listing is
+    stub-grade: empty `app.description`, empty `marketingInfo`, empty
+    `privacyPolicy`, empty `termsAndConditions`, and old short README text in
+    `version.about`.
+  - New docs intentionally mark the Developer Portal update and final public
+    judging post URL as open launch checklist items.
+  - The docs keep comment-report, NSFW, spoiler, flair, repeated dashboard
+    launch reuse, and independent comment-target moderation method proof
+    bounded as unverified unless a newer `docs/RUNTIME_PROOF.md` pass changes
+    that status.
+- Browser note:
+  - No browser recheck was run for this pass because only markdown artifacts
+    were added/validated. `docs/LAUNCH_CHECKLIST.md` now requires browser/WebView
+    recheck after any dashboard/UI/client change and before final screenshot or
+    submission proof refresh.
