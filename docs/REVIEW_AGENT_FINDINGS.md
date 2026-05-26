@@ -6866,3 +6866,19 @@
   - PASS.
   - `git diff --check`
   - PASS.
+
+## 2026-05-26 16:55 IST - Browser Validation
+
+- Scope: Runtime proof evidence panel rendering after the client/CSS change.
+- Result:
+  - PASS in local headless Chromium against the built `dist/client` bundle with mocked ReviewLock API responses.
+  - Desktop, post-`Verify runtime`, and mobile screenshots all rendered target-specific runtime proof evidence without horizontal overflow, nested panels, clipped runtime proof text, forbidden copy, or `undefined`/`NaN`.
+- Screenshot artifacts:
+  - `output/playwright/runtime-proof-evidence-desktop.png`
+  - `output/playwright/runtime-proof-evidence-desktop-verified.png`
+  - `output/playwright/runtime-proof-evidence-mobile.png`
+- Commands:
+  - `npx --yes http-server dist/client -a 127.0.0.1 -p 4173`
+  - `npx --yes --package=playwright node <<'NODE' ... NODE`
+- Boundary:
+  - This is local browser proof with mocked API responses. It does not replace live Reddit WebView proof or live trigger proof.

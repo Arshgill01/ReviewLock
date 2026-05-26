@@ -157,6 +157,53 @@ live-mobile-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/out
 Result: PASS for the current dashboard bundle. This remains local browser proof
 with mocked API responses, not live Reddit trigger proof.
 
+## Runtime Proof Evidence Panel Recheck
+
+After the runtime proof panel started rendering capability evidence, checked
+timestamps, and notes, the browser regression was rerun against the current built
+client bundle.
+
+Commands:
+
+- `npm run build`
+- `mkdir -p output/playwright`
+- `npx --yes http-server dist/client -a 127.0.0.1 -p 4173`
+- `npx --yes --package=playwright node <<'NODE' ... NODE`
+
+The Playwright script mocked ReviewLock API responses and exercised:
+
+- live desktop dashboard;
+- runtime verification action;
+- live mobile dashboard.
+
+Assertions repeated for each captured state:
+
+- required first-viewport phrases are present;
+- runtime proof evidence text is visible;
+- runtime proof target-specific note text is visible;
+- forbidden copy is absent;
+- no horizontal document overflow;
+- no nested panels;
+- no `undefined` or `NaN` visible text;
+- capability names, evidence text, statuses, and buttons do not clip horizontally.
+
+Generated screenshot paths:
+
+- `output/playwright/runtime-proof-evidence-desktop.png`
+- `output/playwright/runtime-proof-evidence-desktop-verified.png`
+- `output/playwright/runtime-proof-evidence-mobile.png`
+
+Browser run output:
+
+```txt
+desktop: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/runtime-proof-evidence-desktop.png text=1479
+desktop-verified: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/runtime-proof-evidence-desktop-verified.png text=1506
+mobile: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/output/playwright/runtime-proof-evidence-mobile.png text=1506
+```
+
+Result: PASS for the runtime proof evidence rendering change. This remains local
+browser proof with mocked API responses, not live Reddit WebView proof.
+
 ## Audit Timeline Layout Recheck
 
 After the audit timeline detail-row fix, a local browser render was checked with
