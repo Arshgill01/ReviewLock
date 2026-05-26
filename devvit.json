@@ -61,7 +61,7 @@
       },
       {
         "label": "Open ReviewLock dashboard",
-        "description": "Create and open the ReviewLock dashboard for this subreddit.",
+        "description": "Open the ReviewLock dashboard for this subreddit.",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/open-dashboard"

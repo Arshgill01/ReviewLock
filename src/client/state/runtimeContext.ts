@@ -10,7 +10,7 @@ export const normalizeSubredditName = (value: unknown): string | undefined => {
   }
 
   const trimmed = value.trim();
-  return SUBREDDIT_NAME_RE.test(trimmed) ? trimmed : undefined;
+  return SUBREDDIT_NAME_RE.test(trimmed) ? trimmed.toLowerCase() : undefined;
 };
 
 export const subredditFromDevvitGlobal = (value: unknown): string | undefined => {

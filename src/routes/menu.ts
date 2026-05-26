@@ -210,11 +210,11 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
             label: 'ReviewLock',
             type: 'paragraph',
             defaultValue:
-              'This creates a visible ReviewLock dashboard custom post in this subreddit. Lock reviewed content until it changes.',
+              'Open the ReviewLock dashboard. ReviewLock creates one dashboard post the first time, then reuses it for future launches. Lock reviewed content until it changes.',
             disabled: true,
           },
         ],
-        acceptLabel: 'Create dashboard post',
+        acceptLabel: 'Open dashboard',
         cancelLabel: 'Cancel',
       },
     },

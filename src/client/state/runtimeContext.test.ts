@@ -9,6 +9,7 @@ import {
 describe('runtime context helpers', () => {
   it('normalizes only valid subreddit names', () => {
     expect(normalizeSubredditName(' reviewlock_dev ')).toBe('reviewlock_dev');
+    expect(normalizeSubredditName(' ReviewLock_Dev ')).toBe('reviewlock_dev');
     expect(normalizeSubredditName('reviewlock-dev')).toBeUndefined();
     expect(normalizeSubredditName('re')).toBeUndefined();
   });

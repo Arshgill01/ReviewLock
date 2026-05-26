@@ -21,7 +21,7 @@ export const normalizeRuntimeSubreddit = (value: string | null | undefined): str
     throw new Error('Subreddit must be 3-21 characters using letters, numbers, or underscores.');
   }
 
-  return subreddit;
+  return subreddit.toLowerCase();
 };
 
 export const verifiedSmokeResult = (

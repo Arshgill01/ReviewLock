@@ -413,4 +413,24 @@ describe('menu routes', () => {
       showForm: { name: 'dashboardLaunch' },
     });
   });
+
+  it('describes dashboard launch as reuse-first instead of every-click creation', async () => {
+    const router = createMenuRouter();
+    const response = await router.request('/open-dashboard', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        name: 'dashboardLaunch',
+        form: {
+          acceptLabel: 'Open dashboard',
+          fields: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'copy',
+              defaultValue: expect.stringContaining('then reuses it for future launches'),
+            }),
+          ]),
+        },
+      },
+    });
+  });
 });

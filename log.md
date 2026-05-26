@@ -3002,3 +3002,68 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 14:09 IST - Dashboard launch permalink hardening
+
+- Scoped cached dashboard launch permalinks to the current subreddit before
+  reuse.
+- Ignored and replaced cached dashboard launch records that point to external
+  URLs or another subreddit.
+- Updated subreddit dashboard launch copy and `devvit.json` copy to describe
+  first-run creation plus future reuse.
+- Updated namespace and runtime proof docs so dashboard-post reuse is recorded
+  as implemented and locally tested, not live verified.
+- Focused validation:
+  - `npm run test -- src/routes/forms.test.ts src/routes/menu.test.ts src/server/services/keys.test.ts --reporter verbose`
+  - PASS, 3 files and 46 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 395 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.
+
+## 2026-05-26 15:08 IST - Subreddit namespace and trigger boundary hardening
+
+- Reviewed the reviewer agent's dirty implementation changes and kept the
+  useful trigger-boundary direction.
+- Canonicalized runtime subreddit names to lowercase for client context,
+  server runtime hardening, form/API scope checks, dashboard launch records,
+  runtime smoke, and trigger fallback paths.
+- Kept malformed trigger fallback subreddit values from selecting arbitrary
+  Redis namespaces when target refetch fails.
+- Used the canonical selected report-trigger namespace after successful target
+  refetches so `unknown` or mixed-case target subreddit fields do not miss
+  active locks.
+- Treated malformed report trigger timestamps as untrusted and used the server
+  clock for dedupe, audit, and metric writes.
+- Added dashboard launch regressions for mixed-case subreddit names and unsafe
+  newly created post permalinks, plus retryable dashboard post creation
+  failures.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/server/services/runtimeHardening.test.ts src/client/state/runtimeContext.test.ts --reporter verbose`
+  - PASS, 7 files and 133 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 411 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

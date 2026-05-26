@@ -2,9 +2,11 @@ import type { Clock } from '../adapters/clock';
 import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
 import type { ReopenEvent, ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
+import { isIsoTimestamp } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
 import { key } from './keys';
+import { normalizeRuntimeSubreddit } from './runtimeHardening';
 import {
   getActiveLockByTarget,
   incrementLockSuppression,
@@ -83,6 +85,21 @@ const clearResolvedTargetWarnings = (lock: ReviewLockRecord): ReviewLockRecord =
 });
 
 const REPORT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+const normalizeTriggerSubreddit = (value: string | undefined): string | undefined => {
+  if (!value || value === 'unknown') {
+    return undefined;
+  }
+
+  try {
+    return normalizeRuntimeSubreddit(value);
+  } catch {
+    return undefined;
+  }
+};
+
+const reportTriggerNow = (input: ReportTriggerInput, clock: Clock): string =>
+  input.reportedAt && isIsoTimestamp(input.reportedAt) ? input.reportedAt : clock.now();
 
 export const buildReopenFromReportDecision = (
   lock: ReviewLockRecord,
@@ -179,9 +196,11 @@ export const handleReportTrigger = async (
   deps: ReportTriggerDependencies,
   input: ReportTriggerInput,
 ): Promise<ReportTriggerResult> => {
-  const now = input.reportedAt ?? deps.clock.now();
+  const now = reportTriggerNow(input, deps.clock);
   const resolution = await resolveTargetById(deps.reddit, input.targetId);
-  const subreddit = resolution.target?.subreddit ?? input.subreddit ?? 'unknown';
+  const fallbackSubreddit = normalizeTriggerSubreddit(input.subreddit);
+  const subreddit =
+    normalizeTriggerSubreddit(resolution.target?.subreddit) ?? fallbackSubreddit ?? 'unknown';
   const dedupeInput = { ...input, subreddit };
 
   try {
@@ -196,8 +215,8 @@ export const handleReportTrigger = async (
 
     return await withTriggerMutex(deps.redis, subreddit, input.targetId, now, async () => {
       if (!resolution.ok || !resolution.target) {
-        if (input.subreddit) {
-          const lock = await getActiveLockByTarget(deps.redis, input.subreddit, input.targetId);
+        if (fallbackSubreddit) {
+          const lock = await getActiveLockByTarget(deps.redis, fallbackSubreddit, input.targetId);
 
           if (lock) {
             const warnings = ['target_resolution_failed'];
@@ -257,12 +276,9 @@ export const handleReportTrigger = async (
         };
       }
 
-      const lock = await getActiveLockByTarget(
-        deps.redis,
-        resolution.target.subreddit,
-        resolution.target.id,
-      );
-      const decision = decideReportTriggerAction(lock, resolution.target);
+      const target = { ...resolution.target, subreddit };
+      const lock = await getActiveLockByTarget(deps.redis, subreddit, target.id);
+      const decision = decideReportTriggerAction(lock, target);
 
       if (!lock || decision.action === 'no_lock') {
         return {
@@ -274,7 +290,7 @@ export const handleReportTrigger = async (
       }
 
       if (decision.action === 'suppress_unchanged') {
-        const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
+        const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, target);
         await recordRuntimeProof(deps, lock.subreddit, ignoreResult, now);
         const recoveredLock = clearResolvedTargetWarnings(lock);
 
@@ -309,10 +325,10 @@ export const handleReportTrigger = async (
             deps.redis,
             recoveredLock,
             now,
-            input.reportCount ?? resolution.target.reportCount,
+            input.reportCount ?? target.reportCount,
           );
           lockCounterIncremented = true;
-          await incrementSuppressedReportMetric(deps.redis, resolution.target, now, lock.demo);
+          await incrementSuppressedReportMetric(deps.redis, target, now, lock.demo);
           metricsIncremented = true;
           await appendAuditEvent(deps.redis, {
             id: reportAuditId('audit-report-suppressed', input, now, lock.id),
@@ -324,11 +340,11 @@ export const handleReportTrigger = async (
             actor: 'reviewlock',
             createdAt: now,
             message: 'Repeat report suppressed because reviewed content was unchanged.',
-            data: { reportCount: input.reportCount ?? resolution.target.reportCount },
+            data: { reportCount: input.reportCount ?? target.reportCount },
             demo: lock.demo,
           });
         } catch (error) {
-          const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+          const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, target);
           await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
 
           if (lockCounterIncremented) {
@@ -336,9 +352,7 @@ export const handleReportTrigger = async (
           }
 
           if (metricsIncremented) {
-            await decrementSuppressedReportMetric(deps.redis, resolution.target, now).catch(
-              () => undefined,
-            );
+            await decrementSuppressedReportMetric(deps.redis, target, now).catch(() => undefined);
           }
 
           if (!rollbackResult.ok) {
@@ -390,12 +404,12 @@ export const handleReportTrigger = async (
 
       if (decision.action === 'reopen_changed') {
         const recoveredLock = clearResolvedTargetWarnings(lock);
-        const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+        const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, target);
         await recordRuntimeProof(deps, lock.subreddit, unignoreResult, now);
         const warnings = unignoreResult.warnings;
         const reopenEvent = buildReopenFromReportDecision(
           recoveredLock,
-          resolution.target,
+          target,
           now,
           warnings,
         );
@@ -407,7 +421,7 @@ export const handleReportTrigger = async (
           runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
         });
         try {
-          await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
+          await incrementReopenedMetric(deps.redis, target, now, lock.demo);
           await appendAuditEvent(deps.redis, {
             id: reportAuditId('audit-report-reopened', input, now, lock.id),
             kind: 'lock_reopened',

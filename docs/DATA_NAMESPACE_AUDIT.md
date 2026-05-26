@@ -14,6 +14,9 @@ Evidence:
 
 - `src/server/services/keys.ts` defines `key(subreddit, suffix)` as the single prefix helper.
 - `src/server/services/keys.test.ts` enumerates every declared key helper and asserts each generated key starts with `reviewlock:alpha:`.
+- Runtime-facing subreddit inputs are validated and canonicalized to lowercase
+  before scope comparison or key construction in forms, dashboard APIs, runtime
+  smoke, dashboard launch, and trigger fallback paths.
 - `rg -n "reviewlock:" src --glob '!**/*.test.ts'` returns only the helper definition in `src/server/services/keys.ts`.
 - `rg -n "redis\\.(get|set|del|exists|expire|hget|hset|hgetall|hdel|hincrby|zAdd|zRange|zRem|zRemRangeByScore|zIncrBy|setIfNotExists)\\(" src --glob '!**/*.test.ts'` shows service and route Redis calls using `keys.*` or `key(...)`.
 
@@ -22,6 +25,16 @@ Dynamic keys not represented as top-level helpers still use `key(...)`:
 - Trigger dedupe keys in `src/server/services/reportTriggers.ts`.
 - Trigger mutex keys in `src/server/services/triggerMutex.ts`.
 - Runtime smoke keys in `src/routes/api.ts`.
+
+Dashboard launch persistence is also namespaced:
+
+- `keys.dashboardPost(subreddit)` stores the canonical dashboard custom-post
+  permalink for reuse.
+- `keys.dashboardPostCreation(subreddit)` is a short Redis creation lease that
+  prevents duplicate first-launch posts.
+- `src/routes/forms.test.ts` covers reuse, malformed dashboard records,
+  external cached permalinks, cross-subreddit cached permalinks, mixed-case
+  subreddit permalinks, and unsafe newly created post permalinks.
 
 ## Demo and Live Separation
 
@@ -52,6 +65,14 @@ Covered readers:
 - Reopen queue: direct and list reads skip malformed reopen event records.
 - Metrics: direct and list reads skip malformed daily and target metric records.
 - Runtime proof: `loadRuntimeProofStatus()` returns the unverified default matrix for malformed runtime proof records.
+- Dashboard launch: malformed, external, or cross-subreddit cached dashboard
+  post records are ignored and replaced before navigation.
+- Trigger fallback scoping: malformed fallback subreddit payload values are
+  ignored on target-refetch failure paths instead of creating arbitrary Redis
+  namespaces.
+- Report trigger refetch scoping: successful target refetches still use the
+  canonical selected subreddit namespace for lock lookup and metrics, so
+  `unknown` or mixed-case target subreddit fields do not split Redis state.
 
 ## Schema and Migration Note
 
@@ -69,5 +90,7 @@ No data migration is required for Wave 24 because the persisted shapes did not c
 Commands run for this audit:
 
 - `npm run test -- --run src/server/services/keys.test.ts src/server/adapters/redis.test.ts src/server/services/demoMode.test.ts src/server/services/locks.test.ts`
+- `npm run test -- src/routes/forms.test.ts src/routes/menu.test.ts src/server/services/keys.test.ts --reporter verbose`
+- `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/server/services/runtimeHardening.test.ts src/client/state/runtimeContext.test.ts --reporter verbose`
 - `rg -n "reviewlock:" src --glob '!**/*.test.ts'`
 - `rg -n "redis\\.(get|set|del|exists|expire|hget|hset|hgetall|hdel|hincrby|zAdd|zRange|zRem|zRemRangeByScore|zIncrBy|setIfNotExists)\\(" src --glob '!**/*.test.ts'`

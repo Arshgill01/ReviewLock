@@ -2503,3 +2503,54 @@ Reason:
 - Showing an expiry setting without a scheduler or trigger-time expiry
   enforcement would overclaim runtime behavior. ReviewLock remains proof-bound:
   locks are edit-aware today, and expiry is not product copy until implemented.
+
+### D139 - Dashboard launch records are untrusted until scoped
+
+ReviewLock stores a dashboard custom-post permalink in Redis so later launches
+can reuse the same subreddit dashboard post.
+
+Decision:
+
+- Reuse cached dashboard launch records only when the permalink is either a
+  relative `/r/{currentSubreddit}/comments/...` path or a canonical
+  `https://www.reddit.com/r/{currentSubreddit}/comments/...` URL.
+- Ignore and replace cached records that point outside Reddit, use another
+  subreddit, or cannot be parsed.
+- Present dashboard launch copy as “open dashboard” with first-run creation and
+  later reuse, not as every-click post creation.
+- Keep repeated-launch reuse claim local-test-only until a controlled playtest
+  verifies it in Reddit.
+
+Reason:
+
+- Redis records are untrusted read-boundary data.
+- Navigation from a Devvit form must never be redirected to an external or
+  cross-subreddit URL because of a malformed cached record.
+- The copy should match the quieter one-dashboard-post product behavior without
+  overclaiming live verification.
+
+### D140 - Runtime subreddit namespaces are canonical lowercase
+
+ReviewLock receives subreddit names from Devvit runtime context, form payloads,
+dashboard query strings, Reddit targets, and trigger payload fallbacks.
+
+Decision:
+
+- Normalize valid subreddit names to lowercase before Redis namespace use or
+  runtime scope comparison.
+- Keep malformed subreddit values out of trigger fallback namespace selection.
+- Treat `unknown` target subreddit values as missing so a validated trigger
+  fallback subreddit can still find an active lock.
+- Compare dashboard custom-post permalink subreddit segments
+  case-insensitively, then navigate to a canonical lowercase Reddit URL.
+- Ignore malformed report trigger timestamps and use the server clock instead
+  of persisting invalid audit timestamps, metric dates, or dedupe ids.
+
+Reason:
+
+- Reddit subreddit names are effectively case-insensitive, while Redis keys are
+  not. Preserving payload casing can split one subreddit across multiple
+  ReviewLock namespaces.
+- Trigger payloads and persisted launch records are untrusted boundaries.
+- Failing open is acceptable when context is missing, but creating arbitrary
+  namespaces or invalid timestamped records is not.

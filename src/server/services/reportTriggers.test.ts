@@ -831,6 +831,128 @@ describe('handleReportTrigger', () => {
     ]);
   });
 
+  it('uses canonical fallback subreddit casing when target refetch fails', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter();
+    await saveLock(redis, lock());
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-mixed-case-fallback', subreddit: 'Alpha' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await redis.exists('reviewlock:Alpha:report:dedupe:evt-mixed-case-fallback')).toBe(
+      false,
+    );
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-mixed-case-fallback')).toBe(
+      false,
+    );
+  });
+
+  it('ignores malformed fallback subreddit namespaces when target refetch fails', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter();
+    await saveLock(redis, lock());
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-bad-subreddit', subreddit: '../../bad' },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: [],
+    });
+    expect(await redis.exists('reviewlock:../../bad:report:dedupe:evt-bad-subreddit')).toBe(false);
+    expect(await redis.exists('reviewlock:unknown:report:dedupe:evt-bad-subreddit')).toBe(false);
+  });
+
+  it('uses the canonical target subreddit on successful report refetches', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([{ ...target(), subreddit: 'Alpha' }]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-mixed-case-target' },
+    );
+
+    expect(result).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 1,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+    expect(await getDailyMetrics(redis, 'Alpha', '2026-05-24')).toBeUndefined();
+  });
+
+  it('prefers a validated fallback subreddit when a resolved target reports unknown subreddit', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([{ ...target(), subreddit: 'unknown' }]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-unknown-target', subreddit: 'alpha' },
+    );
+
+    expect(result).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      suppressedReportCount: 1,
+    });
+    expect(await getActiveLockByTarget(redis, 'unknown', 't3_post')).toBeUndefined();
+  });
+
+  it('reopens changed reports under the canonical fallback subreddit when target reports unknown', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([{ ...target('Edited body'), subreddit: 'unknown' }]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-unknown-target-reopen', subreddit: 'alpha' },
+    );
+
+    expect(result).toMatchObject({ ok: true, action: 'reopen_changed' });
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({ reason: 'content_changed' }),
+    ]);
+    expect(await listOpenReopenEvents(redis, 'unknown')).toEqual([]);
+  });
+
   it('clears report dedupe when retryable target resolution audit persistence fails', async () => {
     class RuntimeAuditFailingRedisStore extends InMemoryRedisStore {
       override async set(key: string, value: string): Promise<void> {
@@ -1126,6 +1248,35 @@ describe('handleReportTrigger', () => {
     expect(await getTargetMetrics(redis, 'alpha', 't3_post')).toMatchObject({
       reportsSuppressed: 3,
     });
+  });
+
+  it('falls back to the server clock for malformed report timestamps', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock());
+    const reddit = new FakeRedditAdapter([target()]);
+    const result = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', reportedAt: 'yesterday', reportCount: 6 },
+    );
+
+    expect(result).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(await getDailyMetrics(redis, 'alpha', '2026-05-24')).toMatchObject({
+      reportsSuppressed: 1,
+    });
+    expect(await getDailyMetrics(redis, 'alpha', 'yesterday')).toBeUndefined();
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        createdAt: '2026-05-24T01:00:00.000Z',
+        kind: 'report_suppressed',
+      }),
+    ]);
+    expect(
+      await redis.exists('reviewlock:alpha:report:dedupe:missing-event:t3_post:count-6'),
+    ).toBe(true);
   });
 
   it('rolls back suppression metrics when the success audit write fails', async () => {

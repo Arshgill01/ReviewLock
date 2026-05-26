@@ -97,7 +97,44 @@ const configuredLockReasons = async (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const parseDashboardPostRecord = (value: string | undefined): DashboardPostRecord | undefined => {
+const canonicalDashboardPermalink = (
+  permalink: string,
+  subreddit: string,
+): string | undefined => {
+  const trimmed = permalink.trim();
+  let path: string | undefined;
+
+  if (trimmed.startsWith('http')) {
+    try {
+      const url = new URL(trimmed);
+
+      if (url.protocol !== 'https:' || url.hostname !== 'www.reddit.com') {
+        return undefined;
+      }
+
+      path = url.pathname;
+    } catch {
+      return undefined;
+    }
+  } else {
+    path = trimmed;
+  }
+
+  const match = /^\/r\/([A-Za-z0-9_]{3,21})\/comments\/(.+)$/i.exec(path);
+
+  if (!match || match[1].toLowerCase() !== subreddit || !match[2]) {
+    return undefined;
+  }
+
+  return `https://www.reddit.com/r/${subreddit}/comments/${
+    match[2].endsWith('/') ? match[2] : `${match[2]}/`
+  }`;
+};
+
+const parseDashboardPostRecord = (
+  value: string | undefined,
+  subreddit: string,
+): DashboardPostRecord | undefined => {
   if (!value) {
     return undefined;
   }
@@ -109,21 +146,21 @@ const parseDashboardPostRecord = (value: string | undefined): DashboardPostRecor
       return undefined;
     }
 
-    const permalink = stringValue(parsed.permalink)?.trim();
+    const permalink = stringValue(parsed.permalink);
     const createdAt = stringValue(parsed.createdAt)?.trim();
+    const canonicalPermalink = permalink
+      ? canonicalDashboardPermalink(permalink, subreddit)
+      : undefined;
 
-    if (!permalink || !createdAt || !isIsoTimestamp(createdAt)) {
+    if (!canonicalPermalink || !createdAt || !isIsoTimestamp(createdAt)) {
       return undefined;
     }
 
-    return { permalink, createdAt };
+    return { permalink: canonicalPermalink, createdAt };
   } catch {
     return undefined;
   }
 };
-
-const absoluteRedditPermalink = (permalink: string): string =>
-  permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`;
 
 const currentSubredditFromReddit = async (reddit: RedditAdapter): Promise<string | undefined> => {
   try {
@@ -321,7 +358,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     let existingRecord: DashboardPostRecord | undefined;
 
     try {
-      existingRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey));
+      existingRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey), subredditName);
     } catch {
       return context.json<UiResponse>(
         uiToast('ReviewLock could not load the dashboard launch record. Try again.'),
@@ -330,7 +367,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
 
     if (existingRecord) {
       return context.json<UiResponse>({
-        navigateTo: absoluteRedditPermalink(existingRecord.permalink),
+        navigateTo: existingRecord.permalink,
         showToast: {
           text: 'Opening ReviewLock dashboard',
           appearance: 'success',
@@ -354,7 +391,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       let inFlightRecord: DashboardPostRecord | undefined;
 
       try {
-        inFlightRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey));
+        inFlightRecord = parseDashboardPostRecord(await deps.redis.get(dashboardKey), subredditName);
       } catch {
         return context.json<UiResponse>(
           uiToast('ReviewLock dashboard creation is already in progress. Try again in a moment.'),
@@ -363,7 +400,7 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
 
       if (inFlightRecord) {
         return context.json<UiResponse>({
-          navigateTo: absoluteRedditPermalink(inFlightRecord.permalink),
+          navigateTo: inFlightRecord.permalink,
           showToast: {
             text: 'Opening ReviewLock dashboard',
             appearance: 'success',
@@ -389,11 +426,26 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     }
 
     try {
-      const post = await deps.reddit.submitDashboardPost({
-        subredditName,
-        title: 'ReviewLock dashboard',
-      });
-      const permalink = absoluteRedditPermalink(post.permalink);
+      let post: { permalink: string };
+
+      try {
+        post = await deps.reddit.submitDashboardPost({
+          subredditName,
+          title: 'ReviewLock dashboard',
+        });
+      } catch {
+        return context.json<UiResponse>(
+          uiToast('ReviewLock could not create the dashboard post. Try again.'),
+        );
+      }
+
+      const permalink = canonicalDashboardPermalink(post.permalink, subredditName);
+
+      if (!permalink) {
+        return context.json<UiResponse>(
+          uiToast('ReviewLock could not verify the dashboard post permalink. Try again.'),
+        );
+      }
 
       try {
         await deps.redis.set(

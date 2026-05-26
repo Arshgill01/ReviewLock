@@ -14,6 +14,10 @@ describe('runtime hardening helpers', () => {
     expect(() => normalizeRuntimeSubreddit('not a subreddit')).toThrow(/Subreddit/);
   });
 
+  it('canonicalizes subreddit namespaces to lowercase', () => {
+    expect(normalizeRuntimeSubreddit(' AlphaTeam ')).toBe('alphateam');
+  });
+
   it('formats verified and failed smoke results without secrets', () => {
     expect(
       verifiedSmokeResult('redis', 'evidence', ['key=reviewlock:alpha:runtime:smoke:1'], 'now'),

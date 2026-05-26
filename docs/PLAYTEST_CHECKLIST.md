@@ -30,6 +30,7 @@ Dev account: `u/BrightyBrainiac`.
 - [x] Confirm dashboard launch creates a ReviewLock custom post in `r/reviewlock_dev`.
 - [x] Confirm the custom post WebView renders instead of showing a Devvit error toast.
 - [x] Re-run dashboard launch after the `/api/context` hardening patch in an isolated browser window.
+- [ ] Re-run dashboard launch twice after dashboard-post reuse hardening and confirm the second launch opens the existing post without creating a duplicate.
 
 ## Lock flows
 

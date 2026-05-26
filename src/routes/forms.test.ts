@@ -353,6 +353,35 @@ describe('form routes', () => {
     expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
   });
 
+  it('accepts lock form submissions when subreddit casing differs across Devvit payloads', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([target()], 'mod_test', 'Alpha');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock locked this reviewed content until it changes.',
+      },
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+    });
+  });
+
   it('rejects lock form submissions when runtime subreddit context is missing', async () => {
     class MissingSubredditRedditAdapter extends FakeRedditAdapter {
       override async getCurrentSubredditName(): Promise<string | undefined> {
@@ -414,6 +443,38 @@ describe('form routes', () => {
     expect(await redis.get(keys.dashboardPost('alpha'))).toBe(
       JSON.stringify({
         permalink: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+        createdAt: '2026-05-24T00:00:00.000Z',
+      }),
+    );
+  });
+
+  it('launches the dashboard in a lowercase namespace when runtime subreddit casing differs', async () => {
+    class LowercasePermalinkRedditAdapter extends FakeRedditAdapter {
+      override async submitDashboardPost(input: {
+        subredditName: string;
+        title: string;
+      }): Promise<{ permalink: string }> {
+        this.calls.push(`submitDashboardPost:${input.subredditName}:${input.title}`);
+        return { permalink: `/r/${input.subredditName.toLowerCase()}/comments/reviewlock_dashboard/` };
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    const reddit = new LowercasePermalinkRedditAdapter([target()], 'mod_test', 'AlphaTeam');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alphateam/comments/reviewlock_dashboard/',
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alphateam:ReviewLock dashboard']);
+    expect(await redis.get(keys.dashboardPost('alphateam'))).toBe(
+      JSON.stringify({
+        permalink: 'https://www.reddit.com/r/alphateam/comments/reviewlock_dashboard/',
         createdAt: '2026-05-24T00:00:00.000Z',
       }),
     );
@@ -512,6 +573,135 @@ describe('form routes', () => {
       showToast: {
         text: 'Opening ReviewLock dashboard',
       },
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+  });
+
+  it('ignores dashboard launch records with external permalinks', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(
+      keys.dashboardPost('alpha'),
+      JSON.stringify({
+        permalink: 'https://example.com/phish',
+        createdAt: '2026-05-24T00:00:00.000Z',
+      }),
+    );
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+  });
+
+  it('reuses cached dashboard launch records when only subreddit casing differs', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(
+      keys.dashboardPost('alphateam'),
+      JSON.stringify({
+        permalink: 'https://www.reddit.com/r/AlphaTeam/comments/reviewlock_dashboard/',
+        createdAt: '2026-05-24T00:00:00.000Z',
+      }),
+    );
+    const reddit = new FakeRedditAdapter([target()], 'mod_test', 'AlphaTeam');
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alphateam/comments/reviewlock_dashboard/',
+    });
+    expect(reddit.calls).toEqual([]);
+  });
+
+  it('returns a retryable toast when dashboard post creation throws', async () => {
+    class FailingDashboardPostRedditAdapter extends FakeRedditAdapter {
+      override async submitDashboardPost(input: {
+        subredditName: string;
+        title: string;
+      }): Promise<{ permalink: string }> {
+        this.calls.push(`submitDashboardPost:${input.subredditName}:${input.title}`);
+        throw new Error('submit failed');
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    const reddit = new FailingDashboardPostRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not create the dashboard post. Try again.',
+      },
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+    expect(await redis.get(keys.dashboardPost('alpha'))).toBeUndefined();
+    expect(await redis.get(keys.dashboardPostCreation('alpha'))).toBeUndefined();
+  });
+
+  it('does not navigate to a newly created dashboard post with an unsafe permalink', async () => {
+    class UnsafeDashboardPermalinkRedditAdapter extends FakeRedditAdapter {
+      override async submitDashboardPost(input: {
+        subredditName: string;
+        title: string;
+      }): Promise<{ permalink: string }> {
+        this.calls.push(`submitDashboardPost:${input.subredditName}:${input.title}`);
+        return { permalink: 'https://example.com/phish' };
+      }
+    }
+
+    const redis = new InMemoryRedisStore();
+    const reddit = new UnsafeDashboardPermalinkRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock could not verify the dashboard post permalink. Try again.',
+      },
+    });
+    expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
+    expect(await redis.get(keys.dashboardPost('alpha'))).toBeUndefined();
+    expect(await redis.get(keys.dashboardPostCreation('alpha'))).toBeUndefined();
+  });
+
+  it('ignores dashboard launch records for another subreddit', async () => {
+    const redis = new InMemoryRedisStore();
+    await redis.set(
+      keys.dashboardPost('alpha'),
+      JSON.stringify({
+        permalink: 'https://www.reddit.com/r/beta/comments/reviewlock_dashboard/',
+        createdAt: '2026-05-24T00:00:00.000Z',
+      }),
+    );
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/dashboard-launch-submit', { method: 'POST' });
+
+    expect(await response.json()).toMatchObject({
+      navigateTo: 'https://www.reddit.com/r/alpha/comments/reviewlock_dashboard/',
     });
     expect(reddit.calls).toEqual(['submitDashboardPost:alpha:ReviewLock dashboard']);
   });

@@ -19,6 +19,7 @@ import { incrementReopenedMetric } from './metrics';
 import { unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
 import { recordCapabilityStatus, recordModerationOperationStatus } from './runtimeProof';
+import { normalizeRuntimeSubreddit } from './runtimeHardening';
 import { resolveTargetById } from './targetResolver';
 import { isTriggerConcurrencyError, withTriggerMutex } from './triggerMutex';
 
@@ -130,13 +131,27 @@ const recordUpdateTriggerProcessed = async (
   ).catch(() => undefined);
 };
 
+const normalizeTriggerSubreddit = (value: string | undefined): string | undefined => {
+  if (!value || value === 'unknown') {
+    return undefined;
+  }
+
+  try {
+    return normalizeRuntimeSubreddit(value);
+  } catch {
+    return undefined;
+  }
+};
+
 export const breakLockForChangedContent = async (
   deps: ReopenFlowDependencies,
   input: BreakLockInput,
 ): Promise<BreakLockResult> => {
   const now = deps.clock.now();
   const resolution = await resolveTargetById(deps.reddit, input.targetId);
-  const subreddit = resolution.target?.subreddit ?? input.subreddit;
+  const subreddit =
+    normalizeTriggerSubreddit(resolution.target?.subreddit) ??
+    normalizeTriggerSubreddit(input.subreddit);
 
   if (!subreddit) {
     return {

@@ -79,6 +79,18 @@ describe('API/client route contract', () => {
     });
   });
 
+  it('accepts dashboard namespaces when only subreddit casing differs', async () => {
+    const app = createApp({
+      redis: new InMemoryRedisStore(),
+      reddit: new FakeRedditAdapter([], 'mod_test', 'AlphaTeam'),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await app.request('/api/locks?subreddit=alphateam&demo=false');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, locks: [] });
+  });
+
   it('rejects runtime smoke namespaces that do not match the runtime subreddit', async () => {
     const response = await createContractApp().request('/api/smoke/redis?subreddit=other', {
       method: 'POST',
@@ -89,6 +101,20 @@ describe('API/client route contract', () => {
       ok: false,
       error: 'Runtime smoke subreddit scope does not match the Devvit runtime subreddit.',
     });
+  });
+
+  it('accepts runtime smoke namespaces when only subreddit casing differs', async () => {
+    const app = createApp({
+      redis: new InMemoryRedisStore(),
+      reddit: new FakeRedditAdapter([], 'mod_test', 'AlphaTeam'),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await app.request('/api/smoke/redis?subreddit=alphateam', {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
   });
 
   it('rejects runtime smoke when neither runtime nor client provides a subreddit', async () => {

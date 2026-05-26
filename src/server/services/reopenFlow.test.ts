@@ -222,6 +222,45 @@ describe('breakLockForChangedContent', () => {
     ]);
   });
 
+  it('uses canonical fallback subreddit casing when update refetch cannot load the target', async () => {
+    const dependencies = await deps(null);
+    const result = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'Alpha',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+  });
+
+  it('ignores malformed fallback subreddit namespaces when update refetch cannot load target', async () => {
+    const dependencies = await deps(null);
+    const result = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'alpha team',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['subreddit_missing'],
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: [],
+    });
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual([]);
+  });
+
   it('clears resolved target-resolution warnings after an unchanged update retry succeeds', async () => {
     const dependencies = await deps(null);
 

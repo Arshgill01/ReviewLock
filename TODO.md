@@ -189,3 +189,11 @@
 - [x] Apply subreddit config reason presets to lock forms and submissions.
 - [x] Keep lock menu usable when subreddit config cannot be read.
 - [x] Keep lock form submit retryable when subreddit config cannot be read.
+- [x] Reject external or cross-subreddit cached dashboard launch permalinks.
+- [x] Update dashboard launch copy for one-post reuse behavior.
+- [x] Canonicalize runtime subreddit namespaces to lowercase for forms, APIs, dashboard launch, and triggers.
+- [x] Validate report trigger timestamps before using them for audit, dedupe, and metric dates.
+- [x] Ignore malformed trigger fallback subreddit namespaces on refetch-failure paths.
+- [x] Use canonical report-trigger namespaces after successful target refetches.
+- [x] Return retryable dashboard launch toast when dashboard post creation fails.
+- [ ] Live-verify repeated dashboard launch reuses the existing dashboard post.
