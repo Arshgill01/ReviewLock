@@ -39,6 +39,39 @@ const writeDemoMetrics = async (redis: RedisStore, scenario: DemoScenario): Prom
   }
 };
 
+const allSortedSetMembers = async (redis: RedisStore, keyName: string): Promise<string[]> =>
+  (await redis.zRange(keyName, 0, -1)).map((entry) => entry.member);
+
+const clearDemoLedger = async (redis: RedisStore, subreddit: string): Promise<void> => {
+  const [lockIds, targetLockIds, reopenEventIds, auditEventIds, metricDates, metricTargetIds] =
+    await Promise.all([
+      allSortedSetMembers(redis, keys.activeLocks(subreddit)),
+      redis.hgetall(keys.activeLocksByTarget(subreddit)),
+      allSortedSetMembers(redis, keys.reopenQueue(subreddit)),
+      allSortedSetMembers(redis, keys.audit(subreddit)),
+      allSortedSetMembers(redis, keys.metricsDailyIndex(subreddit)),
+      allSortedSetMembers(redis, keys.metricsTargetIndex(subreddit)),
+    ]);
+  const lockIdsToDelete = new Set([...lockIds, ...Object.values(targetLockIds)]);
+
+  await Promise.all([
+    ...[...lockIdsToDelete].map((lockId) => redis.del(keys.lock(subreddit, lockId))),
+    ...Object.keys(targetLockIds).map((targetId) =>
+      redis.del(keys.targetLock(subreddit, targetId)),
+    ),
+    ...reopenEventIds.map((eventId) => redis.del(keys.reopenEvent(subreddit, eventId))),
+    ...auditEventIds.map((eventId) => redis.del(keys.auditEvent(subreddit, eventId))),
+    ...metricDates.map((date) => redis.del(keys.metricsDaily(subreddit, date))),
+    ...metricTargetIds.map((targetId) => redis.del(keys.metricsTarget(subreddit, targetId))),
+    redis.del(keys.activeLocks(subreddit)),
+    redis.del(keys.activeLocksByTarget(subreddit)),
+    redis.del(keys.reopenQueue(subreddit)),
+    redis.del(keys.audit(subreddit)),
+    redis.del(keys.metricsDailyIndex(subreddit)),
+    redis.del(keys.metricsTargetIndex(subreddit)),
+  ]);
+};
+
 const assertDemoSubreddit = (subreddit: string): void => {
   if (subreddit !== DEMO_SUBREDDIT) {
     throw new Error(`Demo data writes are restricted to ${DEMO_SUBREDDIT}.`);
@@ -68,6 +101,7 @@ export const seedDemoData = async (
   scenario: DemoScenario = DEMO_SCENARIO,
 ): Promise<DemoModeStatus> => {
   assertDemoSubreddit(scenario.subreddit);
+  await clearDemoLedger(redis, scenario.subreddit);
 
   for (const lock of scenario.locks) {
     await saveLock(redis, lock);

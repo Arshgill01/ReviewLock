@@ -6882,3 +6882,16 @@
   - `npx --yes --package=playwright node <<'NODE' ... NODE`
 - Boundary:
   - This is local browser proof with mocked API responses. It does not replace live Reddit WebView proof or live trigger proof.
+
+## 2026-05-26 16:59 IST - Resolution
+
+- Addressed finding: Demo reset does not clear stale demo ledger indexes before reseeding.
+- Change:
+  - `src/server/services/demoMode.ts` now clears the bounded `reviewlock_demo` ledger indexes and their referenced lock, target-lock, reopen, audit, daily-metric, and target-metric records before reseeding the deterministic scenario.
+  - The clear step remains restricted by `assertDemoSubreddit()`, so it cannot run against a live subreddit namespace through demo mode.
+  - `src/server/services/demoMode.test.ts` now injects stale indexed demo lock, reopen, audit, daily metric, and target metric records, runs `resetDemoMode()`, and asserts the dashboard-facing lists and backing keys contain only the current scenario records.
+- Validation:
+  - `npm test -- src/server/services/demoMode.test.ts`
+  - PASS, 1 file / 7 tests.
+- Boundary:
+  - This fixes deterministic demo reseeding for indexed demo records. It does not alter live subreddit reset behavior or clear non-indexed orphan records that cannot appear in dashboard lists.
