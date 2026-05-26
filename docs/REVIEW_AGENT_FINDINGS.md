@@ -6916,3 +6916,82 @@ desktop/mobile browser screenshots` complete.
 - Validation:
   - `git diff --check`
   - PASS.
+
+## 2026-05-26 17:06 IST - Finding
+
+- Severity: medium
+- Area: App listing upload state is stale after the self-contained README rewrite.
+- Evidence:
+  - `docs/RUNTIME_PROOF.md:21-27` says the latest verified upload was version `0.0.4`, uploaded on 2026-05-26 at `10:21:20.861Z`, with `version.about` populated from the then-current launch-grade README.
+  - `docs/APP_LISTING.md:9-14` now says upload `0.0.4` exists and immediately follows it with the statement that the root `README.md` now includes the self-contained App Directory summary, proof boundary, permissions, privacy, and terms summary.
+  - `docs/APP_LISTING.md:152-154` marks `version.about` as containing the updated README/listing copy as of upload `0.0.4`.
+  - Commit `4a6a98a` changed `README.md` and `docs/APP_LISTING.md` after the documented `0.0.4` upload, adding the self-contained App Directory summary and proof-boundary rewrite. There is no newer `npm run deploy` / `npx devvit view --json` result recorded after that commit.
+  - `docs/DEVPOST_SUBMISSION.md:21-27` still reports the latest upload as `0.0.4` and only says the public judging post needs final confirmation after the final upload.
+- Why it matters: The app listing link is a required Devpost artifact. If the team assumes `version.about` already contains the post-`4a6a98a` self-contained README, judges may see the older uploaded about text instead of the hardened App Directory copy. This is not a product runtime bug, but it is a concrete honorable-mention risk because the final submission depends on listing polish and proof-bound copy.
+- Suggested fix: After the current local docs/code state is final, rerun the full local gate and `npm run deploy`, then run `npx devvit view --json` and update `docs/RUNTIME_PROOF.md`, `docs/APP_LISTING.md`, and `docs/DEVPOST_SUBMISSION.md` with the new uploaded version/timestamp. Until that is done, change the checked item in `docs/APP_LISTING.md:152-154` to say the README is locally ready but not yet verified in uploaded `version.about`.
+- Files reviewed:
+  - `README.md`
+  - `docs/APP_LISTING.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `git show --stat --oneline 4a6a98a`
+
+## 2026-05-26 17:07 IST - Finding
+
+- Severity: low
+- Area: Client forbidden-copy regression guard is narrower than the product guardrail set.
+- Evidence:
+  - `src/client/render.test.ts:18-26` rejects `not reportable`, `disable reports`, `blocked reports`, `ai decides`, `automatic removal`, `permanent`, and `forever` from rendered dashboard HTML.
+  - `AGENTS.md:40` separately forbids claims that Reddit users cannot report locked content, and `AGENTS.md:423` explicitly says not to say `reports disabled`.
+  - `docs/CLAIM_CHECK.md:64-70` also forbids `Users cannot report locked content.` and `Reports are disabled.`.
+  - `docs/LAUNCH_CHECKLIST.md:34-40` includes `reports disabled` in the final manual scan command, but the automated render regression does not currently include `reports disabled`, `users cannot report`, or `cannot report locked content`.
+- Why it matters: There is no current production UI copy violation in the reviewed output, so this is not a launch blocker. It is still a cheap regression gap: the automated dashboard render test could pass after future UI copy accidentally says `Reports disabled` or `Users cannot report locked content`, even though those are explicit product kill phrases for ReviewLock's trust story.
+- Suggested fix: Extend `forbiddenCopy` in `src/client/render.test.ts` to include `reports disabled`, `users cannot report`, and `cannot report locked content`. Consider aligning the final manual scan in `docs/LAUNCH_CHECKLIST.md` with the same exact phrase list so future reviewers do not maintain two subtly different guardrail sets.
+- Files reviewed:
+  - `src/client/render.test.ts`
+  - `AGENTS.md`
+  - `docs/CLAIM_CHECK.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+
+## 2026-05-26 17:08 IST - Finding
+
+- Severity: medium
+- Area: Form binding parser does not enforce key identity on valid-shaped persisted records.
+- Evidence:
+  - `src/server/services/formBindings.ts:32-91` validates form binding JSON shape, but it does not receive or check the expected Redis namespace subreddit or token.
+  - `src/server/services/formBindings.ts:159-169` reads `reviewlock:{subreddit}:form:{token}`, parses the stored JSON, deletes the key, and returns the parsed binding even if `binding.subreddit !== subreddit` or `binding.token !== token`.
+  - `src/routes/forms.ts:250-277` treats a consumed lock binding as the reviewed snapshot authorization source and calls `lockReviewedContent()` with `binding.targetId`, `binding.reviewedContentHash`, and `binding.reviewedFingerprintVersion`.
+  - `src/routes/forms.ts:310-332` treats a consumed unlock binding as the unlock authorization source and calls `unlockReviewedContent()` with `binding.targetId`, `binding.lockId`, and `binding.subreddit`.
+  - `src/server/services/formBindings.test.ts:56-64` covers malformed binding JSON, but there is no valid-shaped wrong-token or wrong-subreddit record under the requested key.
+- Why it matters: Normal app-created bindings are correct, so this is a corrupted/hand-seeded Redis edge rather than a common path. It is still a moderation authorization boundary: ReviewLock has already hardened locks, reopen events, audit, and metrics so valid-shaped persisted records must match their requested key namespace. Form bindings should follow the same rule. Otherwise a valid-shaped binding stored under an `alpha` token key can authorize a different stored token/subreddit/target than the key the form route just scoped to the current Devvit subreddit.
+- Suggested fix: Change `parseBinding()` or `consumeFormBinding()` to require `binding.subreddit === subreddit` and `binding.token === token` before returning the binding. Keep deleting invalid/cross-key binding records after read so the bad token cannot keep retrying. Add regressions for wrong-token and wrong-subreddit valid-shaped binding JSON under an otherwise valid key, and route-level lock/unlock tests proving no Reddit moderation call occurs.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/routes/forms.ts`
+
+## 2026-05-26 17:10 IST - Resolution
+
+- Addressed findings:
+  - App listing upload state is stale after the self-contained README rewrite.
+  - Client forbidden-copy regression guard is narrower than the product guardrail set.
+  - Form binding parser does not enforce key identity on valid-shaped persisted records.
+- Change:
+  - `src/server/services/formBindings.ts` now rejects parsed form bindings unless the stored `subreddit` and `token` match the Redis key namespace and token being consumed.
+  - `src/server/services/formBindings.test.ts` now covers valid-shaped wrong-token and wrong-subreddit bindings under otherwise valid keys and proves they are deleted without being returned.
+  - `src/client/render.test.ts` now adds `reports disabled`, `users cannot report`, and `cannot report locked content` to the rendered dashboard forbidden-copy guard.
+  - `docs/LAUNCH_CHECKLIST.md` now uses the same expanded manual forbidden-copy scan phrases.
+  - `docs/APP_LISTING.md` and `docs/DEVPOST_SUBMISSION.md` now say the post-`4a6a98a` self-contained README still needs a final upload and `npx devvit view --json` verification before submission.
+- Validation:
+  - `npm test -- src/server/services/formBindings.test.ts src/client/render.test.ts`
+  - PASS, 2 files / 28 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 434 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.

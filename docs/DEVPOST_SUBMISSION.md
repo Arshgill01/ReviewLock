@@ -19,11 +19,14 @@ Source requirements checked:
 Submission status:
 
 - App listing URL exists: `https://developers.reddit.com/apps/reviewlock`
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.4`; `npx devvit view
-  --json` showed `version.about` populated from the launch-grade README.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.4`; `npx devvit view --json`
+  showed `version.about` populated from the launch-grade README.
 - Developer Portal app-level metadata still needs a final listing pass before
   submission if editable: `app.description`, `marketingInfo`, `privacyPolicy`,
   and `termsAndConditions` are still empty in the CLI response.
+- The root README was hardened for App Directory `version.about` after upload
+  `0.0.4`; run a final upload and `npx devvit view --json` before treating the
+  uploaded listing copy as current.
 - Public judging post still needs final confirmation after the final upload.
 
 ## Submission Fields
@@ -49,9 +52,9 @@ Before final submission, verify the listing after upload:
 npx devvit view --json
 ```
 
-The listing still needs a final Developer Portal metadata pass if editable, but
-the latest uploaded version no longer uses the old short README as
-`version.about`.
+The listing still needs a final Developer Portal metadata pass if editable, and
+the post-`4a6a98a` self-contained README needs a final upload/view check before
+submission.
 
 ### Reddit usernames
 
@@ -94,8 +97,7 @@ Moderator workflow:
    suppresses the repeat report, increments `Reports suppressed`, and records
    the action in the audit log.
 5. If the post or comment changes, ReviewLock breaks the lock, calls
-   `unignoreReports()` when supported, and surfaces the item as `Reopened after
-   edit`.
+   `unignoreReports()` when supported, and surfaces the item as `Reopened after edit`.
 6. Moderators use the dashboard to inspect active locks, report churn, reopened
    items, runtime proof status, and audit history.
 

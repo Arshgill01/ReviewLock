@@ -19,12 +19,7 @@ const target = (): ReviewLockTarget => ({
 describe('form bindings', () => {
   it('creates and consumes lock bindings once', async () => {
     const redis = new InMemoryRedisStore();
-    const binding = await createFormBinding(
-      redis,
-      'lock',
-      target(),
-      '2026-05-24T00:00:00.000Z',
-    );
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
 
     expect(binding.reviewedContentHash).toEqual(expect.any(String));
     expect(await consumeFormBinding(redis, 'alpha', binding.token)).toMatchObject({
@@ -58,6 +53,28 @@ describe('form bindings', () => {
     const token = 'form-lock-corrupt';
     const bindingKey = key('alpha', `form:${token}`);
     await redis.set(bindingKey, JSON.stringify({ action: 'lock', targetId: 123 }));
+
+    expect(await consumeFormBinding(redis, 'alpha', token)).toBeUndefined();
+    expect(await redis.exists(bindingKey)).toBe(false);
+  });
+
+  it('deletes valid-shaped bindings whose stored token does not match the consumed key', async () => {
+    const redis = new InMemoryRedisStore();
+    const token = 'form-lock-visible';
+    const bindingKey = key('alpha', `form:${token}`);
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    await redis.set(bindingKey, JSON.stringify({ ...binding, token: 'form-lock-other' }));
+
+    expect(await consumeFormBinding(redis, 'alpha', token)).toBeUndefined();
+    expect(await redis.exists(bindingKey)).toBe(false);
+  });
+
+  it('deletes valid-shaped bindings whose stored subreddit does not match the consumed key', async () => {
+    const redis = new InMemoryRedisStore();
+    const token = 'form-lock-cross-subreddit';
+    const bindingKey = key('alpha', `form:${token}`);
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    await redis.set(bindingKey, JSON.stringify({ ...binding, token, subreddit: 'beta' }));
 
     expect(await consumeFormBinding(redis, 'alpha', token)).toBeUndefined();
     expect(await redis.exists(bindingKey)).toBe(false);
@@ -125,12 +142,7 @@ describe('form bindings', () => {
     }
 
     const redis = new ConsumeExpireFailingRedisStore();
-    const binding = await createFormBinding(
-      redis,
-      'lock',
-      target(),
-      '2026-05-24T00:00:00.000Z',
-    );
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
 
     await expect(consumeFormBinding(redis, 'alpha', binding.token)).resolves.toBeUndefined();
     expect(await redis.exists(key('alpha', `form:${binding.token}`))).toBe(true);
@@ -149,12 +161,7 @@ describe('form bindings', () => {
     }
 
     const redis = new ConsumeReservationFailingRedisStore();
-    const binding = await createFormBinding(
-      redis,
-      'lock',
-      target(),
-      '2026-05-24T00:00:00.000Z',
-    );
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
 
     await expect(consumeFormBinding(redis, 'alpha', binding.token)).resolves.toBeUndefined();
     expect(await redis.exists(key('alpha', `form:${binding.token}`))).toBe(true);

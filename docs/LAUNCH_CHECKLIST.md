@@ -32,11 +32,11 @@ rg -n "TODO" src
 ```
 
 - [ ] Confirm forbidden product copy is absent from production UI/code. Matches
-  in guardrail docs, audits, and tests are acceptable only when they are
-  explicitly discussing forbidden copy.
+      in guardrail docs, audits, and tests are acceptable only when they are
+      explicitly discussing forbidden copy.
 
 ```bash
-rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src README.md docs
+rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src README.md docs
 ```
 
 ## 2. Proof Boundary
@@ -45,9 +45,9 @@ rg -n "not reportable|disable reports|blocked reports|reports disabled|Make post
 - [ ] Read `docs/KNOWN_LIMITATIONS.md`.
 - [ ] Read `docs/MODERATION_METHOD_PROOF.md`.
 - [ ] Ensure README, Devpost copy, demo narration, and app listing copy claim
-  only verified rows as verified.
+      only verified rows as verified.
 - [ ] Keep these unverified unless a newer controlled proof pass updates
-  `docs/RUNTIME_PROOF.md`:
+      `docs/RUNTIME_PROOF.md`:
   - comment report trigger delivery;
   - post NSFW update trigger delivery;
   - post spoiler update trigger delivery;
@@ -78,9 +78,9 @@ npm run dev -- reviewlock_dev
 - [ ] Verify no audit timeline text collisions.
 - [ ] Verify target links use safe Reddit permalinks only.
 - [ ] Click `Verify runtime` from the embedded dashboard and confirm the
-  runtime panel updates under `r/reviewlock_dev`.
+      runtime panel updates under `r/reviewlock_dev`.
 - [ ] Record exact playtest version and screenshots in
-  `docs/BROWSER_REGRESSION.md`.
+      `docs/BROWSER_REGRESSION.md`.
 
 If only markdown files changed, browser verification is optional. If any client
 file under `src/client` changed, browser verification is required before final
@@ -138,10 +138,10 @@ npx devvit view --json
   - app listing URL is available.
 
 - [ ] Decide whether to file an unlisted publish request or a public App
-  Directory publish request. `npx devvit publish` creates a new app version,
-  uploads source for review, and files a publish request; `--public` submits the
-  app for public review. Do not run this until the final local gate, proof
-  boundary, listing metadata, and judging post URL are ready.
+      Directory publish request. `npx devvit publish` creates a new app version,
+      uploads source for review, and files a publish request; `--public` submits the
+      app for public review. Do not run this until the final local gate, proof
+      boundary, listing metadata, and judging post URL are ready.
 
 ```bash
 npx devvit publish
@@ -156,7 +156,7 @@ npx devvit view --json
 ```
 
 - [ ] Record the requested version, visibility, and any review/request status
-  shown by the Developer Portal or CLI.
+      shown by the Developer Portal or CLI.
 
 ## 6. Judging Access
 
@@ -166,7 +166,7 @@ subreddit with fewer than 200 members.
 
 - [ ] Confirm the judging subreddit is public and has fewer than 200 members.
 - [ ] Confirm the app is installed there or playtest access is otherwise valid
-  for judges.
+      for judges.
 - [ ] Create or reuse the ReviewLock dashboard post.
 - [ ] Add the final judging post URL to:
   - `docs/DEVPOST_SUBMISSION.md`;
@@ -191,7 +191,7 @@ subreddit with fewer than 200 members.
 
 - [ ] No known high or critical reviewer finding remains unresolved.
 - [ ] Medium findings are either fixed or explicitly accepted in
-  `docs/KNOWN_LIMITATIONS.md`.
+      `docs/KNOWN_LIMITATIONS.md`.
 - [ ] Developer Portal listing is no longer stub-grade.
 - [ ] README links point to files that exist.
 - [ ] Proof docs do not cite stale app version counts as current.

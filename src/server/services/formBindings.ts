@@ -29,7 +29,11 @@ const FORM_BINDING_CONSUME_LEASE_SECONDS = 30;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const parseBinding = (value: string | undefined): ReviewLockFormBinding | undefined => {
+const parseBinding = (
+  value: string | undefined,
+  expectedSubreddit: string,
+  expectedToken: string,
+): ReviewLockFormBinding | undefined => {
   if (!value) {
     return undefined;
   }
@@ -41,10 +45,7 @@ const parseBinding = (value: string | undefined): ReviewLockFormBinding | undefi
       return undefined;
     }
 
-    if (
-      parsed.action !== 'lock' &&
-      parsed.action !== 'unlock'
-    ) {
+    if (parsed.action !== 'lock' && parsed.action !== 'unlock') {
       return undefined;
     }
 
@@ -72,6 +73,10 @@ const parseBinding = (value: string | undefined): ReviewLockFormBinding | undefi
       parsed.reviewedFingerprintVersion !== undefined &&
       typeof parsed.reviewedFingerprintVersion !== 'string'
     ) {
+      return undefined;
+    }
+
+    if (parsed.subreddit !== expectedSubreddit || parsed.token !== expectedToken) {
       return undefined;
     }
 
@@ -160,7 +165,7 @@ export const consumeFormBinding = async (
 
   try {
     const raw = await redis.get(bindingKey);
-    const binding = parseBinding(raw);
+    const binding = parseBinding(raw, subreddit, token);
 
     if (raw !== undefined) {
       await redis.del(bindingKey);

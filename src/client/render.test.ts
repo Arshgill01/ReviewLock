@@ -18,7 +18,10 @@ import type {
 const forbiddenCopy = [
   'not reportable',
   'disable reports',
+  'reports disabled',
   'blocked reports',
+  'users cannot report',
+  'cannot report locked content',
   'ai decides',
   'automatic removal',
   'permanent',
@@ -385,7 +388,8 @@ describe('client render helpers', () => {
 
   it('renders subreddit context recovery guidance on initial load failures', () => {
     const store = new ReviewLockStore(new ReviewLockApiClient(), 'reviewlock', false);
-    store.error = 'API error: Dashboard subreddit scope does not match the Devvit runtime subreddit.';
+    store.error =
+      'API error: Dashboard subreddit scope does not match the Devvit runtime subreddit.';
 
     const html = renderDashboardPage(store);
 
