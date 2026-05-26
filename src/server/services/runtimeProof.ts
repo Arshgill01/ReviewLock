@@ -74,6 +74,9 @@ const isRuntimeCapabilityStatus = (value: unknown): value is RuntimeCapabilitySt
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
 const isRuntimeProofCapability = (value: unknown): value is RuntimeProofCapability => {
   if (!isRecord(value)) {
     return false;
@@ -182,6 +185,10 @@ const capabilityFromReportAudit = (event: AuditEvent): RuntimeProofCapability | 
     return undefined;
   }
 
+  if (!isNonEmptyString(event.targetId) || !isNonEmptyString(event.lockId)) {
+    return undefined;
+  }
+
   return {
     name: event.targetKind === 'post' ? 'postReportTrigger' : 'commentReportTrigger',
     status: 'verified',
@@ -210,6 +217,10 @@ const capabilityFromUpdateAudit = (event: AuditEvent): RuntimeProofCapability | 
   }
 
   if (event.targetKind !== updateTriggerTargetKinds[capabilityName]) {
+    return undefined;
+  }
+
+  if (!isNonEmptyString(event.targetId) || !isNonEmptyString(event.lockId)) {
     return undefined;
   }
 

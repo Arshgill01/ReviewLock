@@ -2769,3 +2769,31 @@
   is claimed for this recheck.
 - No live report submission, post edit, comment edit, unlock, dismiss, or
   destructive moderation action was performed in this recheck.
+
+## 2026-05-26 12:59 IST - Runtime proof reconciliation evidence hardening
+
+- Tightened runtime proof reconciliation so audit-derived report trigger proof
+  requires a non-empty `targetId`, `targetKind`, and `lockId`.
+- Tightened audit-derived update trigger proof so reopen audit evidence requires
+  a non-empty `targetId`, matching `targetKind`, non-empty `lockId`, matching
+  reopen reason, and successful `unignoreReports`.
+- Added regressions that partial suppression audits and partial reopen audits do
+  not turn `postReportTrigger`, `commentReportTrigger`, or update-trigger rows
+  verified.
+- Focused validation:
+  - `npm run test -- src/server/services/runtimeProof.test.ts --reporter verbose`
+  - PASS, 1 test file and 18 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 375 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

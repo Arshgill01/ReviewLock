@@ -260,6 +260,43 @@ describe('runtime proof status', () => {
     );
   });
 
+  it('does not reconcile report trigger proof from suppression audits without concrete target and lock evidence', async () => {
+    const redis = new InMemoryRedisStore();
+    await appendAuditEvent(redis, {
+      id: 'audit-report-suppressed-missing-target',
+      kind: 'report_suppressed',
+      subreddit: 'alpha',
+      targetKind: 'post',
+      lockId: 'lock-missing-target',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:00:00.000Z',
+      message: 'Repeat report suppressed because reviewed content was unchanged.',
+      data: { reportCount: 1 },
+      demo: false,
+    });
+    await appendAuditEvent(redis, {
+      id: 'audit-report-suppressed-missing-lock',
+      kind: 'report_suppressed',
+      subreddit: 'alpha',
+      targetId: 't1_comment',
+      targetKind: 'comment',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:01:00.000Z',
+      message: 'Repeat report suppressed because reviewed content was unchanged.',
+      data: { reportCount: 1 },
+      demo: false,
+    });
+
+    const status = await loadRuntimeProofStatus(redis, 'alpha', '2026-05-24T02:00:00.000Z');
+
+    expect(status.capabilities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
+        expect.objectContaining({ name: 'commentReportTrigger', status: 'unverified' }),
+      ]),
+    );
+  });
+
   it('reconciles unverified update trigger proof from durable reopen audit evidence', async () => {
     const redis = new InMemoryRedisStore();
     await appendAuditEvent(redis, {
@@ -386,6 +423,40 @@ describe('runtime proof status', () => {
         reason: 'flair_changed',
         triggerCapabilityName: 'postFlairUpdateTrigger',
         unignoreReportsOk: false,
+      },
+      demo: false,
+    });
+
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-missing-target',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetKind: 'post',
+      lockId: 'lock-missing-target',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:06:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+        unignoreReportsOk: true,
+      },
+      demo: false,
+    });
+
+    await appendAuditEvent(redis, {
+      id: 'audit-update-reopened-missing-lock',
+      kind: 'lock_reopened',
+      subreddit: 'alpha',
+      targetId: 't3_missing_lock',
+      targetKind: 'post',
+      actor: 'reviewlock',
+      createdAt: '2026-05-24T01:07:00.000Z',
+      message: 'Lock reopened after reviewed content changed or became uncertain.',
+      data: {
+        reason: 'flair_changed',
+        triggerCapabilityName: 'postFlairUpdateTrigger',
+        unignoreReportsOk: true,
       },
       demo: false,
     });

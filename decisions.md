@@ -2346,3 +2346,23 @@ Reason:
   but duplicated helpers across components made future regressions likely.
   Centralizing the render primitives keeps dashboard output consistent and
   makes escaping behavior easier to test directly.
+
+### D132 - Audit-derived trigger proof requires concrete target and lock evidence
+
+Runtime proof reconciliation can derive trigger capability status from durable
+audit events.
+
+Decision:
+
+- Keep the general audit schema flexible for global/runtime events.
+- Require non-empty `targetId` and `lockId` before a `report_suppressed` audit
+  can verify a report-trigger capability.
+- Require non-empty `targetId` and `lockId` before a `lock_reopened` audit can
+  verify an update-trigger capability.
+
+Reason:
+
+- A trigger proof row should not turn green from a partial or legacy audit that
+  cannot identify the reviewed target and lock involved in the suppression or
+  reopen. Runtime proof is judge-facing evidence, so reconciliation must require
+  a concrete moderation loop artifact rather than just an event kind.

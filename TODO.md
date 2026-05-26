@@ -177,3 +177,4 @@
 - [x] Add accessible summaries to audit timeline rows.
 - [x] Centralize client render escaping, date labels, token labels, and thing-id display helpers.
 - [x] Recheck live Zen WebView audit timeline formatting on playtest `v0.0.2.317`.
+- [x] Require target and lock evidence before audit-derived trigger proof reconciliation.
