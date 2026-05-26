@@ -2797,3 +2797,44 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:25 IST - Runtime-uncertain retry and audit timeline hardening
+
+- Changed report and update trigger target-refetch uncertainty so known active
+  locks remain active with `target_resolution_failed` runtime warnings instead
+  of being moved to a `runtime_uncertain` reopen before `unignoreReports()` can
+  run.
+- Added runtime-failure audit data with `recovery: active_lock_retry_required`
+  for those retryable target-resolution failures.
+- Added a regression proving report dedupe is cleared even if the new
+  retryable runtime-failure audit write fails, then the same report event id can
+  retry and suppress unchanged content after target refetch recovers.
+- Reworked the audit timeline markup/CSS into timestamp and content lanes with
+  labeled detail rows so long target and lock ids do not overlap inside the
+  Reddit embed.
+- Captured local browser screenshots:
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+  - PASS, 1 file and 17 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+  - PASS, 4 files and 87 tests.
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+  - PASS, 1 file and 34 tests.
+  - `npm run build`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 376 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

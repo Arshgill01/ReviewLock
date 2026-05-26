@@ -196,15 +196,30 @@ describe('breakLockForChangedContent', () => {
     });
   });
 
-  it('fails open to runtime uncertain when target cannot be refetched', async () => {
+  it('keeps runtime-uncertain refetch failures retryable when target cannot be refetched', async () => {
     const dependencies = await deps(null);
     const result = await breakLockForChangedContent(dependencies, {
       targetId: 't3_post',
       subreddit: 'alpha',
     });
 
-    expect(result.action).toBe('runtime_uncertain');
-    expect(result.event).toMatchObject({ reason: 'runtime_uncertain' });
+    expect(result).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['target_resolution_failed'],
+    });
+    expect(result.event).toBeUndefined();
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([]);
+    expect(await listAuditEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        data: expect.objectContaining({ recovery: 'active_lock_retry_required' }),
+      }),
+    ]);
   });
 
   it('fails open to runtime uncertain when Reddit refetch throws', async () => {
@@ -225,17 +240,16 @@ describe('breakLockForChangedContent', () => {
     );
 
     expect(result).toMatchObject({
-      ok: true,
+      ok: false,
       action: 'runtime_uncertain',
       warnings: ['target_resolution_failed'],
     });
-    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({
-        reason: 'runtime_uncertain',
-        runtimeWarnings: ['target_resolution_failed'],
-      }),
-    ]);
+    expect(result.event).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
     expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
       capabilities: expect.arrayContaining([
         expect.objectContaining({ name: 'postUpdateTrigger', status: 'unverified' }),

@@ -809,18 +809,29 @@ td strong {
 }
 
 .audit-row {
-  display: block;
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  column-gap: 14px;
   position: relative;
-  border-bottom: 0;
-  padding: 10px 0 12px;
+  padding: 12px 0 14px;
+  border-bottom: 1px solid var(--line);
   min-width: 0;
+}
+
+.audit-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.audit-row:first-child {
+  padding-top: 0;
 }
 
 .audit-row::before {
   content: '';
   position: absolute;
   left: -16px;
-  top: 14px;
+  top: 17px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -829,11 +840,25 @@ td strong {
   z-index: 10;
 }
 
+.audit-time {
+  display: block;
+  color: var(--light);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.audit-row-body {
+  min-width: 0;
+}
+
 .audit-row-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 6px 10px;
   min-width: 0;
 }
 
@@ -844,19 +869,10 @@ td strong {
   text-transform: capitalize;
 }
 
-.audit-meta {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
-  min-width: 0;
+.audit-actor {
   color: var(--muted);
   font-size: 0.75rem;
-  line-height: 1.35;
-}
-
-.audit-meta span::before {
-  content: '·';
-  margin-right: 6px;
+  overflow-wrap: anywhere;
 }
 
 .audit-message,
@@ -873,7 +889,34 @@ td strong {
 }
 
 .audit-details {
+  display: grid;
+  gap: 4px;
   max-width: 100%;
+}
+
+.audit-detail {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.audit-detail dt,
+.audit-detail dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.audit-detail dt {
+  color: var(--light);
+  font-weight: 600;
+}
+
+.audit-detail dd {
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 code {
@@ -956,6 +999,11 @@ code {
   table {
     min-width: 600px;
   }
+
+  .audit-row {
+    grid-template-columns: 104px minmax(0, 1fr);
+    column-gap: 12px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -970,5 +1018,18 @@ code {
 
   .metric-cell:not(:last-child)::after {
     content: '';
+  }
+
+  .audit-row {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+  }
+
+  .audit-row::before {
+    top: 15px;
+  }
+
+  .audit-detail {
+    grid-template-columns: 58px minmax(0, 1fr);
   }
 }

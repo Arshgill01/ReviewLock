@@ -2831,3 +2831,471 @@
   - `rg -n "TODO" src` returned no source TODOs.
   - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
     proof checklists; no production UI copy match was found.
+
+## 2026-05-26 12:59 IST - Finding
+
+- Severity: high
+- Area: Runtime-uncertain reopens can clear the active lock without ever returning Reddit reports to normal handling.
+- Evidence:
+  - When a report trigger cannot resolve a known locked target, it enqueues a `runtime_uncertain` reopen and marks the lock reopened without calling `unignoreReports()`: `src/server/services/reportTriggers.ts:207-248`.
+  - The update-trigger path has the same shape: if `resolution.target` is missing, `unignoreResult` is `undefined`, but the code still enqueues a reopen and removes active indexes through `markLockReopenedAfterQueue()`: `src/server/services/reopenFlow.ts:147-182`.
+  - The audit records `unignoreReportsOk: false` for this state, but the active lock is already gone: `src/server/services/reportTriggers.ts:226-238`, `src/server/services/reopenFlow.ts:189-203`.
+  - Recovery actions only operate on active locks by resolving the target and then calling `getActiveLockByTarget()`; if no active lock remains, unlock returns "No active ReviewLock lock was found": `src/server/services/unlockFlow.ts:40-69`, `src/routes/api.dashboard.ts:342-388`, `src/routes/menu.ts:227-258`.
+  - Current regressions assert that the active lock disappears on target-refetch failure, but they do not assert any later recovery path can retry `unignoreReports()`: `src/server/services/reportTriggers.test.ts:313-342`, `src/server/services/reopenFlow.test.ts:199-238`.
+- Why it matters: ReviewLock's safety story depends on reopened content returning to moderator attention and reports no longer being suppressed. If the target refetch fails transiently, ReviewLock can remove its own active lock while Reddit may still have reports ignored from the original lock. The dashboard then shows a reopened item, but the normal unlock path cannot find an active lock to retry `unignoreReports()`, so moderators may not have a ReviewLock-controlled way to restore report handling.
+- Suggested fix: keep target-resolution failures in a retryable state until `unignoreReports()` succeeds, or add an explicit reopen-queue recovery action that refetches the target by `event.targetId`, retries `unignoreReports()`, records runtime proof, and only then allows dismissal. Add regressions proving report/update refetch failure does not strand a Reddit-side ignored target with no active-lock or reopen-queue recovery path.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/unlockFlow.ts`, `src/routes/api.dashboard.ts`, `src/routes/menu.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.test.ts`.
+
+## 2026-05-26 13:04 IST - Finding
+
+- Severity: high
+- Area: Honorable-mention submission and launch hardening work order.
+- Evidence:
+  - Devpost rules require a Reddit Developer Platform project, text description, Reddit usernames, app listing link, and project-impact communities; the optional demo video must be under 1 minute and show the app functioning on the intended device: `https://mod-tools-migration.devpost.com/rules`.
+  - Devpost judging gives equal weight to Community Impact, Polish, Reliable UX, and New Mod Tool Ecosystem Impact for this project category: `https://mod-tools-migration.devpost.com/rules`.
+  - Devvit Rules say moderation apps should be transparent, locally/sandbox tested, provide detailed app descriptions, and give mods safe/responsible usage instructions: `https://developers.reddit.com/docs/devvit_rules`.
+  - Devvit launch FAQ says `npx devvit upload` creates a private uploaded build, `npx devvit publish` is the launch-review step, public App Directory distribution uses `npx devvit publish --public`, and publish-readiness depends on stable mobile/web behavior, multiple-account testing, and an installer-friendly README: `https://developers.reddit.com/docs/guides/faq`.
+  - Current `README.md` is still a 17-line development stub and does not explain the moderator problem, install/use flow, proof boundary, impact model, safety posture, or demo loop: `README.md:1-17`.
+  - Current tracker still has Wave 33, Wave 34, Wave 14, screenshots, and comment-target proof open: `TODO.md:36-58`.
+  - Current limitations still honestly mark `CommentReport`, post NSFW/spoiler/flair triggers, and comment-target moderation methods as unverified: `docs/KNOWN_LIMITATIONS.md:7-25`, `docs/KNOWN_LIMITATIONS.md:43-53`.
+  - `devvit.json` already provides the app name, moderator menu actions, trigger endpoints, Reddit permission, Redis permission, and default playtest subreddit needed for an app listing and publish rehearsal: `devvit.json:1-99`.
+- Why it matters: The project is now strong enough that the limiting factor for a Best New Mod Tool honorable mention is no longer raw implementation breadth alone; it is whether judges can immediately see a launch-ready Devvit mod tool with a crisp safety boundary, a real time-savings story, a verified demo loop, and an installable app listing. The current README/submission package is too thin to carry that story, and publishing without first fixing the open high runtime-safety finding risks failing the Reliable UX criterion.
+- Suggested fix:
+  - First, close the open high runtime-safety finding above: runtime-uncertain report/update reopens must not strand a Reddit-side ignored target with no retry path to `unignoreReports()`. Add focused regressions, then run at least `npm run type-check`, targeted tests, and the full final gate before launch packaging.
+  - Then execute a submission-hardening wave with these deliverables:
+    - Rewrite `README.md` as the installer/judge landing page: problem, solution, "Lock reviewed content until it changes", exact mod workflow, install/playtest instructions, dashboard screenshots, proof matrix, safety/privacy boundaries, known limitations, and validation commands. Keep unverified paths clearly labeled.
+    - Add a single `SUBMISSION.md` or `docs/DEVPOST_SUBMISSION.md` containing final Devpost-ready copy for: app listing link placeholder, Reddit usernames placeholder, tool overview, project impact, 1-3 target community types, time-savings model, demo-video script, proof summary, and optional feedback/helper sections.
+    - Add a concise `docs/APP_LISTING.md` for the developer.reddit.com app listing: app name, short tagline, long description, safe usage instructions for moderators, data stored, permissions used, support/contact route, and current proof limitations.
+    - Add `docs/LAUNCH_CHECKLIST.md` with exact commands and required evidence: `npx devvit whoami`, `npm run type-check`, `npm run lint`, `npm run test`, `npm run build`, controlled playtest smoke, `devvit logs`, `npx devvit upload`, app listing URL capture, and only then `npx devvit publish` or `npx devvit publish --public` if the owner intentionally wants launch review/public listing before submission.
+    - Capture or list required screenshots only after the runtime-safety fix and final demo state: lock form, active lock dashboard, reports suppressed metric, reopened-after-edit queue, runtime proof panel, demo-mode banner.
+    - Produce a sub-60-second demo script with three visible beats: lock reviewed content, repeat report suppressed on unchanged content, edit breaks lock and reopens. Do not spend time on generic product narration.
+  - Honorable-mention optimization scorecard for the main agent to target:
+    - Community Impact: current about 7.5/10, ceiling 8.5/10. Improve by naming concrete community types and adding a conservative time-savings model, e.g. repeated reports per week converted into exception-only reopens.
+    - Polish: current about 6.5/10 because the app is strong but the README/submission package is missing. Ceiling 9/10 with the judge landing README, app listing copy, screenshots, and tight demo.
+    - Reliable UX: current about 7.5/10, ceiling 8.5/10 after the open high runtime-safety finding is fixed, final validation passes, and install/use instructions are explicit.
+    - Ecosystem Impact: current about 7.5/10, ceiling 8.5/10 if the copy repeatedly frames ReviewLock as an integrity-bound review ledger, not an `ignoreReports()` wrapper.
+  - Final submission protocol:
+    - No public claim may exceed `docs/RUNTIME_PROOF.md` and `docs/KNOWN_LIMITATIONS.md`.
+    - Use "implemented and locally tested" for unverified trigger variants.
+    - Use "verified" only for controlled live paths already documented.
+    - Do not say "not reportable", "disable reports", "reports disabled", "unreportable", "permanent", or "forever" except in explicit guardrail/limitation text.
+    - Treat the app listing link from upload as required for Devpost; treat public publish/App Directory approval as desirable if time allows but not guaranteed before the May 28, 2026 06:30 IST deadline.
+- Files reviewed: `README.md`, `TODO.md`, `docs/KNOWN_LIMITATIONS.md`, `devvit.json`, Devpost rules, Devvit Rules, Devvit launch FAQ.
+
+## 2026-05-26 13:06 IST - Finding
+
+- Severity: high
+- Area: Runtime-uncertain recovery hardening is currently partial and failing focused validation.
+- Evidence:
+  - Dirty in-progress `src/server/services/reportTriggers.ts` now keeps the active lock on report refetch failure and writes a `runtime_failure` audit instead of queueing a `runtime_uncertain` reopen, which addresses the report side of the 12:59 finding directionally.
+  - Focused validation currently fails: `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose` exits 1.
+  - The failing report-trigger regressions still expect the old unsafe behavior: `getActiveLockByTarget(..., 't3_post')` should be `undefined` and `result.reopenEvent` should exist after target refetch failure, but the dirty implementation now leaves the active lock in place: `src/server/services/reportTriggers.test.ts:331`, `src/server/services/reportTriggers.test.ts:817`.
+  - The update-trigger service still has the original unsafe shape: when `resolution.target` is missing, `unignoreResult` is `undefined`, but `breakLockForChangedContent()` still builds a `runtime_uncertain` reopen event, enqueues it, and removes active indexes through `markLockReopenedAfterQueue()`: `src/server/services/reopenFlow.ts:142-180`.
+  - The update-trigger refetch-failure regression still asserts the active lock disappears and a `runtime_uncertain` reopen is queued: `src/server/services/reopenFlow.test.ts:199-238`.
+- Why it matters: The report-trigger half of the high safety fix is not yet test-aligned, and the update-trigger half still permits the stranded-state risk. Shipping submission docs or publishing before this is closed would leave the Reliable UX/safety story weaker than the public copy will need to claim.
+- Suggested fix: Finish the high finding as a two-path change. For report triggers, update the two affected tests to assert the lock remains active, runtime warning is stored, no reopen queue item is created, dedupe is cleared, and a `runtime_failure` audit records `active_lock_retry_required`. For update triggers, mirror the same recovery behavior when target resolution is uncertain: keep the active lock retryable with `target_resolution_failed`, avoid queueing a reopen until `unignoreReports()` can be attempted or succeeds, write a runtime-failure audit, keep granular update-trigger proof unverified, and add focused regressions for both missing target and thrown refetch. Re-run the focused command above before moving to submission hardening.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/reopenFlow.test.ts`.
+
+## 2026-05-26 13:09 IST - Finding
+
+- Severity: medium
+- Area: Launch checklist should distinguish existing app listing from final upload/public publish.
+- Evidence:
+  - Prior install/deploy rehearsal already confirmed the signed-in Devvit account, registered app slug `reviewlock`, app id, owner `BrightyBrainiac`, and latest uploaded version `0.0.2`: `docs/INSTALL_DEPLOY_REHEARSAL.md:9-40`.
+  - The same rehearsal captured the app listing URL from `npx devvit upload`: `https://developers.reddit.com/apps/reviewlock`: `docs/INSTALL_DEPLOY_REHEARSAL.md:78-97`.
+  - Controlled install to `r/reviewlock_dev` was already proven for that uploaded version: `docs/INSTALL_DEPLOY_REHEARSAL.md:99-112`.
+  - Product/release audit intentionally blocks one-command public publish and keeps `npm run deploy` as the private upload path: `docs/PRODUCTION_TRUST_AUDIT.md:23-37`, `decisions.md:320-328`, `package.json:14-16`.
+  - Production trust audit still says public publish must wait until live proof and claim boundaries are resolved: `docs/PRODUCTION_TRUST_AUDIT.md:52-70`.
+- Why it matters: Devpost requires an app listing link, and ReviewLock already has one. The remaining launch work should not create a new Devvit app or conflate `upload` with public App Directory approval. The correct path is to preserve the existing app identity, fix the high runtime-safety issue, run final validation, upload a final version to refresh the existing listing, and only run `devvit publish`/`devvit publish --public` if the owner intentionally accepts launch review timing and remaining proof boundaries.
+- Suggested fix: In `docs/LAUNCH_CHECKLIST.md` and Devpost copy, use `https://developers.reddit.com/apps/reviewlock` as the app listing link, record the final uploaded version after the last `npm run deploy`/`npx devvit upload`, and keep public publish as an explicit owner-approved step after final claim-boundary review. Include a "do not run `devvit init --force`" note so the registered app identity from D016 is preserved.
+- Files reviewed: `docs/INSTALL_DEPLOY_REHEARSAL.md`, `docs/PRODUCTION_TRUST_AUDIT.md`, `decisions.md`, `package.json`.
+
+## 2026-05-26 13:08 IST - Finding
+
+- Severity: high
+- Area: Runtime-uncertain recovery implementation now covers report and update paths, but focused tests are still red.
+- Evidence:
+  - Dirty `src/server/services/reportTriggers.ts` keeps the active lock on report refetch failure, appends `target_resolution_failed`, writes a `runtime_failure` audit with `active_lock_retry_required`, and clears report dedupe.
+  - Dirty `src/server/services/reopenFlow.ts` now has the matching update-trigger shape: `comparison === 'uncertain'` updates the active lock with `target_resolution_failed`, writes a `runtime_failure` audit, and returns `ok: false, action: 'runtime_uncertain'` without queueing a reopen or removing active indexes.
+  - Focused validation still fails: `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose` exits 1 with 4 failed tests.
+  - Failing tests are stale relative to the intended safer behavior: `src/server/services/reopenFlow.test.ts:207` still expects a `runtime_uncertain` reopen event, `src/server/services/reopenFlow.test.ts:227` still expects `ok: true`, `src/server/services/reportTriggers.test.ts:331` still expects no active lock, and `src/server/services/reportTriggers.test.ts:817` still expects `result.reopenEvent`.
+- Why it matters: The implementation direction now matches the high safety finding, but until tests assert the new contract, the project has no regression proof that runtime-uncertain report/update deliveries remain retryable and do not strand Reddit-side ignored targets.
+- Suggested fix: Update the four stale tests to assert the new contract: result is `ok: false`, action is `runtime_uncertain`, active lock remains present with deduped `target_resolution_failed`, no reopen queue event is created, report dedupe is cleared for retries where applicable, runtime proof rows remain unverified, and a `runtime_failure` audit records `recovery: active_lock_retry_required`. Then run the same focused command; only after it passes should the main agent run `npm run type-check`, `npm run lint`, `npm run test`, and `npm run build`.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`, `src/server/services/reopenFlow.ts`, `src/server/services/reopenFlow.test.ts`.
+
+## 2026-05-26 13:09 IST - Integration Status
+
+- Update-trigger runtime-uncertain tests have been aligned with the safer active-lock retry contract.
+- Focused validation still fails only on the report-trigger side:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    exits 1 with 2 failing tests.
+  - Remaining stale assertions are in `src/server/services/reportTriggers.test.ts:331`
+    and `src/server/services/reportTriggers.test.ts:817`.
+- The remaining expected test updates are the report-trigger equivalents of the
+  now-passing update-trigger tests: assert active lock remains retryable, no
+  reopen event is queued, runtime failure audit is written, report dedupe is
+  cleared, and runtime proof remains unverified.
+
+## 2026-05-26 13:10 IST - Integration Status
+
+- The high runtime-uncertain recovery fix is now focused-test green.
+- Report and update refetch-failure paths both keep the active lock retryable
+  instead of queueing a `runtime_uncertain` reopen before `unignoreReports()`
+  can run.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 2 files / 48 tests.
+- Remaining gate before submission hardening: main agent should still run the
+  full final app gate (`npm run type-check`, `npm run lint`, `npm run test`,
+  `npm run build`) after finishing any cleanup, then proceed to README,
+  Devpost, app-listing, launch-checklist, and screenshot/demo-script work.
+
+## 2026-05-26 13:12 IST - Finding
+
+- Severity: high
+- Area: Runtime-uncertain recovery fix is focused-test green but currently fails type-check.
+- Evidence:
+  - `npm run lint` PASS.
+  - `npm run type-check` FAILS with `src/server/services/reopenFlow.ts(204,78): error TS2345: Argument of type 'ReviewLockTarget | undefined' is not assignable to parameter of type 'ReviewLockTarget'.`
+  - The failing line passes `resolution.target` to `unignoreReportsForReviewLock()` after the `comparison === 'uncertain'` and `comparison === 'unchanged'` branches: `src/server/services/reopenFlow.ts:203-212`.
+  - Runtime tests pass because the branch is logically reachable only for changed content with a target, but TypeScript does not infer that `resolution.target` is defined from the `comparison` discriminant.
+- Why it matters: The high runtime-safety behavior is now covered by focused tests, but the app cannot proceed to final gate, upload, or submission hardening while type-check is red.
+- Suggested fix: After the `comparison === 'unchanged'` return, introduce a narrowed local target before moderation operations, for example `const target = resolution.target; if (!target) { ...runtime_uncertain retryable fallback... }`, then use `target` for `unignoreReportsForReviewLock()` and `buildReopenEvent()`. Keep the fallback behavior identical to the new runtime-uncertain active-lock retry contract. Re-run `npm run type-check`, then the focused report/update suite.
+- Files reviewed: `src/server/services/reopenFlow.ts`.
+
+## 2026-05-26 13:12 IST - Integration Status
+
+- Route-level report/update trigger tests are aligned with the new retryable
+  runtime-uncertain contract.
+- Focused route validation:
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+    PASS, 2 files / 39 tests.
+- Current blocker remains the TypeScript narrowing failure in
+  `src/server/services/reopenFlow.ts:204`; `npm run type-check` is still the
+  next gate to re-run after the main agent narrows `resolution.target`.
+
+## 2026-05-26 13:12 IST - Finding
+
+- Severity: high
+- Area: New report refetch-failure branch can leave retryable deliveries deduped if audit writing fails.
+- Evidence:
+  - The new locked-target report refetch-failure branch updates the active lock warning, writes a `runtime_failure` audit, then clears the report dedupe marker: `src/server/services/reportTriggers.ts:195-220`.
+  - The outer catch returns `runtime_uncertain` with `redis_write_failed` on any thrown Redis/audit error, but this branch does not clear the dedupe marker in a `finally` or before the audit write: `src/server/services/reportTriggers.ts:491-505`.
+  - Existing tests cover the happy retryable branch and older audit-failure branches, but there is no regression that forces `appendAuditEvent()` to fail in the target-refetch-failure branch and asserts the same event id can retry: `src/server/services/reportTriggers.test.ts:313-339`, `src/server/services/reportTriggers.test.ts:799-831`, `src/server/services/reportTriggers.test.ts:623-700`.
+- Why it matters: This path is explicitly supposed to be retryable. If Redis accepts the dedupe marker and active-lock warning update but fails the audit write, a repeated Devvit delivery with the same report event id can be treated as `duplicate`, leaving moderators with a warning but no durable runtime-failure audit and no real retry of the unresolved report event.
+- Suggested fix: In the locked-target refetch-failure branch, clear the dedupe marker in a `try`/`catch`/`finally` on all `runtime_uncertain` exits after the marker is created, including audit-write failure. Add a regression that injects an audit write failure for this branch, asserts the handler returns `runtime_uncertain`, asserts the dedupe key is absent, and then retries the same event id successfully into the active-lock retryable warning/audit path.
+- Files reviewed: `src/server/services/reportTriggers.ts`, `src/server/services/reportTriggers.test.ts`.
+
+## 2026-05-26 13:15 IST - Integration Status
+
+- Dirty audit timeline UI changes in `src/client/components/AuditTimeline.ts`
+  and `src/client/styles.css` pass the focused render coverage.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+    PASS, 1 file / 17 tests.
+- This does not replace browser/mobile screenshot validation before final
+  submission screenshots; it only verifies the rendered HTML helpers and
+  escaping expectations.
+
+## 2026-05-26 13:16 IST - Integration Status
+
+- The runtime-uncertain recovery hardening now passes the local app gate.
+- Validation:
+  - `npm run type-check` PASS.
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 2 files / 48 tests.
+  - `npm run test -- src/routes/triggers.report.test.ts src/routes/triggers.update.test.ts --reporter verbose`
+    PASS, 2 files / 39 tests.
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+    PASS, 1 file / 17 tests.
+  - `npm run lint` PASS.
+  - `npm run test` PASS, 43 files / 375 tests.
+  - `npm run build` PASS.
+- Remaining reviewer caveat: the high finding about clearing report dedupe if
+  the new runtime-failure audit write fails still appears open; I did not see a
+  dedicated regression for audit failure in the locked-target refetch-failure
+  branch.
+
+## 2026-05-26 13:19 IST - Recheck
+
+- Area: Report-trigger runtime-uncertain dedupe cleanup after audit failure.
+- Result: Implementation appears directionally resolved, but regression proof is
+  still missing.
+- Evidence:
+  - The report-trigger catch path now calls `clearDedupe(...)` for non-concurrency
+    errors before returning `runtime_uncertain`: `src/server/services/reportTriggers.ts`.
+  - The locked-target refetch-failure branch still writes the active-lock warning
+    and `runtime_failure` audit before its local `clearDedupe(...)` call.
+  - Existing tests prove normal refetch-failure retryability and other audit
+    failure rollback paths, but I still did not find a test that forces the
+    `audit-report-runtime-active` write to fail and then retries the same event id.
+- Why it matters: This is now a proof gap more than an obvious production bug,
+  because the outer catch should clear the marker. A focused regression is still
+  worth adding before final upload because retryability under transient Redis
+  failure is part of the Reliable UX story.
+
+## 2026-05-26 13:25 IST - Integration Status
+
+- The report-trigger runtime-uncertain dedupe proof gap is closed.
+- Added regression:
+  `clears report dedupe when retryable target resolution audit persistence fails`.
+- The regression forces `audit-report-runtime-active` persistence to fail,
+  verifies the report dedupe key is removed, keeps the active lock retryable
+  with `target_resolution_failed`, then retries the same event id after target
+  refetch recovers and reaches `suppress_unchanged`.
+- Focused validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+    PASS, 1 file / 34 tests.
+- Also updated `docs/TRIGGER_PROOF.md` so runtime-uncertain target-refetch
+  failures document the current safer behavior: keep active locks retryable with
+  a runtime-failure audit and no reopen queue item until current content can be
+  loaded and `unignoreReports()` can be attempted.
+- Suggested fix: Add a targeted report-trigger test where `appendAuditEvent()`
+  fails for the locked-target refetch-failure branch, assert the result is
+  `runtime_uncertain`, assert `reviewlock:alpha:report:dedupe:<event>` is absent,
+  then retry the same `eventId` with the audit write restored and assert the
+  active lock stays retryable with a `runtime_failure` audit.
+
+## 2026-05-26 13:19 IST - Honorable Mention Execution Packet
+
+- Severity: high
+- Area: Final app hardening, submission hardening, and Devvit launch path.
+- Current status:
+  - The highest-risk runtime-uncertain active-lock safety issue is locally gate
+    green after the main-agent patch.
+  - `README.md` is still a 17-line development stub.
+  - No submission artifacts exist yet: `SUBMISSION.md`,
+    `docs/DEVPOST_SUBMISSION.md`, `docs/APP_LISTING.md`, and
+    `docs/LAUNCH_CHECKLIST.md` are absent.
+  - The app listing already exists and should be preserved:
+    `https://developers.reddit.com/apps/reviewlock`.
+- Work order for the main agent:
+  1. Add the missing report-trigger audit-failure regression above, then rerun
+     `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`.
+  2. Run the final local gate after that regression:
+     `npm run type-check`, `npm run lint`, `npm run test`, `npm run build`,
+     and `git diff --check`.
+  3. Rewrite `README.md` as the judge and installer landing page. It should
+     contain the problem, the core promise, how the mod workflow works, what the
+     dashboard shows, install/playtest instructions, validation commands, proof
+     matrix, safety/privacy boundaries, and known limitations. The first screen
+     of the README must make "Lock reviewed content until it changes" obvious.
+  4. Add `docs/DEVPOST_SUBMISSION.md` with paste-ready fields for:
+     app listing, Reddit usernames, tool overview, project impact, target
+     community types, time-savings model, proof summary, screenshots needed,
+     sub-60-second video script, optional feedback award, and helper nomination.
+  5. Add `docs/APP_LISTING.md` with developer.reddit.com listing copy:
+     short tagline, long description, moderator usage instructions, permissions,
+     data stored, safety limits, support/contact note, and verified/unverified
+     runtime boundaries.
+  6. Add `docs/LAUNCH_CHECKLIST.md` with exact preflight and launch commands:
+     `npx devvit whoami`, `npx devvit view --json`, final local gate,
+     controlled playtest smoke, `npx devvit logs ...`, `npx devvit upload`,
+     app listing URL capture, install confirmation, and optional owner-approved
+     `npx devvit publish` / `npx devvit publish --public`.
+  7. Capture final screenshots only after the docs and app-hardening regression
+     land: lock form, active-lock dashboard, reports-suppressed metric,
+     reopened-after-edit queue, runtime proof panel, and demo-mode banner.
+  8. Run a copy guardrail scan before upload:
+     `rg -n "not reportable|disable reports|reports disabled|unreportable|ignore reports wrapper|AI decides|automatic removal|remove automatically|report disabling|permanent|forever" README.md docs src package.json devvit.json`.
+- Submission scoring target:
+  - Community Impact: get to 8+ by naming 1-3 community types and quantifying
+    repeat-report time savings conservatively.
+  - Polish: get to 9 by making README, Devpost copy, app listing, launch
+    checklist, screenshots, and demo script coherent and proof-bound.
+  - Reliable UX: get to 8.5 by finishing the retryability regression, running
+    the full gate, and making install/config/use instructions explicit.
+  - Ecosystem Impact: get to 8.5 by framing ReviewLock as an integrity-bound
+    review ledger, not as native `ignoreReports()` with a UI.
+- Claim boundaries for all new copy:
+  - May claim verified controlled post lock, post report suppression, post edit
+    reopen, comment edit reopen, dashboard runtime smoke, and post-target
+    moderation methods only as documented in `docs/RUNTIME_PROOF.md`.
+  - Must label comment report, post NSFW/spoiler/flair triggers, and independent
+    comment-target moderation methods as implemented/local-tested or unverified
+    until controlled proof exists.
+  - Must not describe ReviewLock as making content not reportable, disabling
+    reports, blocking user reports, permanently suppressing reports, or making
+    automated removals.
+
+## 2026-05-26 13:24 IST - Finding
+
+- Severity: medium
+- Area: Trigger proof documentation is stale after retryable runtime-uncertain
+  safety hardening.
+- Evidence:
+  - `docs/TRIGGER_PROOF.md:49` still says a report trigger that cannot load a
+    target with a known active lock marks the lock `reopened`, removes the active
+    target index, writes `reopenReason: runtime_uncertain`, and enqueues a
+    `runtime_uncertain` reopen event.
+  - `docs/TRIGGER_PROOF.md:130-134` still says missing target resolution with a
+    known active lock reopens the lock so it cannot continue suppressing reports.
+  - The current report-trigger code keeps the active lock in place, adds
+    `target_resolution_failed`, writes a `runtime_failure` audit, clears report
+    dedupe, and returns `runtime_uncertain` with no reopen event:
+    `src/server/services/reportTriggers.ts:191-225`.
+  - The current update-trigger reopen flow mirrors that safer behavior for
+    target refetch uncertainty: `src/server/services/reopenFlow.ts:160-190`.
+- Why it matters: `docs/TRIGGER_PROOF.md` is exactly the kind of proof-boundary
+  source the final README and Devpost copy will cite. Leaving the old behavior
+  there can cause the submission to either overclaim runtime-uncertain reopen
+  behavior or document the unsafe state the code just removed, weakening the
+  Reliable UX story.
+- Suggested fix: Update `docs/TRIGGER_PROOF.md` after the main-agent safety patch
+  settles. The report table and fail-open section should say target-refetch
+  uncertainty keeps known active locks retryable with runtime warnings and a
+  `runtime_failure` audit; no reopen queue event is created until ReviewLock can
+  load current content and safely attempt `unignoreReports()`. Also update the
+  test-evidence counts if the new focused regression is added.
+- Files reviewed: `docs/TRIGGER_PROOF.md`,
+  `src/server/services/reportTriggers.ts`, `src/server/services/reopenFlow.ts`.
+
+## 2026-05-26 13:27 IST - Finding
+
+- Severity: medium
+- Area: Reopened items with unresolved runtime warnings can still be dismissed
+  with no recovery step.
+- Evidence:
+  - Reopened events can carry `unignoreReports()` failure warnings after a
+    changed-content reopen: `src/server/services/reopenFlow.ts:215-232` builds
+    and queues the event with `unignoreResult.warnings`; the report-trigger path
+    follows the same shape.
+  - The dashboard now renders those warnings as `Needs attention`:
+    `src/client/components/ReopenQueue.ts:22-32`,
+    `src/client/components/ReopenQueue.ts:105-112`, and
+    `src/client/components/ReopenQueue.ts:132-138`.
+  - The same component still renders the normal dismiss confirmation for warned
+    events; `renderDismissAction()` does not inspect `event.runtimeWarnings`:
+    `src/client/components/ReopenQueue.ts:35-66`.
+  - The dismiss API removes the reopen item after recording a dismissal audit and
+    does not block or require a recovery action when `event.runtimeWarnings` is
+    non-empty: `src/routes/api.dashboard.ts:435-489`.
+- Why it matters: Rendering the warning is an improvement, but if
+  `unignoreReports()` failed, dismissing the reopen item can remove the only
+  moderator-facing task while Reddit may still be ignoring reports. That leaves
+  the app relying on a human seeing and acting on a warning with no ReviewLock
+  retry/recovery path, which is weaker than the safety story we want in the
+  final submission.
+- Suggested fix: Before final launch packaging, either block dismissals for
+  reopen events with unresolved runtime warnings or add a dedicated recovery
+  action that retries target refetch plus `unignoreReports()` and only allows
+  dismissal once the warning is resolved. At minimum, strengthen the confirmation
+  copy and server audit data for warned dismissals, and add a route/render
+  regression that a warned reopen cannot be silently dismissed like a clean
+  reopen.
+- Files reviewed: `src/server/services/reopenFlow.ts`,
+  `src/server/services/reportTriggers.ts`,
+  `src/client/components/ReopenQueue.ts`, `src/routes/api.dashboard.ts`.
+
+## 2026-05-26 13:31 IST - Finding
+
+- Severity: medium
+- Area: Runtime proof doc still describes the old report-refetch recovery
+  behavior.
+- Evidence:
+  - `docs/RUNTIME_PROOF.md:208-211` says report-trigger target resolution
+    failure was hardened by reopening known active locks as `runtime_uncertain`.
+  - The current report-trigger code keeps the known active lock active, appends
+    `target_resolution_failed`, writes a `runtime_failure` audit with
+    `active_lock_retry_required`, clears dedupe, and returns no reopen event:
+    `src/server/services/reportTriggers.ts:190-225`.
+  - The current focused regression asserts exactly that retryable active-lock
+    behavior and an empty reopen queue:
+    `src/server/services/reportTriggers.test.ts:313-342`.
+- Why it matters: `docs/RUNTIME_PROOF.md` is the primary claim-boundary source
+  for README and Devpost copy. If it still says ReviewLock reopens known locks
+  on target-refetch uncertainty, the final submission can end up citing a
+  behavior that no longer exists and describing the safety model incorrectly.
+- Suggested fix: Update the runtime failure/hardening bullet in
+  `docs/RUNTIME_PROOF.md` to match the current contract: known active locks stay
+  active and retryable with item-level runtime warnings until current content can
+  be loaded and ReviewLock can safely attempt `unignoreReports()`. Cross-link
+  the matching `docs/TRIGGER_PROOF.md` row once that doc is updated too.
+- Files reviewed: `docs/RUNTIME_PROOF.md`,
+  `src/server/services/reportTriggers.ts`,
+  `src/server/services/reportTriggers.test.ts`.
+
+## 2026-05-26 13:34 IST - Finding
+
+- Severity: medium
+- Area: Dashboard launch creates a new custom post every time instead of
+  reusing an existing dashboard.
+- Evidence:
+  - The dashboard launch form tells moderators it will create a visible custom
+    post and labels the action `Create dashboard post`:
+    `src/routes/menu.ts:172-188`.
+  - Every `/dashboard-launch-submit` call directly invokes
+    `deps.reddit.submitDashboardPost(...)` and then navigates to that new
+    permalink; there is no Redis lookup/write for an existing dashboard
+    permalink or post id: `src/routes/forms.ts:239-275`.
+  - The Reddit adapter maps that call to `submitCustomPost(...)`:
+    `src/server/adapters/reddit.ts:163-175`.
+  - The route test only proves one create-and-navigate call; it does not cover
+    idempotent reopen behavior or duplicate launch prevention:
+    `src/routes/forms.test.ts:318-333`.
+- Why it matters: Devpost requires an app listing and judges will likely try the
+  install/open flow more than once. Repeated `Open ReviewLock dashboard` clicks
+  can create multiple visible dashboard posts in a subreddit, which is noisy for
+  moderators and weakens the "close to publishable" installability story.
+- Suggested fix: Store the dashboard custom-post permalink/id in the subreddit
+  namespace after first creation and have subsequent dashboard launches navigate
+  to the existing dashboard when it is available. If Devvit cannot reliably
+  check whether the post still exists, keep a conservative "Create new dashboard
+  post" fallback, but make the normal path idempotent. Add a regression where
+  two `/dashboard-launch-submit` calls result in one `submitDashboardPost` call
+  and the second response navigates to the stored permalink.
+- Files reviewed: `src/routes/menu.ts`, `src/routes/forms.ts`,
+  `src/server/adapters/reddit.ts`, `src/routes/forms.test.ts`.
+
+## 2026-05-26 13:37 IST - Integration Status
+
+- The missing report-trigger audit-failure regression from the 13:19 execution
+  packet has been added and is focused-test green.
+- Validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts --reporter verbose`
+    PASS, 1 file / 34 tests.
+- The stale `docs/TRIGGER_PROOF.md` finding from 13:24 appears resolved in the
+  current worktree: the report table and fail-open section now say known active
+  locks stay active/retryable on target-refetch uncertainty.
+- Still open from this reviewer pass:
+  - `docs/RUNTIME_PROOF.md` still says report-refetch uncertainty reopens known
+    active locks, so the primary claim-boundary doc still needs cleanup.
+  - Reopened items with unresolved runtime warnings can still be dismissed with
+    no recovery step.
+  - Dashboard launch still creates a new custom post on every submit instead of
+    reusing an existing dashboard.
+  - Submission docs and README rewrite are still absent.
+
+## 2026-05-26 13:39 IST - Finding
+
+- Severity: medium
+- Area: Successful retry after transient report-refetch failure leaves stale
+  active-lock warning.
+- Evidence:
+  - The refetch-failure path adds `target_resolution_failed` to the active lock
+    runtime warnings: `src/server/services/reportTriggers.ts:196-200`.
+  - A later successful unchanged-content retry calls `incrementLockSuppression()`
+    with the original lock object; that helper increments counters but preserves
+    existing `runtimeWarnings`: `src/server/services/reportTriggers.ts:297-305`
+    and `src/server/services/locks.ts:124-135`.
+  - The new audit-failure retry regression verifies the retry succeeds but does
+    not assert the warning is cleared after recovery:
+    `src/server/services/reportTriggers.test.ts:871-891`.
+  - Active locks render runtime warnings as `Needs attention`, so the stale
+    warning remains moderator-visible: `src/client/components/LockTable.ts:84`.
+- Why it matters: Keeping the lock active on target-refetch uncertainty is the
+  right safety behavior, but once the exact same report delivery retries and
+  successfully suppresses unchanged content, the recovery has completed. Leaving
+  `target_resolution_failed` on the active lock can make the dashboard continue
+  showing a resolved transient failure as an unresolved attention item, which
+  weakens the proof/status story during final judging.
+- Suggested fix: On a successful retry after target resolution recovers, remove
+  resolved transient warnings such as `target_resolution_failed` from the active
+  lock while preserving non-transient warnings like failed moderation operations.
+  Add a regression where the first delivery records `target_resolution_failed`,
+  the retry resolves the target and suppresses unchanged content, and the active
+  lock no longer renders that warning.
+- Files reviewed: `src/server/services/reportTriggers.ts`,
+  `src/server/services/locks.ts`,
+  `src/server/services/reportTriggers.test.ts`,
+  `src/client/components/LockTable.ts`.

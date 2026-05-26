@@ -178,3 +178,6 @@
 - [x] Centralize client render escaping, date labels, token labels, and thing-id display helpers.
 - [x] Recheck live Zen WebView audit timeline formatting on playtest `v0.0.2.317`.
 - [x] Require target and lock evidence before audit-derived trigger proof reconciliation.
+- [x] Keep runtime-uncertain report/update refetch failures retryable with active lock warnings.
+- [x] Clear report-trigger dedupe markers when retryable runtime-failure audit persistence fails.
+- [x] Rework audit timeline detail rows and verify desktop/mobile browser screenshots.

@@ -212,7 +212,7 @@ describe('report trigger routes', () => {
     expect(serialized).not.toContain('private report reason');
   });
 
-  it('uses wrapped report subreddit for fail-open reopen when refetch fails', async () => {
+  it('uses wrapped report subreddit for retryable runtime uncertainty when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
     const router = createReportTriggersRouter({
@@ -235,11 +235,12 @@ describe('report trigger routes', () => {
     expect(await response.json()).toMatchObject({
       ok: false,
       action: 'runtime_uncertain',
-      reopenEvent: { reason: 'runtime_uncertain' },
     });
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ reason: 'runtime_uncertain' }),
-    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
   });
 
   it('accepts Devvit TriggerEvent-wrapped comment report payloads', async () => {

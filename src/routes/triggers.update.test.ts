@@ -4,7 +4,7 @@ import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockRecord, ReviewLockTarget } from '../shared/schema';
 import { fingerprintTarget } from '../server/services/fingerprint';
-import { saveLock } from '../server/services/locks';
+import { getActiveLockByTarget, saveLock } from '../server/services/locks';
 import { listOpenReopenEvents } from '../server/services/reopenQueue';
 import { loadRuntimeProofStatus } from '../server/services/runtimeProof';
 import { createUpdateTriggersRouter } from './triggers.update';
@@ -201,7 +201,7 @@ describe('update trigger routes', () => {
     expect(serialized).not.toContain('private previous body');
   });
 
-  it('uses Devvit top-level subreddit object for fail-open reopen when refetch fails', async () => {
+  it('uses Devvit top-level subreddit object for retryable runtime uncertainty when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
     const router = createUpdateTriggersRouter({
@@ -218,16 +218,17 @@ describe('update trigger routes', () => {
     });
 
     expect(await response.json()).toMatchObject({
-      ok: true,
+      ok: false,
       action: 'runtime_uncertain',
-      event: { reason: 'runtime_uncertain' },
     });
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ reason: 'runtime_uncertain' }),
-    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
   });
 
-  it('uses wrapped update subreddit for fail-open reopen when refetch fails', async () => {
+  it('uses wrapped update subreddit for retryable runtime uncertainty when refetch fails', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
     const router = createUpdateTriggersRouter({
@@ -248,13 +249,14 @@ describe('update trigger routes', () => {
     });
 
     expect(await response.json()).toMatchObject({
-      ok: true,
+      ok: false,
       action: 'runtime_uncertain',
-      event: { reason: 'runtime_uncertain' },
     });
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ reason: 'runtime_uncertain' }),
-    ]);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
   });
 
   it('accepts comment update payloads and reopens changed comments', async () => {

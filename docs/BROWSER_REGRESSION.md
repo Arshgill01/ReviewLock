@@ -156,3 +156,27 @@ live-mobile-current: ok screenshot=/Users/arshdeepsingh/Developer/ReviewLock/out
 
 Result: PASS for the current dashboard bundle. This remains local browser proof
 with mocked API responses, not live Reddit trigger proof.
+
+## Audit Timeline Layout Recheck
+
+After the audit timeline detail-row fix, a local browser render was checked with
+representative long target and lock ids matching the live Reddit embed issue.
+
+Commands:
+
+- `npx vite --host 127.0.0.1 --port 5197`
+- `agent-browser --session reviewlock-audit open 'http://127.0.0.1:5197/?subreddit=reviewlock_dev&demo=false'`
+- `agent-browser --session reviewlock-audit eval --stdin`
+- `agent-browser --session reviewlock-audit screenshot output/playwright/audit-timeline-layout-fixed.png`
+- `agent-browser --session reviewlock-audit set viewport 420 720`
+- `agent-browser --session reviewlock-audit screenshot output/playwright/audit-timeline-layout-fixed-mobile.png`
+
+Generated screenshot paths:
+
+- `output/playwright/audit-timeline-layout-fixed.png`
+- `output/playwright/audit-timeline-layout-fixed-mobile.png`
+
+Result: PASS. The audit timestamp, kind, actor, message, target, lock, and
+reason fields render as separate rows without overlap at desktop width and at a
+420px mobile viewport. This was local browser proof of the client CSS/markup,
+not live Reddit WebView proof.

@@ -1,6 +1,6 @@
 # Trigger Proof
 
-Last updated: 2026-05-25 23:07 IST.
+Last updated: 2026-05-26 13:25 IST.
 
 This document traces every ReviewLock trigger path from incoming payload to target resolution, lock decision, moderation operation, Redis mutation, metrics, audit, and reopen queue effects.
 
@@ -46,7 +46,7 @@ names, or report reason text.
 | PostReport changed locked post                | `postId: t3_post`, current post fingerprint differs                           | `reopen_changed`                                       | `unignoreReports:t3_post`       | Lock becomes `reopened`; active target index removed; `reopenReason: content_changed`          | Daily `locksReopened +1`; target `locksReopened +1`         | `lock_reopened` with report-trigger message                      | Event with `reason: content_changed`          |
 | CommentReport changed locked comment          | `commentId: t1_comment`, current comment fingerprint differs                  | `reopen_changed`                                       | `unignoreReports:t1_comment`    | Lock becomes `reopened`; active target index removed; `reopenReason: content_changed`          | Daily `locksReopened +1`; target `locksReopened +1`         | `lock_reopened` with `targetKind: comment`                       | Event with `reason: content_changed`          |
 | Target cannot be loaded, no subreddit scope   | Payload identifies a target absent from Reddit adapter and no subreddit scope | `runtime_uncertain`                                    | None                            | Any active lock remains retryable because no namespace can be proven                           | No suppression metric                                       | `runtime_failure`                                                | No event                                      |
-| Target cannot be loaded, known active lock    | Payload identifies a target absent from Reddit adapter with subreddit scope    | `runtime_uncertain`                                    | None                            | Known lock becomes `reopened`; active target index removed; `reopenReason: runtime_uncertain`  | No suppression metric                                       | `lock_reopened` with `unignoreReportsOk: false`                  | Event with `reason: runtime_uncertain`       |
+| Target cannot be loaded, known active lock    | Payload identifies a target absent from Reddit adapter with subreddit scope    | `runtime_uncertain`                                    | None                            | Known lock remains `active` with `target_resolution_failed` warning so `unignoreReports()` can be retried later | No suppression metric                                       | `runtime_failure` with `recovery: active_lock_retry_required`     | No event                                      |
 | `ignoreReports()` fails                       | Active unchanged lock but moderation operation throws                         | `runtime_uncertain`                                    | Failed `ignoreReports` call     | Lock remains `active`; no suppression mutation                                                 | No suppression metric                                       | `runtime_failure`                                                | No event                                      |
 
 ### Controlled Live PostReport Evidence
@@ -77,6 +77,7 @@ Verified on 2026-05-25 in `r/reviewlock_dev` against locked dashboard post
 | PostNsfwUpdate material change     | `postId: t3_post`, NSFW flag differs                | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: nsfw_changed`                                 | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: nsfw_changed`    |
 | PostSpoilerUpdate material change  | `postId: t3_post`, spoiler flag differs             | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: spoiler_changed`                              | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: spoiler_changed` |
 | PostFlairUpdate material change    | `postId: t3_post`, flair differs                    | `reopened`  | `unignoreReports:t3_post`    | Lock becomes `reopened`; `reopenReason: flair_changed`                                | Daily and target `locksReopened +1`                 | `lock_reopened`                            | Event with `reason: flair_changed`   |
+| Target cannot be loaded, known active lock | Payload identifies an active lock but current content cannot be refetched | `runtime_uncertain` | None | Lock remains `active` with `target_resolution_failed` warning | No metric | `runtime_failure` with `recovery: active_lock_retry_required` | No event |
 
 ### Controlled Live PostUpdate Evidence
 
@@ -127,14 +128,17 @@ Verified on 2026-05-25 in `r/reviewlock_dev` against locked proof comment
 No trigger path suppresses reports when ReviewLock cannot prove the current content fingerprint matches the reviewed fingerprint.
 
 - Missing target resolution records a runtime failure and leaves reports unsuppressed.
-- Missing target resolution with a known active lock reopens that lock as
-  `runtime_uncertain` so it cannot continue suppressing reports after content
-  integrity becomes unknowable.
+- Missing target resolution with a known active lock keeps that lock active,
+  adds `target_resolution_failed`, and writes a runtime-failure audit. ReviewLock
+  does not queue a `runtime_uncertain` reopen until it can refetch the target and
+  safely attempt `unignoreReports()`.
 - `ignoreReports()` failure records a runtime failure and leaves the lock active without counting suppression.
 - Redis failure after `ignoreReports()` attempts `unignoreReports()` rollback,
   records the moderation result in runtime proof, and writes a rollback
   `runtime_failure` audit event if rollback fails and Redis is still available.
-- Changed or uncertain content reopens instead of suppressing.
+- Changed content reopens instead of suppressing. Uncertain target refetch keeps
+  known locks retryable rather than claiming a reopen without report-restoration
+  proof.
 - Runtime-uncertain report-trigger deliveries clear their dedupe marker so a
   Devvit retry with the same event id can reprocess the target.
 - Successful report-trigger dedupe markers expire after seven days to avoid
@@ -154,9 +158,10 @@ Commands:
 Targeted test result:
 
 - 4 files passed.
-- Report trigger service coverage now includes 20 report-trigger tests, including
-  dedupe TTL, retry after runtime-uncertain failures, and rollback failure
-  evidence after Redis write failures.
+- Report trigger service coverage now includes 34 report-trigger tests, including
+  dedupe TTL, retry after runtime-uncertain failures, retry after runtime-failure
+  audit persistence failure, and rollback failure evidence after Redis write
+  failures.
 - Trigger route coverage includes Devvit wrapper payloads, bare post/comment id
   normalization before target resolution, and sanitized payload-shape logging
   that rejects raw ids, content, subreddit names, and report reason text.

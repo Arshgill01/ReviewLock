@@ -2366,3 +2366,47 @@ Reason:
   cannot identify the reviewed target and lock involved in the suppression or
   reopen. Runtime proof is judge-facing evidence, so reconciliation must require
   a concrete moderation loop artifact rather than just an event kind.
+
+### D133 - Target-refetch uncertainty keeps active locks retryable
+
+Report and update triggers can receive a known locked target id while Reddit
+target refetch is temporarily unavailable.
+
+Decision:
+
+- Keep the active lock in place when a known locked target cannot be refetched.
+- Add `target_resolution_failed` to the active lock runtime warnings.
+- Write a `runtime_failure` audit with `recovery: active_lock_retry_required`
+  when Redis is available.
+- Do not enqueue a `runtime_uncertain` reopen event until ReviewLock can load
+  current content and safely attempt `unignoreReports()`.
+- Clear report-trigger dedupe markers on all runtime-uncertain exits so Devvit
+  can retry the same delivery.
+
+Reason:
+
+- Reopening without a target can remove ReviewLock's active-lock recovery path
+  before reports have been returned to normal Reddit handling. Keeping the lock
+  active with a warning is the safer moderator-useful state: it preserves
+  visibility, preserves retry paths, and avoids claiming an edit-break reopen
+  that could not actually restore report handling.
+
+### D134 - Audit timeline details render as labeled rows
+
+The audit ledger appears inside Reddit's embedded app surface and can include
+long target ids, lock ids, timestamps, actors, and runtime failure details.
+
+Decision:
+
+- Render each audit entry with a fixed timestamp lane and a flexible content
+  lane on desktop/tablet widths.
+- Render target, lock, operation, error, and reason as labeled detail rows
+  under the audit message.
+- Collapse the timeline to a single-column row on narrow mobile widths.
+
+Reason:
+
+- The previous wrapped metadata row could look readable in isolated HTML tests
+  while still overlapping in the Reddit embed. Labeled detail rows keep the
+  proof ledger scan-friendly and prevent long ids from competing with the
+  audit message.

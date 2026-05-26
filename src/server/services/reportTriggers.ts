@@ -71,6 +71,10 @@ const reportAuditId = (
   subjectId: string,
 ): string => `${prefix}-${Date.parse(now)}-${safeIdPart(subjectId)}-${auditIdPart(input, now)}`;
 
+const mergeRuntimeWarnings = (existing: string[], added: string[]): string[] => [
+  ...new Set([...existing, ...added]),
+];
+
 const REPORT_DEDUPE_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export const buildReopenFromReportDecision = (
@@ -89,26 +93,6 @@ export const buildReopenFromReportDecision = (
   reason: 'content_changed',
   createdAt: now,
   summary: 'Report arrived after the reviewed content changed.',
-  runtimeWarnings: warnings,
-  demo: lock.demo,
-});
-
-const buildRuntimeUncertainReopenFromReportFailure = (
-  lock: ReviewLockRecord,
-  input: ReportTriggerInput,
-  now: string,
-  warnings: string[],
-): ReopenEvent => ({
-  id: `reopen-${lock.id}-runtime-${Date.parse(now)}-${auditIdPart(input, now)}`,
-  lockId: lock.id,
-  subreddit: lock.subreddit,
-  targetId: lock.targetId,
-  targetKind: lock.targetKind,
-  oldContentHash: lock.contentHash,
-  newContentHash: 'runtime_uncertain',
-  reason: 'runtime_uncertain',
-  createdAt: now,
-  summary: 'Report arrived, but ReviewLock could not verify current content.',
   runtimeWarnings: warnings,
   demo: lock.demo,
 });
@@ -210,22 +194,13 @@ export const handleReportTrigger = async (
 
           if (lock) {
             const warnings = ['target_resolution_failed'];
-            const reopenEvent = buildRuntimeUncertainReopenFromReportFailure(
-              lock,
-              input,
-              now,
-              warnings,
-            );
-            await enqueueReopenEvent(deps.redis, reopenEvent);
-            await markLockReopenedAfterQueue(deps.redis, lock, {
-              reopenedAt: now,
-              reopenReason: 'runtime_uncertain',
-              reopenEventId: reopenEvent.id,
-              runtimeWarnings: [...lock.runtimeWarnings, ...warnings],
+            await updateLock(deps.redis, {
+              ...lock,
+              runtimeWarnings: mergeRuntimeWarnings(lock.runtimeWarnings, warnings),
             });
             await appendAuditEvent(deps.redis, {
-              id: reportAuditId('audit-report-runtime-reopened', input, now, lock.id),
-              kind: 'lock_reopened',
+              id: reportAuditId('audit-report-runtime-active', input, now, lock.id),
+              kind: 'runtime_failure',
               subreddit: lock.subreddit,
               targetId: lock.targetId,
               targetKind: lock.targetKind,
@@ -233,17 +208,21 @@ export const handleReportTrigger = async (
               actor: 'reviewlock',
               createdAt: now,
               message:
-                'Report trigger reopened the lock because current content could not be loaded.',
-              data: { reason: 'target_resolution_failed', unignoreReportsOk: false },
+                'Report trigger could not load current content; active lock kept for retry.',
+              data: {
+                error: resolution.error,
+                reason: 'target_resolution_failed',
+                recovery: 'active_lock_retry_required',
+              },
               demo: lock.demo,
             });
+            await clearDedupe(deps.redis, dedupeInput, now);
 
             return {
               ok: false,
               action: 'runtime_uncertain',
               message:
-                'Current target could not be loaded; lock reopened because content integrity was uncertain.',
-              reopenEvent,
+                'Current target could not be loaded; active lock kept so moderators can retry restoring report handling.',
               warnings,
             };
           }

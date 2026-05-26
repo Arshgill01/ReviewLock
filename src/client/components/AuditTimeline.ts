@@ -1,14 +1,21 @@
 import type { AuditEvent } from '../../shared/schema';
 import { escapeAttr, escapeText, formatLocalDateTime, labelFromToken } from '../utils/format';
 
-const auditDetails = (event: AuditEvent): string[] =>
+type AuditDetail = {
+  label: string;
+  value: string;
+};
+
+const auditDetails = (event: AuditEvent): AuditDetail[] =>
   [
-    event.targetId ? `Target ${event.targetKind ?? 'target'} ${event.targetId}` : undefined,
-    event.lockId ? `Lock ${event.lockId}` : undefined,
-    event.data.operation ? `Operation ${String(event.data.operation)}` : undefined,
-    event.data.error ? `Error ${String(event.data.error)}` : undefined,
-    event.data.reason ? `Reason ${String(event.data.reason)}` : undefined,
-  ].filter((detail): detail is string => Boolean(detail));
+    event.targetId
+      ? { label: 'Target', value: `${event.targetKind ?? 'target'} ${event.targetId}` }
+      : undefined,
+    event.lockId ? { label: 'Lock', value: event.lockId } : undefined,
+    event.data.operation ? { label: 'Operation', value: String(event.data.operation) } : undefined,
+    event.data.error ? { label: 'Error', value: String(event.data.error) } : undefined,
+    event.data.reason ? { label: 'Reason', value: String(event.data.reason) } : undefined,
+  ].filter((detail): detail is AuditDetail => Boolean(detail));
 
 const renderAuditDetails = (event: AuditEvent): string => {
   const details = auditDetails(event);
@@ -17,7 +24,20 @@ const renderAuditDetails = (event: AuditEvent): string => {
     return '';
   }
 
-  return `<p class="audit-details">${escapeText(details.join(' · '))}</p>`;
+  return `
+    <dl class="audit-details">
+      ${details
+        .map(
+          (detail) => `
+            <div class="audit-detail">
+              <dt>${escapeText(detail.label)}</dt>
+              <dd>${escapeText(detail.value)}</dd>
+            </div>
+          `,
+        )
+        .join('')}
+    </dl>
+  `;
 };
 
 export const renderAuditTimeline = (events: AuditEvent[]): string => {
@@ -30,20 +50,20 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
         createdAt,
         event.actor,
         event.message,
-        ...details,
+        ...details.map((detail) => `${detail.label} ${detail.value}`),
       ].join(' · ');
 
       return `
         <li class="audit-row" aria-label="${escapeAttr(summary)}">
-          <div class="audit-row-header">
-            <strong class="audit-kind">${labelFromToken(event.kind)}</strong>
-            <span class="audit-meta">
-              <time datetime="${escapeAttr(event.createdAt)}">${createdAt}</time>
-              <span>${escapeText(event.actor)}</span>
-            </span>
+          <time class="audit-time" datetime="${escapeAttr(event.createdAt)}">${createdAt}</time>
+          <div class="audit-row-body">
+            <div class="audit-row-header">
+              <strong class="audit-kind">${labelFromToken(event.kind)}</strong>
+              <span class="audit-actor">${escapeText(event.actor)}</span>
+            </div>
+            <p class="audit-message">${escapeText(event.message)}</p>
+            ${renderAuditDetails(event)}
           </div>
-          <p class="audit-message">${escapeText(event.message)}</p>
-          ${renderAuditDetails(event)}
         </li>
       `;
     })

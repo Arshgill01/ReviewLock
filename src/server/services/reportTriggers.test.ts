@@ -310,7 +310,7 @@ describe('handleReportTrigger', () => {
     expect(await listAuditEvents(dependencies.redis, 'alpha')).toHaveLength(1);
   });
 
-  it('fails open when Reddit refetch throws while a locked report target is known', async () => {
+  it('keeps runtime-uncertain report refetch failures retryable while a locked target is known', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());
 
@@ -328,13 +328,12 @@ describe('handleReportTrigger', () => {
       action: 'runtime_uncertain',
       warnings: ['target_resolution_failed'],
     });
-    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({
-        reason: 'runtime_uncertain',
-        runtimeWarnings: ['target_resolution_failed'],
-      }),
-    ]);
+    expect(result.reopenEvent).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
     expect(await loadRuntimeProofStatus(redis, 'alpha')).toMatchObject({
       capabilities: expect.arrayContaining([
         expect.objectContaining({ name: 'postReportTrigger', status: 'unverified' }),
@@ -799,7 +798,7 @@ describe('handleReportTrigger', () => {
     });
   });
 
-  it('reopens as runtime uncertain when a report target cannot be loaded but the active lock is known', async () => {
+  it('keeps the active lock retryable when a report target cannot be loaded but the lock is known', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter();
     await saveLock(redis, lock());
@@ -814,19 +813,73 @@ describe('handleReportTrigger', () => {
 
     expect(result).toMatchObject({ ok: false, action: 'runtime_uncertain' });
     expect(reddit.calls).toEqual([]);
-    expect(result.reopenEvent).toMatchObject({ reason: 'runtime_uncertain' });
-    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
-    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
-      status: 'reopened',
-      reopenReason: 'runtime_uncertain',
+    expect(result.reopenEvent).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
       runtimeWarnings: ['target_resolution_failed'],
     });
-    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ reason: 'runtime_uncertain' }),
-    ]);
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([]);
     expect(await listAuditEvents(redis, 'alpha')).toEqual([
-      expect.objectContaining({ kind: 'lock_reopened' }),
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        data: expect.objectContaining({ recovery: 'active_lock_retry_required' }),
+      }),
     ]);
+  });
+
+  it('clears report dedupe when retryable target resolution audit persistence fails', async () => {
+    class RuntimeAuditFailingRedisStore extends InMemoryRedisStore {
+      override async set(key: string, value: string): Promise<void> {
+        if (key.includes(':audit:audit-report-runtime-active')) {
+          throw new Error('runtime audit down');
+        }
+
+        await super.set(key, value);
+      }
+    }
+
+    const redis = new RuntimeAuditFailingRedisStore();
+    const reddit = new FakeRedditAdapter();
+    await saveLock(redis, lock());
+
+    const first = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-runtime-audit-fail', subreddit: 'alpha' },
+    );
+
+    expect(first).toMatchObject({
+      ok: false,
+      action: 'runtime_uncertain',
+      warnings: ['redis_write_failed'],
+    });
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-runtime-audit-fail')).toBe(
+      false,
+    );
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+
+    reddit.setTarget(target());
+    const retry = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-runtime-audit-fail', subreddit: 'alpha' },
+    );
+
+    expect(retry).toMatchObject({ ok: true, action: 'suppress_unchanged' });
+    expect(reddit.calls).toEqual(['ignoreReports:t3_post']);
   });
 
   it('does not keep a dedupe marker after target resolution fails without enough scope to find a lock', async () => {

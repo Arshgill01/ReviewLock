@@ -9,7 +9,12 @@ import type {
 } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { compareFingerprints, fingerprintTarget } from './fingerprint';
-import { getActiveLockByTarget, removeActiveLockIndexes, updateLockStatus } from './locks';
+import {
+  getActiveLockByTarget,
+  removeActiveLockIndexes,
+  updateLock,
+  updateLockStatus,
+} from './locks';
 import { incrementReopenedMetric } from './metrics';
 import { unignoreReportsForReviewLock } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
@@ -75,6 +80,10 @@ const buildReopenEvent = (
   runtimeWarnings: warnings,
   demo: lock.demo,
 });
+
+const mergeRuntimeWarnings = (existing: string[], added: string[]): string[] => [
+  ...new Set([...existing, ...added]),
+];
 
 const markLockReopenedAfterQueue = async (
   redis: RedisStore,
@@ -148,6 +157,40 @@ export const breakLockForChangedContent = async (
         ? fingerprintComparison(lock, resolution.target)
         : 'uncertain';
 
+      if (comparison === 'uncertain') {
+        const warnings = ['target_resolution_failed'];
+        await updateLock(deps.redis, {
+          ...lock,
+          runtimeWarnings: mergeRuntimeWarnings(lock.runtimeWarnings, warnings),
+        });
+        await appendAuditEvent(deps.redis, {
+          id: `audit-update-runtime-active-${Date.parse(now)}-${lock.id}`,
+          kind: 'runtime_failure',
+          subreddit: lock.subreddit,
+          targetId: lock.targetId,
+          targetKind: lock.targetKind,
+          lockId: lock.id,
+          actor: 'reviewlock',
+          createdAt: now,
+          message:
+            'Update trigger could not load current content; active lock kept for retry.',
+          data: {
+            reason: 'target_resolution_failed',
+            triggerCapabilityName: input.triggerCapabilityName,
+            recovery: 'active_lock_retry_required',
+          },
+          demo: lock.demo,
+        });
+
+        return {
+          ok: false,
+          action: 'runtime_uncertain',
+          message:
+            'Current target could not be loaded; active lock kept so moderators can retry restoring report handling.',
+          warnings,
+        };
+      }
+
       if (comparison === 'unchanged') {
         return {
           ok: true,
@@ -157,21 +200,28 @@ export const breakLockForChangedContent = async (
         };
       }
 
-      const reason =
-        comparison === 'uncertain' ? 'runtime_uncertain' : (input.reasonHint ?? 'content_changed');
-      const unignoreResult = resolution.target
-        ? await unignoreReportsForReviewLock(deps.reddit, resolution.target)
-        : undefined;
-      if (unignoreResult) {
-        await recordModerationOperationStatus(
-          deps.redis,
-          lock.subreddit,
-          unignoreResult,
-          now,
-        ).catch(() => undefined);
+      const currentTarget = resolution.target;
+
+      if (!currentTarget) {
+        return {
+          ok: false,
+          action: 'runtime_uncertain',
+          message:
+            'Current target could not be loaded; active lock kept so moderators can retry restoring report handling.',
+          warnings: ['target_resolution_failed'],
+        };
       }
-      const warnings = unignoreResult?.warnings ?? ['target_resolution_failed'];
-      const event = buildReopenEvent(lock, resolution.target, reason, now, warnings);
+
+      const reason = input.reasonHint ?? 'content_changed';
+      const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, currentTarget);
+      await recordModerationOperationStatus(
+        deps.redis,
+        lock.subreddit,
+        unignoreResult,
+        now,
+      ).catch(() => undefined);
+      const warnings = unignoreResult.warnings;
+      const event = buildReopenEvent(lock, currentTarget, reason, now, warnings);
 
       await enqueueReopenEvent(deps.redis, event);
       await markLockReopenedAfterQueue(deps.redis, lock, {
@@ -182,9 +232,7 @@ export const breakLockForChangedContent = async (
       });
 
       try {
-        if (resolution.target) {
-          await incrementReopenedMetric(deps.redis, resolution.target, now, lock.demo);
-        }
+        await incrementReopenedMetric(deps.redis, currentTarget, now, lock.demo);
 
         await appendAuditEvent(deps.redis, {
           id: `audit-update-reopened-${Date.parse(now)}-${lock.id}`,
@@ -199,7 +247,7 @@ export const breakLockForChangedContent = async (
           data: {
             reason,
             triggerCapabilityName: input.triggerCapabilityName,
-            unignoreReportsOk: unignoreResult?.ok ?? false,
+            unignoreReportsOk: unignoreResult.ok,
           },
           demo: lock.demo,
         });
@@ -232,7 +280,7 @@ export const breakLockForChangedContent = async (
         };
       }
 
-      if (resolution.target && unignoreResult?.ok) {
+      if (unignoreResult.ok) {
         await recordUpdateTriggerProcessed(
           deps,
           lock.subreddit,
@@ -244,11 +292,8 @@ export const breakLockForChangedContent = async (
 
       return {
         ok: true,
-        action: comparison === 'uncertain' ? 'runtime_uncertain' : 'reopened',
-        message:
-          comparison === 'uncertain'
-            ? 'Lock reopened because current content could not be verified.'
-            : 'Lock reopened because reviewed content changed.',
+        action: 'reopened',
+        message: 'Lock reopened because reviewed content changed.',
         event,
         warnings,
       };
