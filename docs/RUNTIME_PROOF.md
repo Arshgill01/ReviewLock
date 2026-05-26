@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-26 15:44 IST.
+Last updated: 2026-05-26 15:46 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -20,13 +20,15 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, logged in as `u/BrightyBrainiac`.
 - `npx devvit view --json`
   - Result: PASS, app `reviewlock` exists, install count is `1`, owner is
-    `BrightyBrainiac`, versions count is `351`.
-  - Latest listing check at 2026-05-26 15:40 IST showed current uploaded version
-    `0.0.2`, uploaded `2026-05-24T13:13:58.832Z`.
-  - Listing blocker: `app.description`, `marketingInfo`, `privacyPolicy`, and
-    `termsAndConditions` are still empty, and `version.about` still contains
-    the old short README. A final upload/listing pass is still required before
-    Devpost submission.
+    `BrightyBrainiac`, versions count is `352`.
+  - Latest upload completed through `npm run deploy` on 2026-05-26 15:46 IST.
+  - Latest listing check after upload showed current uploaded version `0.0.3`,
+    uploaded `2026-05-26T10:16:14.709Z`, with `version.about` populated from
+    the launch-grade README.
+  - Remaining listing blocker: `app.description`, `marketingInfo`,
+    `privacyPolicy`, and `termsAndConditions` are still empty. If the Developer
+    Portal exposes those fields separately from `devvit upload`, fill them from
+    `docs/APP_LISTING.md` before Devpost submission.
 - `npm run dev -- reviewlock_dev`
   - Result: PASS, playtest served `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.
   - Latest observed hot reload in the Wave 31 live WebView smoke pass: `v0.0.2.6`.

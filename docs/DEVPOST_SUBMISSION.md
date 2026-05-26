@@ -19,10 +19,11 @@ Source requirements checked:
 Submission status:
 
 - App listing URL exists: `https://developers.reddit.com/apps/reviewlock`
-- Developer Portal listing still needs a final upload/listing pass before
-  submission. `npx devvit view --json` on 2026-05-26 showed an empty app
-  description, empty marketing info, empty privacy/terms fields, and an uploaded
-  version about section that still contained the old short README.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.3`; `npx devvit view
+  --json` showed `version.about` populated from the launch-grade README.
+- Developer Portal app-level metadata still needs a final listing pass before
+  submission if editable: `app.description`, `marketingInfo`, `privacyPolicy`,
+  and `termsAndConditions` are still empty in the CLI response.
 - Public judging post still needs final confirmation after the final upload.
 
 ## Submission Fields

@@ -6378,3 +6378,28 @@
   - `docs/RUNTIME_PROOF.md`
   - `docs/CLAIM_COPY_AUDIT.md`
   - fresh `npx devvit view --json` output
+
+## 2026-05-26 15:46 IST - Validation Status
+
+- Ran non-public upload path:
+  - `npm run deploy`
+  - PASS.
+  - The script ran `npm run type-check`, `npm run lint`, `npm run test`, and
+    `devvit upload`.
+  - Test gate during deploy: 43 files / 419 tests.
+  - Devvit upload auto-bumped the uploaded app version to `0.0.3`.
+- Verified listing after upload:
+  - `npx devvit view --json`
+  - PASS.
+  - App id `5201a616-7c35-48d6-a030-743e41456e69`, slug `reviewlock`, owner
+    `BrightyBrainiac`, install count `1`, versions count `352`.
+  - Uploaded version `0.0.3`, uploaded `2026-05-26T10:16:14.709Z`.
+  - `version.about` now contains the launch-grade README, so the old short
+    README stub is no longer the uploaded about text.
+- Remaining listing blocker:
+  - `app.description`, `marketingInfo`, `privacyPolicy`, and
+    `termsAndConditions` are still empty in the CLI response.
+  - Use `docs/APP_LISTING.md` if the Developer Portal exposes those fields for
+    manual editing before Devpost submission.
+- Safety note:
+  - This was an upload, not public publish. No `devvit publish` command was run.

@@ -4,13 +4,15 @@ Last updated: 2026-05-26.
 
 Target listing: `https://developers.reddit.com/apps/reviewlock`
 
-Current listing blocker:
+Current listing state:
 
-- `npx devvit view --json` on 2026-05-26 returned empty `app.description`,
-  empty `marketingInfo`, empty `privacyPolicy`, empty `termsAndConditions`, and
-  an uploaded version `about` section containing the old short README.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.3`.
+- `npx devvit view --json` after that upload returned `version.about` populated
+  from the launch-grade README.
+- App-level `description`, `marketingInfo`, `privacyPolicy`, and
+  `termsAndConditions` are still empty in the CLI response.
 - Treat this file as ready-to-use listing copy. It is not proof that the
-  Developer Portal listing has been updated.
+  remaining Developer Portal listing fields have been updated.
 
 ## Short Description
 
@@ -140,11 +142,12 @@ Suggested category framing:
 - [ ] Run `npm run build`.
 - [ ] Run `devvit upload` only after the local gate passes.
 - [ ] Run `npx devvit view --json`.
-- [ ] Confirm `app.description` is no longer empty.
 - [ ] Confirm `version.about` contains the updated README/listing copy.
+- [ ] Confirm `app.description` is no longer empty, or confirm the current
+  Developer Portal workflow does not expose this field for manual editing before
+  public submission.
 - [ ] Confirm `marketingInfo`, privacy, and terms fields are either populated
   or intentionally left unavailable by the current Developer Portal workflow.
 - [ ] Confirm the app listing URL opens: `https://developers.reddit.com/apps/reviewlock`.
 - [ ] Confirm the public judging post URL works in a public subreddit with
   fewer than 200 members.
-
