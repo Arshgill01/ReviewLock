@@ -24,35 +24,91 @@ export const createDemoApiRouter = (deps: RouteDeps = {}): Hono => {
 
   router.get('/demo/status', async (context) => {
     if (!deps.redis) {
-      return context.json({ ok: false, demo: true, error: 'Redis adapter is not configured.', requestId: requestId() }, 503);
+      return context.json(
+        {
+          ok: false,
+          demo: true,
+          error: 'Redis adapter is not configured.',
+          requestId: requestId(),
+        },
+        503,
+      );
     }
 
     const subreddit = context.req.query('subreddit') ?? DEMO_SUBREDDIT;
-    return context.json({ ok: true, demo: true, status: await getDemoModeStatus(deps.redis, subreddit) });
+    return context.json({
+      ok: true,
+      demo: true,
+      status: await getDemoModeStatus(deps.redis, subreddit),
+    });
   });
 
   router.post('/demo/enable', async (context) => {
     if (!configured(deps)) {
-      return context.json({ ok: false, demo: true, error: 'Demo dependencies are not configured.', requestId: requestId() }, 503);
+      return context.json(
+        {
+          ok: false,
+          demo: true,
+          error: 'Demo dependencies are not configured.',
+          requestId: requestId(),
+        },
+        503,
+      );
     }
 
-    return context.json({ ok: true, demo: true, status: await enableDemoMode(deps.redis, deps.clock.now()) });
+    return context.json({
+      ok: true,
+      demo: true,
+      status: await enableDemoMode(deps.redis, deps.clock.now()),
+    });
   });
 
   router.post('/demo/reset', async (context) => {
     if (!configured(deps)) {
-      return context.json({ ok: false, demo: true, error: 'Demo dependencies are not configured.', requestId: requestId() }, 503);
+      return context.json(
+        {
+          ok: false,
+          demo: true,
+          error: 'Demo dependencies are not configured.',
+          requestId: requestId(),
+        },
+        503,
+      );
     }
 
-    return context.json({ ok: true, demo: true, status: await resetDemoMode(deps.redis, deps.clock.now()) });
+    return context.json({
+      ok: true,
+      demo: true,
+      status: await resetDemoMode(deps.redis, deps.clock.now()),
+    });
   });
 
   router.post('/demo/disable', async (context) => {
     if (!configured(deps)) {
-      return context.json({ ok: false, demo: true, error: 'Demo dependencies are not configured.', requestId: requestId() }, 503);
+      return context.json(
+        {
+          ok: false,
+          demo: true,
+          error: 'Demo dependencies are not configured.',
+          requestId: requestId(),
+        },
+        503,
+      );
     }
 
     const subreddit = context.req.query('subreddit') ?? DEMO_SUBREDDIT;
+    if (subreddit !== DEMO_SUBREDDIT) {
+      return context.json(
+        {
+          ok: false,
+          demo: true,
+          error: `Demo data writes are restricted to ${DEMO_SUBREDDIT}.`,
+          requestId: requestId(),
+        },
+        403,
+      );
+    }
+
     return context.json({
       ok: true,
       demo: true,

@@ -6895,3 +6895,13 @@
   - PASS, 1 file / 7 tests.
 - Boundary:
   - This fixes deterministic demo reseeding for indexed demo records. It does not alter live subreddit reset behavior or clear non-indexed orphan records that cannot appear in dashboard lists.
+
+## 2026-05-26 17:01 IST - Resolution
+
+- Addressed finding: Demo API error contract for invalid demo namespace.
+- Change:
+  - `src/routes/api.demo.ts` now rejects `/demo/disable` requests for non-`reviewlock_demo` namespaces with a structured `{ ok: false, demo: true, error, requestId }` JSON response and HTTP 403 before calling the demo service.
+  - `src/routes/api.demo.test.ts` now covers `/demo/disable?subreddit=alpha`, verifies the structured response, and proves the live namespace demo marker/config remain untouched.
+- Validation:
+  - `npm test -- src/routes/api.demo.test.ts`
+  - PASS, 1 file / 4 tests.
