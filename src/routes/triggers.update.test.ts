@@ -593,6 +593,33 @@ describe('update trigger routes', () => {
     });
   });
 
+  it('accepts alternate method-named NSFW update wrappers', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isNsfw: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isNsfw: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-nsfw-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-nsfw-alias',
+        nsfwPostUpdate: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'nsfw_changed' },
+    });
+  });
+
   it('accepts method-named wrapped spoiler update payloads', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock({ ...target(), isSpoiler: false }));
@@ -607,6 +634,33 @@ describe('update trigger routes', () => {
       body: JSON.stringify({
         id: 'evt-wrapper-spoiler',
         postSpoilerUpdate: {
+          post: { id: 't3_post' },
+          subreddit: { name: 'alpha' },
+        },
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      event: { reason: 'spoiler_changed' },
+    });
+  });
+
+  it('accepts alternate method-named spoiler update wrappers', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, lock({ ...target(), isSpoiler: false }));
+    const reddit = new FakeRedditAdapter([{ ...target(), isSpoiler: true }]);
+    const router = createUpdateTriggersRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T01:00:00.000Z'),
+    });
+    const response = await router.request('/on-post-spoiler-update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'evt-wrapper-spoiler-alias',
+        spoilerPostUpdate: {
           post: { id: 't3_post' },
           subreddit: { name: 'alpha' },
         },

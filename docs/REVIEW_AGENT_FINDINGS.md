@@ -3877,6 +3877,23 @@
     PASS, 2 files / 27 tests.
   - `npm run type-check` PASS.
 
+## 2026-05-26 13:51 IST - Codex Resolution Notes
+
+- Addressed the changed-content retry warning coverage gap with report-trigger
+  and update-trigger regressions.
+- The new report regression proves `target_resolution_failed` is cleared after a
+  later changed-content retry reopens the lock, while a new
+  `unignoreReports failed for t3_post` warning remains visible on the reopened
+  lock and queue event.
+- The new update regression proves the same warning cleanup and preservation for
+  `breakLockForChangedContent()`.
+- Added direct route tests for alternate Devvit wrapper aliases
+  `nsfwPostUpdate` and `spoilerPostUpdate`.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.update.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 3 files / 76 tests.
+  - `npm run type-check` PASS.
+
 ## 2026-05-26 13:45 IST - Finding
 
 - Severity: medium
@@ -3968,3 +3985,123 @@
   route test if one asserts the old copy.
 - Files reviewed: `src/routes/menu.ts`, `devvit.json`,
   `src/routes/forms.ts`, `src/routes/forms.test.ts`.
+
+## 2026-05-26 13:49 IST - Finding
+
+- Severity: low
+- Area: Dashboard-post reuse is local-test proven but not reflected in runtime
+  proof boundaries.
+- Evidence:
+  - The current runtime matrix marks only the old dashboard custom-post launch
+    behavior as verified: a dashboard post was created and opened in
+    `r/reviewlock_dev`: `docs/RUNTIME_PROOF.md:98-100`.
+  - The new D137 behavior stores the created dashboard permalink and reuses it
+    on later launches instead of creating a new visible post:
+    `decisions.md:2457-2479`.
+  - The implementation log records focused local validation for the reuse/lease
+    behavior, but not a live playtest recheck of repeated dashboard launches:
+    `log.md:2896-2910`.
+  - `docs/PLAYTEST_CHECKLIST.md:26-32` still records only creating a custom
+    post and rerunning dashboard launch after earlier context hardening; it
+    does not include a repeated-launch reuse check.
+- Why it matters: Reusing the existing dashboard post is now part of the
+  publishability story. If README, Devpost, or app-listing copy says this is
+  runtime-verified, it will overclaim beyond the current proof ledger. The
+  safe phrasing is currently "implemented and locally tested" unless a
+  controlled playtest repeats the subreddit menu launch and observes no new
+  dashboard post.
+- Suggested fix: Either live-verify repeated dashboard launch reuse before
+  Wave 14 copy, or update `docs/RUNTIME_PROOF.md` / `docs/PLAYTEST_CHECKLIST.md`
+  to distinguish the verified initial dashboard custom-post launch from
+  locally tested reuse and duplicate-prevention behavior.
+- Files reviewed: `docs/RUNTIME_PROOF.md`, `docs/PLAYTEST_CHECKLIST.md`,
+  `decisions.md`, `log.md`, `src/routes/forms.test.ts`.
+
+## 2026-05-26 13:50 IST - Integration Status
+
+- The update-wrapper alias route-test finding from 13:43 is addressed in the
+  current dirty test worktree.
+- The changed-content retry warning cleanup coverage finding from 13:40 is now
+  covered by focused tests:
+  - `src/server/services/reportTriggers.test.ts` adds
+    `clears resolved target-resolution warnings when a changed-report retry
+    reopens`, proving a prior `target_resolution_failed` warning is not carried
+    into the reopened lock/event when the retry loads changed content and a new
+    `unignoreReports` warning is generated.
+  - `src/server/services/reopenFlow.test.ts` already contains
+    `clears resolved target-resolution warnings when a changed-update retry
+    reopens`, proving the update-trigger side.
+  - `src/routes/triggers.update.test.ts` now directly covers both alternate
+    wrappers: `nsfwPostUpdate` and `spoilerPostUpdate`.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.update.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+    PASS, 3 files / 76 tests.
+  - `git diff --check` PASS.
+- Remaining notable open review items:
+  - Cached dashboard launch permalink validation.
+  - Dashboard launch copy still says create even though reuse exists.
+  - Dashboard-post reuse proof should be labeled local-only unless live
+    rechecked.
+  - Redis namespace docs need the new dashboard keys.
+  - Moderator config is still modeled but not surfaced/applied.
+  - Submission artifacts are still absent.
+
+## 2026-05-26 13:52 IST - Finding
+
+- Severity: high
+- Area: Wave 14 submission spec is not yet sufficient for the actual Devpost
+  and Devvit launch gates.
+- Evidence:
+  - The official Devpost rules require the submission to include a text
+    description, all participant Reddit usernames, a unique
+    `developers.reddit.com/apps/{app-name}` app listing link, 1-3 impact
+    communities, and judge testing access through a Reddit post running the app
+    in a public subreddit with fewer than 200 members:
+    `https://mod-tools-migration.devpost.com/rules`.
+  - The official Devpost rules also say the optional demonstration video should
+    be less than one minute, publicly visible, and show the project functioning
+    on the intended device: `https://mod-tools-migration.devpost.com/rules`.
+  - Reddit's launch guide says launch readiness starts with a user-friendly
+    `README.md`, then `npx devvit publish`; public App Directory listing uses
+    `npx devvit publish --public` and requires a detailed README with overview,
+    installer-facing instructions, and changelogs:
+    `https://developers.reddit.com/docs/guides/launch/launch-guide`.
+  - Current `waves/wave-14/spec.md:39-78` asks for README, Devpost copy, demo
+    script, screenshot plan, claim check, and final audit, but does not require
+    a public judge-testing Reddit post URL, app listing URL confirmation,
+    participant Reddit username slot, under-one-minute video constraint,
+    publish/public-publish owner checkpoints, or an App Directory listing copy
+    artifact.
+  - Current `README.md:1-17` is still a development stub, which is not enough
+    for launch review or public listing.
+  - No submission/launch artifacts exist yet:
+    `find . -maxdepth 2 \( -name 'SUBMISSION.md' -o -name 'DEVPOST_SUBMISSION.md' -o -name 'APP_LISTING.md' -o -name 'LAUNCH_CHECKLIST.md' \) -print`
+    returned no files.
+- Why it matters: The updated target is at least a Best New Mod Tool honorable
+  mention. Missing a required app listing, judge-testing post, or launch-ready
+  README is not a polish issue; it can cause judges to score Reliable UX and
+  Polish sharply lower or fail to test the app at all. Wave 14 should be
+  expanded before execution so the main agent does not create high-quality prose
+  that still misses required submission gates.
+- Suggested fix: Update Wave 14 or have the executor explicitly include these
+  artifacts:
+  - `README.md`: judge/App Directory grade landing page with product thesis,
+    install/use instructions, configuration limits, safety boundaries,
+    validation commands, runtime proof status, and changelog.
+  - `docs/DEVPOST_SUBMISSION.md`: paste-ready fields for app listing URL
+    `https://developers.reddit.com/apps/reviewlock`, participant Reddit
+    usernames, tool overview, project impact, 1-3 community types, proof
+    summary, limitations, and optional feedback/helper sections.
+  - `docs/APP_LISTING.md`: App Directory copy with moderator-facing overview,
+    install/setup/use flow, privacy/safety, support, and version notes.
+  - `docs/LAUNCH_CHECKLIST.md`: final gate for `npm run type-check`,
+    `npm run lint`, `npm run test`, `npm run build`, controlled playtest,
+    public test subreddit under 200 members, Reddit post URL running the app,
+    `npx devvit upload`, `npx devvit publish`, and separate owner approval
+    before `npx devvit publish --public`.
+  - `docs/DEMO_SCRIPT.md`: keep the video plan under 60 seconds and show the
+    four-beat loop: lock reviewed item, suppress repeat report, edit content,
+    reopen after edit.
+- Files reviewed: `waves/wave-14/spec.md`, `README.md`, `plan.md`,
+  `docs/RUNTIME_PROOF.md`, `docs/KNOWN_LIMITATIONS.md`, Devpost official rules,
+  Reddit launch guide.

@@ -2920,3 +2920,31 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:50 IST - Trigger wrapper and retry-warning regression hardening
+
+- Added direct update-route coverage for alternate Devvit wrapper aliases
+  `nsfwPostUpdate` and `spoilerPostUpdate`.
+- Added a report-trigger regression for the sequence target refetch failure,
+  active-lock `target_resolution_failed` warning, changed-content retry,
+  unignore failure, and visible reopen without the stale target-resolution
+  warning.
+- Added the same changed-content retry warning regression for update-trigger
+  reopen flow.
+- Focused validation:
+  - `npm run test -- src/routes/triggers.update.test.ts src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 3 files and 76 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 387 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

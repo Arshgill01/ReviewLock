@@ -249,6 +249,40 @@ describe('breakLockForChangedContent', () => {
     expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([]);
   });
 
+  it('clears resolved target-resolution warnings when a changed-update retry reopens', async () => {
+    const dependencies = await deps(null);
+
+    await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'alpha',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+
+    dependencies.reddit.setTarget(target({ body: 'Edited body', edited: true }));
+    dependencies.reddit.failOperation('unignoreReports', 'permission denied');
+    const retry = await breakLockForChangedContent(dependencies, {
+      targetId: 't3_post',
+      subreddit: 'alpha',
+      triggerCapabilityName: 'postUpdateTrigger',
+    });
+
+    expect(retry).toMatchObject({
+      ok: true,
+      action: 'reopened',
+      warnings: ['unignoreReports failed for t3_post'],
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listOpenReopenEvents(dependencies.redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        reason: 'content_changed',
+        runtimeWarnings: ['unignoreReports failed for t3_post'],
+      }),
+    ]);
+  });
+
   it('fails open to runtime uncertain when Reddit refetch throws', async () => {
     const redis = new InMemoryRedisStore();
     await saveLock(redis, lock());

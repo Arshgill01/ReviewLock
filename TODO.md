@@ -184,3 +184,5 @@
 - [x] Block dismissals for reopened items with unresolved runtime warnings.
 - [x] Clear resolved `target_resolution_failed` warnings after successful report/update retries.
 - [x] Reuse the existing dashboard custom post on repeated dashboard launches.
+- [x] Add changed-content retry regressions for clearing stale target-resolution warnings.
+- [x] Add direct route coverage for `nsfwPostUpdate` and `spoilerPostUpdate` wrappers.

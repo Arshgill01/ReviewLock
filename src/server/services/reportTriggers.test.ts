@@ -886,6 +886,52 @@ describe('handleReportTrigger', () => {
     });
   });
 
+  it('clears resolved target-resolution warnings when a changed-report retry reopens', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter();
+    await saveLock(redis, lock());
+
+    await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:00:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-report-refetch-failed', subreddit: 'alpha' },
+    );
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      runtimeWarnings: ['target_resolution_failed'],
+    });
+
+    reddit.setTarget(target('Edited body'));
+    reddit.failOperation('unignoreReports', 'permission denied');
+    const retry = await handleReportTrigger(
+      {
+        redis,
+        reddit,
+        clock: fixedClock('2026-05-24T01:01:00.000Z'),
+      },
+      { targetId: 't3_post', eventId: 'evt-report-refetch-retry', subreddit: 'alpha' },
+    );
+
+    expect(retry).toMatchObject({
+      ok: true,
+      action: 'reopen_changed',
+      warnings: ['unignoreReports failed for t3_post'],
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await getLock(redis, 'alpha', 'lock-t3_post')).toMatchObject({
+      status: 'reopened',
+      runtimeWarnings: ['unignoreReports failed for t3_post'],
+    });
+    expect(await listOpenReopenEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        reason: 'content_changed',
+        runtimeWarnings: ['unignoreReports failed for t3_post'],
+      }),
+    ]);
+  });
+
   it('does not keep a dedupe marker after target resolution fails without enough scope to find a lock', async () => {
     const redis = new InMemoryRedisStore();
     const reddit = new FakeRedditAdapter();
