@@ -1,6 +1,6 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-26 01:51 IST.
+Last updated: 2026-05-26 02:50 IST.
 
 ## Scope
 
@@ -35,6 +35,8 @@ This pass does not prove live moderation methods or live report/edit trigger del
   `v0.0.2.246`.
 - Latest Redis hash smoke hardening playtest version observed in Zen:
   `v0.0.2.250`.
+- Latest embedded audit timeline formatting hardening playtest version observed
+  in Zen: `v0.0.2.317`.
 
 ## Failure Found
 
@@ -305,6 +307,46 @@ operations:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Embedded Audit Timeline Formatting Recheck
+
+After the audit timeline layout fix, accessibility summary hardening, and shared
+render-formatting helper pass:
+
+- Playtest version: `v0.0.2.317`.
+- Existing Zen tab was used on the ReviewLock dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account was `u/BrightyBrainiac`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed 2 active locks, 1 report suppressed, and 2 reopened
+  after edit.
+- Latest edit-break event showed `comment:ontlx1k`.
+- Active lock rows still showed `post:1tmmeo6` and `post:1tm8nak`.
+- Runtime proof/status still showed:
+  - `approve verified`
+  - `commentReportTrigger unverified`
+  - `commentUpdateTrigger verified`
+  - `ignoreReports verified`
+  - `postFlairUpdateTrigger unverified`
+  - `postNsfwUpdateTrigger unverified`
+  - `postReportTrigger verified`
+  - `postSpoilerUpdateTrigger unverified`
+  - `postUpdateTrigger verified`
+  - `redditContext verified`
+  - `redis verified`
+  - `unignoreReports verified`
+- The audit timeline accessibility tree exposed each row as a vertical entry
+  with separate kind, timestamp, actor, message, and target/lock/reason detail
+  nodes. The live rows no longer presented timestamp, message, target id, and
+  lock id as one overlapping horizontal cluster.
+- Computer Use bitmap capture and macOS `screencapture` both landed on the
+  wrong visible space during this pass, so no new live bitmap screenshot is
+  claimed for this recheck. The earlier local Playwright preview remains the
+  bitmap proof for the CSS shape; this pass proves the updated DOM/layout is
+  deployed in the live Devvit WebView.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Dashboard UI Hardening Recheck
 
 After the reviewed Antigravity frontend refresh was cleaned and integrated:
@@ -393,6 +435,11 @@ performed in this recheck.
   - Result: PASS, live dashboard rendered on playtest `v0.0.2.250`, `Verify
     runtime` completed, and `redis verified` remained verified after the
     expanded string/hash/sorted-set smoke route.
+- Zen browser live WebView audit timeline formatting recheck
+  - Result: PASS, live dashboard rendered on playtest `v0.0.2.317`, the audit
+    timeline exposed separate kind/timestamp/actor/message/detail nodes instead
+    of the previous overlapping horizontal row, and remaining unverified trigger
+    rows stayed unverified.
 - `npm exec devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
   - Result: FAIL, npm passthrough treated `5m` as an unexpected argument.
 - `npm exec devvit logs -- reviewlock_dev reviewlock --connect --since=15m --show-timestamps --log-runtime`

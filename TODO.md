@@ -176,3 +176,4 @@
 - [x] Fix embedded audit timeline wrapping so dense audit rows remain readable.
 - [x] Add accessible summaries to audit timeline rows.
 - [x] Centralize client render escaping, date labels, token labels, and thing-id display helpers.
+- [x] Recheck live Zen WebView audit timeline formatting on playtest `v0.0.2.317`.

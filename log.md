@@ -2746,3 +2746,26 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 02:50 IST - Live audit timeline formatting recheck
+
+- Rechecked the live Reddit Devvit WebView in Zen after the audit timeline
+  layout, accessibility, and shared render-formatting hardening passes.
+- Existing dashboard post:
+  `https://www.reddit.com/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/?playtest=reviewlock`.
+- Logged-in browser account: `u/BrightyBrainiac`.
+- Playtest version observed in WebView links: `v0.0.2.317`.
+- Live dashboard rendered under `r/reviewlock_dev` with 2 active locks, 1
+  report suppressed, 2 reopened after edit, latest edit-break target
+  `comment:ontlx1k`, and 9 audit timeline entries.
+- Runtime proof/status preserved the current claim boundary:
+  `postReportTrigger`, `postUpdateTrigger`, and `commentUpdateTrigger`
+  verified; `commentReportTrigger`, `postFlairUpdateTrigger`,
+  `postNsfwUpdateTrigger`, and `postSpoilerUpdateTrigger` unverified.
+- Audit timeline rows exposed separate kind, timestamp, actor, message, and
+  target/lock/reason detail nodes in the live WebView accessibility tree.
+- Computer Use bitmap capture and macOS `screencapture` both landed on the
+  wrong visible desktop space during this pass, so no new live bitmap screenshot
+  is claimed for this recheck.
+- No live report submission, post edit, comment edit, unlock, dismiss, or
+  destructive moderation action was performed in this recheck.
