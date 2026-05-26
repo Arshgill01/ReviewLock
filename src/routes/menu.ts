@@ -99,9 +99,16 @@ const normalizeMenuTarget = (target: ReviewLockTarget): ReviewLockTarget | undef
   }
 };
 
+const formPreparationFailure = (): UiResponse => ({
+  showToast: {
+    text: 'ReviewLock could not prepare the confirmation form. Reopen the menu and try again.',
+    appearance: 'neutral',
+  },
+});
+
 export const buildLockReviewForm = (
   target: Parameters<typeof targetSummary>[0],
-  token = '',
+  reviewOpenedAt = '',
   config?: ReviewLockConfig,
 ) => {
   const reasonPresets = configuredReasonPresets(config);
@@ -116,7 +123,7 @@ export const buildLockReviewForm = (
         type: 'string',
         required: true,
         defaultValue: target.id,
-        disabled: true,
+        helpText: 'Leave unchanged. ReviewLock verifies this against the opened review snapshot.',
       },
       {
         name: 'subreddit',
@@ -126,11 +133,12 @@ export const buildLockReviewForm = (
         defaultValue: target.subreddit,
       },
       {
-        name: 'formToken',
-        label: 'Review token',
+        name: 'reviewOpenedAt',
+        label: 'Snapshot time',
         type: 'string',
         required: true,
-        defaultValue: token,
+        defaultValue: reviewOpenedAt,
+        helpText: 'Leave unchanged. Used to reject stale review confirmations.',
       },
       {
         name: 'targetSummary',
@@ -167,7 +175,7 @@ export const buildUnlockReviewForm = (
   targetId: string,
   lockId: string,
   subreddit = '',
-  token = '',
+  reviewOpenedAt = '',
 ) => ({
   title: 'Unlock review',
   description: 'Unlock this reviewed item and allow reports to surface again.',
@@ -178,7 +186,7 @@ export const buildUnlockReviewForm = (
       type: 'string',
       required: true,
       defaultValue: targetId,
-      disabled: true,
+      helpText: 'Leave unchanged. ReviewLock verifies this before unlocking.',
     },
     {
       name: 'lockId',
@@ -186,7 +194,7 @@ export const buildUnlockReviewForm = (
       type: 'string',
       required: true,
       defaultValue: lockId,
-      disabled: true,
+      helpText: 'Leave unchanged. ReviewLock unlocks only this active lock.',
     },
     {
       name: 'subreddit',
@@ -196,11 +204,12 @@ export const buildUnlockReviewForm = (
       defaultValue: subreddit,
     },
     {
-      name: 'formToken',
-      label: 'Review token',
+      name: 'reviewOpenedAt',
+      label: 'Confirmation time',
       type: 'string',
       required: true,
-      defaultValue: token,
+      defaultValue: reviewOpenedAt,
+      helpText: 'Leave unchanged. Used to reject stale unlock confirmations.',
     },
     {
       name: 'confirmation',
@@ -270,17 +279,23 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
 
     const now = deps.clock.now();
     const config = await safeLoadConfig(deps.redis, target.subreddit, now);
-    const binding = await createFormBinding(
-      deps.redis,
-      'lock',
-      target,
-      now,
-    );
+    let binding: Awaited<ReturnType<typeof createFormBinding>>;
+
+    try {
+      binding = await createFormBinding(
+        deps.redis,
+        'lock',
+        target,
+        now,
+      );
+    } catch {
+      return context.json<UiResponse>(formPreparationFailure());
+    }
 
     return context.json<UiResponse>({
       showForm: {
         name: 'lockReview',
-        form: buildLockReviewForm(target, binding.token, config),
+        form: buildLockReviewForm(target, binding.createdAt, config),
       },
     });
   };
@@ -326,13 +341,19 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       });
     }
 
-    const binding = await createFormBinding(
-      deps.redis,
-      'unlock',
-      target,
-      deps.clock?.now() ?? new Date().toISOString(),
-      lock.id,
-    );
+    let binding: Awaited<ReturnType<typeof createFormBinding>>;
+
+    try {
+      binding = await createFormBinding(
+        deps.redis,
+        'unlock',
+        target,
+        deps.clock?.now() ?? new Date().toISOString(),
+        lock.id,
+      );
+    } catch {
+      return context.json<UiResponse>(formPreparationFailure());
+    }
 
     return context.json<UiResponse>({
       showForm: {
@@ -341,7 +362,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
           target.id,
           lock.id,
           target.subreddit,
-          binding.token,
+          binding.createdAt,
         ),
       },
     });

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { InMemoryRedisStore } from '../adapters/redis';
 import type { ReviewLockTarget } from '../../shared/schema';
 import { key } from './keys';
-import { consumeFormBinding, createFormBinding } from './formBindings';
+import {
+  consumeFormBinding,
+  consumeFormBindingByContext,
+  createFormBinding,
+} from './formBindings';
 
 const target = (): ReviewLockTarget => ({
   id: 't3_post',
@@ -28,6 +32,208 @@ describe('form bindings', () => {
       reviewedFingerprintVersion: 'content-v1',
     });
     expect(await consumeFormBinding(redis, 'alpha', binding.token)).toBeUndefined();
+  });
+
+  it('creates and consumes lock bindings by context without exposing the token', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+
+    expect(
+      await consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        binding.createdAt,
+      ),
+    ).toMatchObject({
+      action: 'lock',
+      targetId: 't3_post',
+      token: binding.token,
+      reviewedFingerprintVersion: 'content-v1',
+    });
+    expect(
+      await consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        binding.createdAt,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('allows only one concurrent context consumer to use a form binding', async () => {
+    class PausingContextReadRedisStore extends InMemoryRedisStore {
+      private firstBindingRead = true;
+      private firstBindingReadResolver: (() => void) | undefined;
+      private releaseFirstBindingReadResolver: (() => void) | undefined;
+
+      readonly firstBindingReadStarted = new Promise<void>((resolve) => {
+        this.firstBindingReadResolver = resolve;
+      });
+
+      releaseFirstBindingRead(): void {
+        this.releaseFirstBindingReadResolver?.();
+      }
+
+      override async get(keyName: string): Promise<string | undefined> {
+        const value = await super.get(keyName);
+
+        if (keyName.startsWith('reviewlock:alpha:form:form-unlock-') && this.firstBindingRead) {
+          this.firstBindingRead = false;
+          this.firstBindingReadResolver?.();
+          await new Promise<void>((resolve) => {
+            this.releaseFirstBindingReadResolver = resolve;
+          });
+        }
+
+        return value;
+      }
+    }
+
+    const redis = new PausingContextReadRedisStore();
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+
+    const firstPromise = consumeFormBindingByContext(
+      redis,
+      'alpha',
+      'unlock',
+      't3_post',
+      binding.createdAt,
+      'lock-1',
+    );
+    await redis.firstBindingReadStarted;
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'unlock',
+        't3_post',
+        binding.createdAt,
+        'lock-1',
+      ),
+    ).resolves.toBeUndefined();
+    redis.releaseFirstBindingRead();
+    await expect(firstPromise).resolves.toMatchObject({
+      action: 'unlock',
+      targetId: 't3_post',
+      lockId: 'lock-1',
+    });
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'unlock',
+        't3_post',
+        binding.createdAt,
+        'lock-1',
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not burn a valid context binding when a stale lock id is submitted', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(
+      redis,
+      'unlock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+      'lock-1',
+    );
+
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'unlock',
+        't3_post',
+        binding.createdAt,
+        'old-lock',
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'unlock',
+        't3_post',
+        binding.createdAt,
+        'lock-1',
+      ),
+    ).resolves.toMatchObject({
+      action: 'unlock',
+      lockId: 'lock-1',
+    });
+  });
+
+  it('keeps same-target contexts separate by opened timestamp', async () => {
+    const redis = new InMemoryRedisStore();
+    const first = await createFormBinding(
+      redis,
+      'lock',
+      target(),
+      '2026-05-24T00:00:00.000Z',
+    );
+    const second = await createFormBinding(
+      redis,
+      'lock',
+      target(),
+      '2026-05-24T00:01:00.000Z',
+    );
+
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        first.createdAt,
+      ),
+    ).resolves.toMatchObject({ token: first.token });
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        second.createdAt,
+      ),
+    ).resolves.toMatchObject({ token: second.token });
+  });
+
+  it('keeps same-target contexts separate when forms open in the same millisecond', async () => {
+    const redis = new InMemoryRedisStore();
+    const openedAt = '2026-05-24T00:00:00.000Z';
+    const first = await createFormBinding(redis, 'lock', target(), openedAt);
+    const second = await createFormBinding(redis, 'lock', target(), openedAt);
+
+    expect(first.createdAt).toBe(openedAt);
+    expect(second.createdAt).toBe('2026-05-24T00:00:00.001Z');
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        first.createdAt,
+      ),
+    ).resolves.toMatchObject({ token: first.token });
+    await expect(
+      consumeFormBindingByContext(
+        redis,
+        'alpha',
+        'lock',
+        't3_post',
+        second.createdAt,
+      ),
+    ).resolves.toMatchObject({ token: second.token });
   });
 
   it('stores mixed-case target subreddits under the canonical lowercase binding key', async () => {
@@ -78,6 +284,34 @@ describe('form bindings', () => {
 
     expect(await consumeFormBinding(redis, 'alpha', token)).toBeUndefined();
     expect(await redis.exists(bindingKey)).toBe(false);
+  });
+
+  it('deletes malformed context bindings and their context pointer', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const bindingKey = key('alpha', `form:${binding.token}`);
+    const contextKey = key('alpha', `form-context:lock:t3_post:${binding.createdAt}`);
+    await redis.set(bindingKey, JSON.stringify({ action: 'lock', targetId: 123 }));
+
+    await expect(
+      consumeFormBindingByContext(redis, 'alpha', 'lock', 't3_post', binding.createdAt),
+    ).resolves.toBeUndefined();
+    expect(await redis.exists(bindingKey)).toBe(false);
+    expect(await redis.exists(contextKey)).toBe(false);
+  });
+
+  it('deletes context bindings whose stored subreddit does not match the consumed namespace', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const bindingKey = key('alpha', `form:${binding.token}`);
+    const contextKey = key('alpha', `form-context:lock:t3_post:${binding.createdAt}`);
+    await redis.set(bindingKey, JSON.stringify({ ...binding, subreddit: 'beta' }));
+
+    await expect(
+      consumeFormBindingByContext(redis, 'alpha', 'lock', 't3_post', binding.createdAt),
+    ).resolves.toBeUndefined();
+    expect(await redis.exists(bindingKey)).toBe(false);
+    expect(await redis.exists(contextKey)).toBe(false);
   });
 
   it('allows only one concurrent consumer to use a form binding', async () => {
@@ -171,10 +405,16 @@ describe('form bindings', () => {
   it('rolls back the binding write if setting the expiry fails', async () => {
     class ExpireFailingRedisStore extends InMemoryRedisStore {
       readonly setKeys: string[] = [];
+      readonly reservedKeys: string[] = [];
 
       override async set(keyName: string, value: string): Promise<void> {
         this.setKeys.push(keyName);
         await super.set(keyName, value);
+      }
+
+      override async setIfNotExists(keyName: string, value: string): Promise<boolean> {
+        this.reservedKeys.push(keyName);
+        return super.setIfNotExists(keyName, value);
       }
 
       override async expire(): Promise<void> {
@@ -188,6 +428,41 @@ describe('form bindings', () => {
       createFormBinding(redis, 'unlock', target(), '2026-05-24T00:00:00.000Z', 'lock-1'),
     ).rejects.toThrow('expire down');
     expect(redis.setKeys).toHaveLength(1);
-    expect(await redis.exists(redis.setKeys[0] ?? '')).toBe(false);
+    expect(redis.reservedKeys).toHaveLength(1);
+    await Promise.all(
+      [...redis.setKeys, ...redis.reservedKeys].map(async (keyName) => {
+        expect(await redis.exists(keyName)).toBe(false);
+      }),
+    );
+  });
+
+  it('rolls back the binding write if context reservation fails', async () => {
+    class ContextReservationFailingRedisStore extends InMemoryRedisStore {
+      readonly setKeys: string[] = [];
+
+      override async set(keyName: string, value: string): Promise<void> {
+        this.setKeys.push(keyName);
+        await super.set(keyName, value);
+      }
+
+      override async setIfNotExists(keyName: string, value: string): Promise<boolean> {
+        if (keyName.includes(':form-context:')) {
+          throw new Error('context reservation down');
+        }
+
+        return super.setIfNotExists(keyName, value);
+      }
+    }
+
+    const redis = new ContextReservationFailingRedisStore();
+
+    await expect(
+      createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z'),
+    ).rejects.toThrow('context reservation down');
+    await Promise.all(
+      redis.setKeys.map(async (keyName) => {
+        expect(await redis.exists(keyName)).toBe(false);
+      }),
+    );
   });
 });

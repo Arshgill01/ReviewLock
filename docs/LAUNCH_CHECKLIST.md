@@ -165,8 +165,10 @@ providing a link to a Reddit post running the app. The rules specify a public
 subreddit with fewer than 200 members.
 
 - [ ] Confirm the judging subreddit is public and has fewer than 200 members.
-- [ ] Confirm the app is installed there or playtest access is otherwise valid
-      for judges.
+- [ ] Confirm the final Reddit post runs ReviewLock there and is accessible to
+      judges without developer-only playtest privileges.
+- [ ] Keep `r/reviewlock_dev` evidence scoped as private controlled proof, not
+      the final judging access URL.
 - [ ] Create or reuse the ReviewLock dashboard post.
 - [ ] Add the final judging post URL to:
   - `docs/DEVPOST_SUBMISSION.md`;

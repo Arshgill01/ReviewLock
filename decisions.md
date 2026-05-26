@@ -2581,3 +2581,34 @@ Reason:
   Devvit payload casing differs.
 - Dashboard unlock should use the trusted runtime scope when Reddit omits a
   precise target subreddit, but it must still reject cross-subreddit targets.
+
+### D142 - Review forms bind by server context instead of visible tokens
+
+ReviewLock's Devvit lock/unlock forms need to bind moderator confirmation to
+the exact target snapshot that was shown without exposing a reusable raw token in
+the form UI.
+
+Decision:
+
+- Do not render a visible `formToken` or `Review token` field in the final lock
+  and unlock forms.
+- Store a server-side binding keyed by action, target id, lock id when present,
+  subreddit, and opened-at snapshot timestamp.
+- Reserve the context key with NX semantics and shift same-millisecond
+  collisions by a millisecond so two same-target forms do not share a context.
+- Expire both the token binding and context pointer, and roll back partial Redis
+  writes if context reservation or expiry fails.
+- If Redis cannot prepare a form binding from a menu action, return a valid
+  neutral retry toast rather than surfacing an internal Devvit error.
+- Keep the visible `Target ID`, `Subreddit`, and snapshot time fields as an
+  explicit runtime tradeoff until a Devvit-supported hidden submit data channel
+  is proven.
+
+Reason:
+
+- Raw token fields looked like implementation internals in the moderator-facing
+  form and weakened the submission screenshots.
+- Server-side binding keeps stale or tampered submissions from locking or
+  unlocking content that differs from the reviewed snapshot.
+- The context reservation and rollback path prevents same-millisecond form
+  races and avoids orphan Redis records when form preparation fails.

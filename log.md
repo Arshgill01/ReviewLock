@@ -3178,6 +3178,59 @@
 - Validation:
   - `git diff --check`
   - PASS.
+
+## 2026-05-26 20:20 IST - Form binding and live audit timeline hardening
+
+- Identified the reviewer-agent changes made while Codex was offline:
+  dashboard active-lock layout updates, regenerated submission screenshots,
+  claim/listing proof-boundary edits, and active reviewer findings around
+  no-visible-token form binding reliability.
+- Hardened no-visible-token form bindings:
+  - context reservations now use action, target, lock, subreddit, and opened
+    snapshot time with same-millisecond collision handling;
+  - partial token/context writes roll back on reservation or expiry failure;
+  - malformed context bindings are cleaned when consumed;
+  - menu form preparation failures return a neutral retry toast instead of an
+    uncaught server error.
+- Fixed the live audit timeline formatting issue from the Zen screenshots:
+  timestamps render as compact date/time rows and target/lock/reason details
+  use wider responsive columns instead of overlapping the message text.
+- Live proof:
+  - `npm run dev -- reviewlock_dev`
+  - PASS, playtest reached `v0.0.10.2` for the live proof steps and later
+    rebuilt to `v0.0.10.4` before being stopped cleanly.
+  - Zen opened the `Lock review` form on controlled post `t3_1tnfgqf` with no
+    raw `Review token`/`formToken` field visible.
+  - Submitted the form; the live dashboard showed active lock `post:1tnfgqf`
+    and audit event `Lock Created 5/26/2026, 6:35 PM`.
+  - Zen live dashboard showed `3` active locks, `1` report suppressed, `2`
+    reopened after edit, and non-overlapping audit timeline rows.
+  - Captured `output/submission/01-live-lock-form-zen.png`.
+  - Captured `output/submission/02-live-dashboard-runtime-proof.png`.
+- Version proof:
+  - `npm run deploy`
+  - PASS, uploaded app version `0.0.10` after type-check, lint, test, build,
+    and Devvit upload.
+  - `npx devvit view --json`
+  - PASS, app `reviewlock`, owner `BrightyBrainiac`, install count `1`,
+    uploaded `2026-05-26T14:17:37.752Z`, built
+    `2026-05-26T14:17:40.373Z`, visibility `1`, populated
+    `version.about`, empty app-level description/privacy/terms fields.
+- Focused validation:
+  - `npm run test -- src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/fullScenario.test.ts src/client/render.test.ts --reporter verbose`
+  - PASS, 5 files and 89 tests.
+- Full validation:
+  - `npm run type-check`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files and 444 tests.
+  - `npm run build`
+  - PASS.
+
   - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
   - PASS.
   - `rg -n "TODO" src || true`

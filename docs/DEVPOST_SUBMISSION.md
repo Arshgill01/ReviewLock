@@ -19,7 +19,7 @@ Source requirements checked:
 Submission status:
 
 - App listing URL exists: `https://developers.reddit.com/apps/reviewlock`
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.5`; `npx devvit view --json`
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.10`; `npx devvit view --json`
   showed `version.about` populated from the self-contained README/App Directory
   summary.
 - Developer Portal app-level metadata still needs a final listing pass before
@@ -50,7 +50,7 @@ Before final submission, verify the listing after upload:
 npx devvit view --json
 ```
 
-The uploaded `version.about` copy is current as of version `0.0.5`. The listing
+The uploaded `version.about` copy is current as of version `0.0.10`. The listing
 still needs a final Developer Portal metadata pass if editable.
 
 ### Reddit usernames
@@ -119,8 +119,9 @@ Capabilities:
 
 Safety boundaries:
 
-- ReviewLock does not make content unreportable.
-- ReviewLock does not claim that users cannot submit reports.
+- ReviewLock does not change Reddit's reporting surface.
+- ReviewLock only suppresses repeat report handling on unchanged reviewed
+  content after a moderator creates a lock.
 - ReviewLock does not remove content automatically when a lock reopens.
 - ReviewLock does not store reporter usernames.
 - ReviewLock does not use AI or external services.
@@ -266,7 +267,9 @@ Stable screenshot manifest: `docs/SCREENSHOTS.md`.
 
 ### Testing instructions for judges
 
-Use the final public Reddit post URL after upload and playtest confirmation:
+Use the final public Reddit post URL after upload and playtest confirmation.
+Do not use `r/reviewlock_dev`, private controlled-proof screenshots, or a
+developer-only playtest URL as the judging access link:
 
 ```txt
 FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED

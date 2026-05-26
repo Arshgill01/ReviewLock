@@ -37,11 +37,34 @@ const fieldValue = (
   body: unknown,
   name: string,
 ): string | undefined => {
+  return formField(body, name)?.defaultValue;
+};
+
+const formField = (
+  body: unknown,
+  name: string,
+): {
+  name?: string;
+  defaultValue?: string;
+  disabled?: boolean;
+  isSecret?: boolean;
+  scope?: string;
+} | undefined => {
   const fields = (body as {
-    showForm?: { form?: { fields?: Array<{ name?: string; defaultValue?: string }> } };
+    showForm?: {
+      form?: {
+        fields?: Array<{
+          name?: string;
+          defaultValue?: string;
+          disabled?: boolean;
+          isSecret?: boolean;
+          scope?: string;
+        }>;
+      };
+    };
   }).showForm?.form?.fields ?? [];
 
-  return fields.find((field) => field.name === name)?.defaultValue;
+  return fields.find((field) => field.name === name);
 };
 
 describe('menu routes', () => {
@@ -50,15 +73,22 @@ describe('menu routes', () => {
       title: 'Lock review',
       fields: expect.arrayContaining([
         expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
-        expect.objectContaining({ name: 'formToken' }),
+        expect.objectContaining({
+          name: 'reviewOpenedAt',
+          defaultValue: '',
+        }),
         expect.objectContaining({ name: 'lockReason' }),
       ]),
     });
+    expect(formField({ showForm: { form: buildLockReviewForm(target()) } }, 'targetId')?.disabled)
+      .not.toBe(true);
+    expect(buildLockReviewForm(target()).fields.some((field) => field.name === 'formToken'))
+      .toBe(false);
   });
 
   it('builds lock review form reason options from subreddit config', () => {
     expect(
-      buildLockReviewForm(target(), 'token-1', {
+      buildLockReviewForm(target(), '2026-05-24T00:00:00.000Z', {
         ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
         reasonPresets: ['repeat_report_churn', 'custom'],
       }),
@@ -106,19 +136,18 @@ describe('menu routes', () => {
       body: JSON.stringify({ targetId: 't3_post' }),
     });
     const menuBody = await menuResponse.json();
-    const formToken = fieldValue(menuBody, 'formToken');
 
     expect(fieldValue(menuBody, 'subreddit')).toBe('alpha');
-    expect(typeof formToken).toBe('string');
-    expect(await redis.exists(`reviewlock:alpha:form:${formToken}`)).toBe(true);
-    expect(await redis.exists(`reviewlock:Alpha:form:${formToken}`)).toBe(false);
+    expect(formField(menuBody, 'formToken')).toBeUndefined();
+    expect(formField(menuBody, 'targetId')?.disabled).not.toBe(true);
+    expect(fieldValue(menuBody, 'reviewOpenedAt')).toBe('2026-05-24T00:00:00.000Z');
 
     const submitResponse = await formsRouter.request('/lock-review-submit', {
       method: 'POST',
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken,
+        reviewOpenedAt: fieldValue(menuBody, 'reviewOpenedAt'),
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -201,7 +230,6 @@ describe('menu routes', () => {
       };
     };
     const fields = body.showForm?.form?.fields ?? [];
-    const token = fields.find((field) => field.name === 'formToken')?.defaultValue;
 
     expect(fields).toEqual(
       expect.arrayContaining([
@@ -215,9 +243,36 @@ describe('menu routes', () => {
         }),
       ]),
     );
-    expect(typeof token).toBe('string');
-    expect(await redis.exists(`reviewlock:alpha:form:${typeof token === 'string' ? token : ''}`))
-      .toBe(true);
+    expect(fields.some((field) => field.name === 'formToken')).toBe(false);
+  });
+
+  it('returns a neutral toast when lock form preparation cannot reserve Redis state', async () => {
+    class FormBindingFailingRedisStore extends InMemoryRedisStore {
+      override async set(keyName: string, value: string): Promise<void> {
+        if (keyName.startsWith('reviewlock:alpha:form:')) {
+          throw new Error('form binding down');
+        }
+
+        await super.set(keyName, value);
+      }
+    }
+
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis: new FormBindingFailingRedisStore(),
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+
+    expect(await response.json()).toEqual({
+      showToast: {
+        text: 'ReviewLock could not prepare the confirmation form. Reopen the menu and try again.',
+        appearance: 'neutral',
+      },
+    });
   });
 
   it('normalizes bare post ids from Devvit menu payloads', async () => {
@@ -359,9 +414,59 @@ describe('menu routes', () => {
           fields: expect.arrayContaining([
             expect.objectContaining({ name: 'targetId', defaultValue: 't3_post' }),
             expect.objectContaining({ name: 'lockId', defaultValue: 'lock-1' }),
-            expect.objectContaining({ name: 'formToken' }),
           ]),
         },
+      },
+    });
+  });
+
+  it('returns a neutral toast when unlock form preparation cannot reserve Redis state', async () => {
+    class FormBindingFailingRedisStore extends InMemoryRedisStore {
+      override async set(keyName: string, value: string): Promise<void> {
+        if (keyName.startsWith('reviewlock:alpha:form:')) {
+          throw new Error('form binding down');
+        }
+
+        await super.set(keyName, value);
+      }
+    }
+
+    const redis = new FormBindingFailingRedisStore();
+    await saveLock(redis, {
+      id: 'lock-1',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      targetAuthor: 'u_author',
+      permalink: '/r/alpha/comments/post',
+      contentPreview: 'Reviewed body',
+      contentHash: 'hash',
+      fingerprintVersion: 'content-v1',
+      lockedBy: 'mod',
+      lockedAt: '2026-05-24T00:00:00.000Z',
+      lockReason: 'reviewed_policy_compliant',
+      status: 'active',
+      lastKnownEdited: false,
+      lastReportCount: 4,
+      suppressedReportCount: 0,
+      runtimeWarnings: [],
+      demo: false,
+    });
+
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/unlock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+
+    expect(await response.json()).toEqual({
+      showToast: {
+        text: 'ReviewLock could not prepare the confirmation form. Reopen the menu and try again.',
+        appearance: 'neutral',
       },
     });
   });
@@ -398,12 +503,12 @@ describe('menu routes', () => {
       body: JSON.stringify({ targetId: 't3_post' }),
     });
     const menuBody = await menuResponse.json();
-    const formToken = fieldValue(menuBody, 'formToken');
 
     expect(fieldValue(menuBody, 'subreddit')).toBe('alpha');
-    expect(typeof formToken).toBe('string');
-    expect(await redis.exists(`reviewlock:alpha:form:${formToken}`)).toBe(true);
-    expect(await redis.exists(`reviewlock:Alpha:form:${formToken}`)).toBe(false);
+    expect(formField(menuBody, 'formToken')).toBeUndefined();
+    expect(formField(menuBody, 'targetId')?.disabled).not.toBe(true);
+    expect(formField(menuBody, 'lockId')?.disabled).not.toBe(true);
+    expect(fieldValue(menuBody, 'reviewOpenedAt')).toBe('2026-05-24T00:00:00.000Z');
 
     const submitResponse = await formsRouter.request('/unlock-review-submit', {
       method: 'POST',
@@ -411,7 +516,7 @@ describe('menu routes', () => {
         targetId: 't3_post',
         lockId: 'lock-1',
         subreddit: 'alpha',
-        formToken,
+        reviewOpenedAt: fieldValue(menuBody, 'reviewOpenedAt'),
       }),
     });
 

@@ -5950,22 +5950,6 @@ post. Try again.` while preserving the existing guard cleanup. Add a focused
   - `npm run build`
   - PASS.
 
-## 2026-05-26 18:35 IST - Finding
-
-- Severity: medium
-- Area: Selected final Devpost screenshots include visible text overlap/clipping in the dashboard audit area.
-- Evidence:
-  - `docs/SCREENSHOTS.md:12-18` maps `output/submission/03-local-dashboard-active-locks.png`, `output/submission/04-local-reopened-after-edit.png`, and `output/submission/05-local-demo-mode.png` into the final Devpost screenshot set.
-  - Visual review of `output/submission/03-local-dashboard-active-locks.png` shows the audit timeline text at bottom right overlapping around the `Report Suppressed` timestamp/message area.
-  - Visual review of `output/submission/04-local-reopened-after-edit.png` shows the same overlap.
-  - Visual review of `output/submission/05-local-demo-mode.png` shows the same audit timeline overlap, and the active-lock table is horizontally clipped at the right edge of the screenshot.
-- Why it matters: These are judge-facing assets. Even if the underlying dashboard is locally tested, final Devpost screenshots with visible text collision or clipped columns weaken the polish score and distract from the core lock -> suppress -> reopen story.
-- Suggested fix: Recapture cleaner submission screenshots after hiding/cropping the lower audit timeline area, scrolling to focus the intended section, or using the newer audit-timeline-fixed artifacts where the timestamp layout is readable. Keep the manifest captions honest about local versus live source, and visually re-open each final PNG before submission.
-- Files reviewed:
-  - `docs/SCREENSHOTS.md`
-  - `output/submission/03-local-dashboard-active-locks.png`
-  - `output/submission/04-local-reopened-after-edit.png`
-  - `output/submission/05-local-demo-mode.png`
   - `git diff --check`
   - PASS.
   - `rg -n "TODO" src`
@@ -7119,6 +7103,23 @@ desktop/mobile browser screenshots` complete.
   - `npm run build`
   - PASS.
 
+## 2026-05-26 18:36 IST - Finding
+
+- Severity: medium
+- Area: Selected final Devpost screenshots include visible text overlap/clipping in the dashboard audit area.
+- Evidence:
+  - `docs/SCREENSHOTS.md:12-18` maps `output/submission/03-local-dashboard-active-locks.png`, `output/submission/04-local-reopened-after-edit.png`, and `output/submission/05-local-demo-mode.png` into the final Devpost screenshot set.
+  - Visual review of `output/submission/03-local-dashboard-active-locks.png` shows the audit timeline text at bottom right overlapping around the `Report Suppressed` timestamp/message area.
+  - Visual review of `output/submission/04-local-reopened-after-edit.png` shows the same overlap.
+  - Visual review of `output/submission/05-local-demo-mode.png` shows the same audit timeline overlap, and the active-lock table is horizontally clipped at the right edge of the screenshot.
+- Why it matters: These are judge-facing assets. Even if the underlying dashboard is locally tested, final Devpost screenshots with visible text collision or clipped columns weaken the polish score and distract from the core lock -> suppress -> reopen story.
+- Suggested fix: Recapture cleaner submission screenshots after hiding/cropping the lower audit timeline area, scrolling to focus the intended section, or using the newer audit-timeline-fixed artifacts where the timestamp layout is readable. Keep the manifest captions honest about local versus live source, and visually re-open each final PNG before submission.
+- Files reviewed:
+  - `docs/SCREENSHOTS.md`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/04-local-reopened-after-edit.png`
+  - `output/submission/05-local-demo-mode.png`
+
 ## 2026-05-26 18:35 IST - Finding
 
 - Severity: medium
@@ -7165,3 +7166,740 @@ desktop/mobile browser screenshots` complete.
   - PASS, 43 files / 434 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-26 18:37 IST - Finding
+
+- Severity: medium
+- Area: Judging-access checklist still leaves room to rely on private/playtest-only access.
+- Evidence:
+  - Official Devpost rules, `https://mod-tools-migration.devpost.com/rules`, lines 203-205, require access to the working project by providing a link to a Reddit post running the app, and say entrants should make this post in a public subreddit with fewer than 200 members; the project must remain available free and without restriction through judging.
+  - `docs/DEVPOST_SUBMISSION.md:269-272` still has the placeholder `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED`.
+  - `docs/LAUNCH_CHECKLIST.md:141-147` correctly says to confirm the judging subreddit is public and under 200 members, but also says "app is installed there or playtest access is otherwise valid", which could be misread as allowing a developer-only playtest URL.
+  - `output/submission/01-live-lock-form-zen.png` was captured in `r/reviewlock_dev`, and the Reddit sidebar in the screenshot shows that subreddit as `Private`.
+- Why it matters: Runtime proof in a private controlled subreddit is fine, but it cannot be the final judging-access artifact. If the final Devpost submission points judges at a private subreddit or a playtest URL that only works for the developer, the project can fail the access requirement even if the app itself is strong.
+- Suggested fix: Tighten the launch checklist and final handoff wording: the final Devpost testing URL must be a Reddit post running ReviewLock in a public subreddit with fewer than 200 members, accessible to judges without developer-only playtest privileges. Keep `r/reviewlock_dev` evidence as controlled proof only, not the judging access URL.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/SCREENSHOTS.md`
+  - `output/submission/01-live-lock-form-zen.png`
+
+## 2026-05-26 18:43 IST - Recheck
+
+- Area: Lock/unlock Devvit forms expose the raw ReviewLock form token in moderator UI and submission screenshots.
+- Result: Partially resolved in the current worktree.
+- Evidence:
+  - `src/routes/menu.ts:129-134` now marks the lock `formToken` field with `isSecret: true`.
+  - `src/routes/menu.ts:199-205` now marks the unlock `formToken` field with `isSecret: true`.
+  - `src/routes/menu.test.ts:57-65`, `src/routes/menu.test.ts:108-119`, `src/routes/menu.test.ts:365-373`, and `src/routes/menu.test.ts:401-412` now assert the token field is secret on lock and unlock forms.
+  - `npm run test -- src/routes/menu.test.ts --reporter verbose` passed with 17 tests.
+- Remaining boundary:
+  - The existing `output/submission/01-live-lock-form-zen.png` still shows the raw pre-fix token and should be recaptured before Devpost.
+  - This recheck verifies the local form definition and route tests; it does not prove how Reddit clients visually mask `isSecret` fields in live Devvit Web forms.
+
+## 2026-05-26 18:44 IST - Finding
+
+- Severity: medium
+- Area: Screenshot manifest overclaims local runtime-proof screenshot as live Reddit WebView proof.
+- Evidence:
+  - `docs/SCREENSHOTS.md:14` labels `output/submission/02-live-dashboard-runtime-proof.png` as a "Live Reddit WebView runtime proof screenshot selected from `output/playwright/runtime-proof-evidence-desktop-verified.png`."
+  - `cmp -s output/playwright/runtime-proof-evidence-desktop-verified.png output/submission/02-live-dashboard-runtime-proof.png` returned `0`, so the submission artifact is byte-for-byte the same file as the Playwright runtime-proof artifact.
+  - `docs/BROWSER_REGRESSION.md:172-211` says that runtime-proof evidence pass ran against `dist/client` with mocked ReviewLock API responses and explicitly concludes: "This remains local browser proof with mocked API responses, not live Reddit WebView proof."
+  - Visual review of `output/submission/02-live-dashboard-runtime-proof.png` also shows the standalone ReviewLock dashboard, not the surrounding Reddit WebView shell.
+- Why it matters: The screenshot itself is useful, but the manifest currently gives it a stronger runtime source than the artifact supports. ReviewLock's submission strategy depends on strict proof boundaries; a local mocked screenshot should not be captioned as live Reddit WebView evidence.
+- Suggested fix: Rename and recaption slot 2 as local browser/runtime-proof rendering evidence, or replace it with a true live Reddit WebView screenshot captured from the embedded dashboard. Update the filename/source text in `docs/SCREENSHOTS.md` and any Devpost caption to keep local rendering proof separate from `docs/RUNTIME_PROOF.md` live capability proof.
+- Files reviewed:
+  - `docs/SCREENSHOTS.md`
+  - `docs/BROWSER_REGRESSION.md`
+  - `output/submission/02-live-dashboard-runtime-proof.png`
+  - `output/playwright/runtime-proof-evidence-desktop-verified.png`
+
+## 2026-05-26 18:50 IST - Finding
+
+- Severity: high
+- Area: Form-token masking patch may break Devvit form display because `isSecret` is restricted to app-scoped settings.
+- Evidence:
+  - `src/routes/menu.ts:129-134` now marks the lock `formToken` field with `isSecret: true` but does not set `scope: 'app'`.
+  - `src/routes/menu.ts:199-205` does the same for the unlock `formToken` field.
+  - `node_modules/@devvit/client/effects/helpers/assert-valid-form-fields.js:21-27` calls `assertAppSecretsOnly()` and throws when `field.type === 'string' && field.isSecret && field.scope !== 'app'`.
+  - `node_modules/@devvit/client/effects/show-form.js:21-31` calls `assertValidFormFields(formDefinition.fields)` before emitting the form.
+  - `node_modules/@devvit/public-api/apis/ui/UIClient.js` and `node_modules/@devvit/public-api/apis/ui/blocks/handler/UIClient.js` contain the same validation path before showing forms.
+  - `npm run test -- src/routes/menu.test.ts --reporter verbose` passed, but those tests only assert that the route response includes `isSecret: true`; they do not exercise Devvit's installed form validator.
+- Why it matters: Lock and unlock forms are core workflows. If Devvit validates the Hono-returned form definition through the same helper used by installed clients, the current token-masking fix can turn a polish issue into a runtime form-open failure. The app would look locally green while moderators cannot open the main `Lock review` / `Unlock review` forms.
+- Suggested fix: Do not rely on `isSecret` unless a live playtest proves the forms still open. Safer options are to move the binding token into Devvit-supported form data if available, use a server-derived binding keyed by immutable menu/runtime context, or add the correct Devvit-supported scope only after verifying it is valid for runtime forms and does not turn the field into app settings. Add a regression that runs the installed Devvit form-field validator or mirrors its `isSecret` rule, then recapture the lock-form screenshot after the live form opens without a raw token.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `node_modules/@devvit/client/effects/helpers/assert-valid-form-fields.js`
+  - `node_modules/@devvit/client/effects/show-form.js`
+  - `node_modules/@devvit/public-api/apis/ui/UIClient.js`
+  - `node_modules/@devvit/public-api/apis/ui/blocks/handler/UIClient.js`
+
+## 2026-05-26 18:55 IST - Finding
+
+- Severity: low
+- Area: Judge-facing safety copy still uses the "unreportable" frame while the README uses the cleaner reporting-surface boundary.
+- Evidence:
+  - `APP_LISTING.md:43-45` says, "ReviewLock does not make content unreportable..."
+  - `DEVPOST_SUBMISSION.md:120-128` includes the safety-boundary bullet, "ReviewLock does not make content unreportable."
+  - `README.md:13-14` and `README.md:124-127` use the stronger product-safe wording: ReviewLock does not change Reddit's reporting surface and surfaces items when state changes or cannot be verified.
+  - `CLAIM_COPY_AUDIT.md:25` marks "ReviewLock makes content unreportable" as a cut claim, but the forbidden-copy scan at `CLAIM_COPY_AUDIT.md:35` and `LAUNCH_CHECKLIST.md:39` does not include the standalone word `unreportable`, so this frame can slip into judge-facing copy.
+- Why it matters: The wording is negative and safety-oriented, so it is not an overclaim. Still, the submission strategy depends on avoiding the "not reportable / unreportable" mental model entirely. Introducing the word in Devpost/App Listing copy can make judges think about the risky native-reporting frame instead of the safer "reporting surface unchanged; reviewed content ledger tied to integrity" frame.
+- Suggested fix: Replace judge-facing instances with "ReviewLock does not change Reddit's reporting surface" or "ReviewLock does not claim that user reports disappear." If the team wants to ban this frame completely outside guardrail docs, add `unreportable` to the final forbidden-copy scan and keep remaining matches limited to claim-audit/guardrail sections.
+- Files reviewed:
+  - `APP_LISTING.md`
+  - `DEVPOST_SUBMISSION.md`
+  - `README.md`
+  - `CLAIM_COPY_AUDIT.md`
+  - `LAUNCH_CHECKLIST.md`
+
+## 2026-05-26 18:58 IST - Recheck
+
+- Area: Form-token masking patch may break Devvit form display because `isSecret` is restricted to app-scoped settings.
+- Result: Evidence path correction for the 18:50 finding.
+- Evidence:
+  - The blocks UI client validation path is `node_modules/@devvit/public-api/devvit/internals/blocks/handler/UIClient.js:61-79`, not `node_modules/@devvit/public-api/apis/ui/blocks/handler/UIClient.js`.
+  - The corrected path also calls `assertValidFormFields(formData.fields)` before transforming and emitting the form.
+- Boundary:
+  - This strengthens the validator-risk finding; it still does not prove whether Devvit Web menu/form `UiResponse` objects are validated through these exact UIClient helpers at runtime.
+
+## 2026-05-26 19:02 IST - Finding
+
+- Severity: medium
+- Area: Uploaded Devvit version `0.0.5` no longer matches the current dirty source tree if the form-token patch is kept.
+- Evidence:
+  - `git status --short` currently shows modified implementation files: `src/routes/menu.ts` and `src/routes/menu.test.ts`.
+  - `src/routes/menu.ts:129-134` and `src/routes/menu.ts:199-205` now include the unuploaded `isSecret: true` form-token change.
+  - `DEVPOST_SUBMISSION.md:21-28`, `DEVPOST_SUBMISSION.md:53-54`, `APP_LISTING.md:7-18`, and `RUNTIME_PROOF.md:21-30` all describe the current uploaded Devvit app state as version `0.0.5`.
+  - Fresh `npx devvit view --json` still reports uploaded version `0.0.5`, uploaded at `2026-05-26T11:43:06.145Z`.
+- Why it matters: This is normal during active development, but it becomes a submission risk if not closed before final handoff. Judges and App Directory reviewers will exercise the uploaded app, not the dirty local source tree. Any retained source fix after `0.0.5` needs a fresh local gate, upload/publish step, and doc update before Devpost copy says the listing contains the final behavior.
+- Suggested fix: After resolving the `isSecret`/form-token strategy, run the full local gate, upload a new Devvit version, rerun `npx devvit view --json`, and update `docs/RUNTIME_PROOF.md`, `docs/APP_LISTING.md`, `docs/DEVPOST_SUBMISSION.md`, and `docs/CLAIM_COPY_AUDIT.md` with the final uploaded version. If the implementation patch is abandoned, remove it before final upload and recapture screenshots accordingly.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+
+## 2026-05-26 19:08 IST - Recheck
+
+- Area: Selected final Devpost screenshots include visible text overlap/clipping in the dashboard audit/table area.
+- Result: Partially resolved in the current worktree, but not submission-clean yet.
+- Evidence:
+  - Current `git status --short` shows concurrent main-agent changes to `src/client/styles.css` and updated `output/submission/03-local-dashboard-active-locks.png`, `output/submission/04-local-reopened-after-edit.png`, and `output/submission/05-local-demo-mode.png`.
+  - Visual review of the updated `03-local-dashboard-active-locks.png`, `04-local-reopened-after-edit.png`, and `05-local-demo-mode.png` no longer shows the earlier bottom-right audit timeline text collision.
+  - Visual review of updated `03-local-dashboard-active-locks.png` still shows the active-lock table action button clipped at the right edge (`Unlock` appears truncated), and `05-local-demo-mode.png` shows the same action-column clipping for demo action buttons.
+  - `src/client/styles.css:547-596` applies `table-layout: fixed` globally and assigns the seventh column only `7%` width, which appears too narrow for action buttons in the final screenshot viewport.
+- Why it matters: The screenshot fix moved in the right direction, but the final Devpost screenshots still visibly clip core table controls. This remains a polish risk for judges because the screenshots are the main proof that the dashboard is usable and production-grade.
+- Suggested fix: Give the action column a stable button-safe width, or apply table-specific column widths only to the active-lock table instead of global `nth-child` widths. Recapture and visually reopen the final PNGs after the action buttons render fully.
+- Files reviewed:
+  - `src/client/styles.css`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/04-local-reopened-after-edit.png`
+  - `output/submission/05-local-demo-mode.png`
+
+## 2026-05-26 19:14 IST - Finding
+
+- Severity: medium
+- Area: Updated final screenshots are stale relative to the current active-lock UI source.
+- Evidence:
+  - `src/client/components/LockTable.ts:121-125` now renders active locks as `<ul class="lock-list">${rows}</ul>` rather than a table.
+  - `src/client/components/LockTable.ts:81-110` renders each active lock as `<li class="lock-row">`.
+  - Visual review of the current `output/submission/03-local-dashboard-active-locks.png` still shows the old active-lock table with column headers `Target`, `Author`, `Content`, `Reason`, `Reports suppressed`, `Locked`, and `Action`.
+  - Visual review of the current `output/submission/05-local-demo-mode.png` also still shows the old table layout.
+  - Those screenshots still show the action column clipped at the right edge, which the new list-based source appears intended to address.
+- Why it matters: The screenshot set is the judge-facing proof of dashboard polish. If the final Devpost artifacts are stale relative to the source, they can keep showing a visual defect after the code fix lands, and reviewers cannot tell which UI version is actually shipped.
+- Suggested fix: Rebuild the client bundle after the `LockTable.ts` change, recapture `output/submission/03-local-dashboard-active-locks.png` and `output/submission/05-local-demo-mode.png` from that rebuilt UI, then visually confirm the active-lock area no longer uses the old table or clips action controls.
+- Files reviewed:
+  - `src/client/components/LockTable.ts`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/05-local-demo-mode.png`
+
+## 2026-05-26 19:17 IST - Recheck
+
+- Area: Form-token masking patch may break Devvit form display because `isSecret` is restricted to app-scoped settings.
+- Result: Local package validator reproduction confirms the installed Devvit helper rejects the current no-scope secret string field.
+- Evidence:
+  - Command run:
+    `node --input-type=module <<'NODE' ... import ./node_modules/@devvit/client/effects/helpers/assert-valid-form-fields.js ... NODE`
+  - Result:
+    - `no-scope: FAIL Invalid setting: only app settings can be secrets. Add "scope: SettingScope.App" to field "formToken"`
+    - `app: PASS`
+  - The current implementation at `src/routes/menu.ts:129-134` and `src/routes/menu.ts:199-205` uses `isSecret: true` without `scope: 'app'`.
+- Why it matters: This removes most uncertainty about the installed Devvit validation rule itself. The remaining uncertainty is only whether the Devvit Web menu-response path bypasses this helper. Until live playtest proves otherwise, the current no-scope `isSecret` patch should be treated as unsafe for the core forms.
+- Suggested fix: Either add a Devvit-supported scope and live-test the menu forms, or replace this with a token strategy that does not depend on `isSecret`. Do not recapture final form screenshots or upload a final app version until the live `Lock review` and `Unlock review` forms open successfully.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `node_modules/@devvit/client/effects/helpers/assert-valid-form-fields.js`
+
+## 2026-05-26 19:00 IST - Recheck
+
+- Area: Final Devpost screenshot set after active-lock layout and recapture changes.
+- Result: Partially resolved in the current worktree.
+- Evidence:
+  - Visual review of the latest `output/submission/03-local-dashboard-active-locks.png` shows the active-lock area no longer uses the old header table layout, the audit overlap is not visible, and `Unlock` controls are fully visible.
+  - Visual review of the latest `output/submission/04-local-reopened-after-edit.png` shows the reopen queue, active locks, report churn, and runtime proof panels without the earlier action-column clipping.
+  - Visual review of the latest `output/submission/05-local-demo-mode.png` shows the demo banner, demo namespace, and `Demo read-only` controls fully visible instead of clipped at the right edge.
+  - The lock-form screenshot remains stale relative to the current source: `output/submission/01-live-lock-form-zen.png` still shows a raw `Review token` value and a private `r/reviewlock_dev` context, while `src/routes/menu.ts:129-134` and `src/routes/menu.ts:199-205` now contain the unuploaded `isSecret: true` token change.
+  - `docs/SCREENSHOTS.md:14` still labels `output/submission/02-live-dashboard-runtime-proof.png` as a live Reddit WebView runtime proof screenshot even though it is selected from the local Playwright artifact `output/playwright/runtime-proof-evidence-desktop-verified.png`.
+- Why it matters: The dashboard visual polish issue is largely fixed for the local screenshot set, but the final Devpost assets still mix stale live-form proof, private-subreddit evidence, and an overclaimed local runtime screenshot. Judges should see clean visuals without weakening ReviewLock's proof-boundary discipline.
+- Suggested fix: Keep the regenerated dashboard screenshots if they still match the final built bundle, recapture the lock-form screenshot only after the final form-token strategy is live-tested, recaption or replace slot 2 so local browser proof is not called live WebView proof, and fill the final public judging Reddit post URL before submission.
+- Files reviewed:
+  - `output/submission/01-live-lock-form-zen.png`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/04-local-reopened-after-edit.png`
+  - `output/submission/05-local-demo-mode.png`
+  - `docs/SCREENSHOTS.md`
+  - `src/routes/menu.ts`
+
+## 2026-05-26 19:00 IST - Recheck
+
+- Area: Submission access and screenshot proof-boundary docs after the latest main-agent edits.
+- Result: Partially resolved in the current worktree.
+- Evidence:
+  - `docs/LAUNCH_CHECKLIST.md:165-173` now explicitly requires the final Reddit post to run ReviewLock in a public subreddit under 200 members, accessible without developer-only playtest privileges, and keeps `r/reviewlock_dev` scoped as private controlled proof. This resolves the ambiguous "playtest access is otherwise valid" wording.
+  - `docs/DEVPOST_SUBMISSION.md:269-274` now warns not to use `r/reviewlock_dev`, private controlled-proof screenshots, or a developer-only playtest URL as the judging access link, but still contains `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED`.
+  - `docs/SCREENSHOTS.md:15-17` now correctly labels slots 3-5 as local built-client captures with mocked dashboard API data.
+  - `docs/SCREENSHOTS.md:14` still labels slot 2 as a "Live Reddit WebView runtime proof screenshot selected from `output/playwright/runtime-proof-evidence-desktop-verified.png`", and `docs/SCREENSHOTS.md:23-24` still says it is selected from the live runtime proof screenshot set even though that source artifact is documented as local browser proof with mocked API responses.
+  - `docs/DEVPOST_SUBMISSION.md:122-123` and `docs/APP_LISTING.md:43-45` still use the "unreportable/users cannot submit reports" frame in judge-facing copy instead of the cleaner README phrasing about not changing Reddit's reporting surface.
+- Why it matters: The judging-access checklist is now safer, but final submission still has two proof/copy risks: no actual public judging URL yet, and one screenshot source is still overstated. The remaining wording issue is lower severity, but it keeps the risky "unreportable" mental model in the main judge-facing artifacts.
+- Suggested fix: Fill the final public Reddit post URL after upload/playtest confirmation, recaption or replace screenshot slot 2 so it is not called live WebView proof unless recaptured inside Reddit, and replace the judge-facing "unreportable/users cannot submit reports" wording with "ReviewLock does not change Reddit's reporting surface."
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/SCREENSHOTS.md`
+  - `docs/APP_LISTING.md`
+
+## 2026-05-26 19:03 IST - Recheck
+
+- Area: Form-token masking patch and Devvit form-field validation.
+- Result: Locally resolved for the installed validator shape; live form proof still required.
+- Evidence:
+  - `src/routes/menu.ts:129-135` now marks the lock `formToken` field with `isSecret: true` and `scope: 'app'`.
+  - `src/routes/menu.ts:201-207` now marks the unlock `formToken` field with `isSecret: true` and `scope: 'app'`.
+  - `src/routes/menu.test.ts` now asserts both `isSecret: true` and `scope: 'app'` on lock and unlock form-token fields.
+  - `npm run test -- src/routes/menu.test.ts --reporter verbose` passes with 17 tests.
+  - Direct installed-validator check against the current secret-token field shape passed:
+    `node --input-type=module <<'NODE' ... assertValidFormFields([{ name: 'formToken', type: 'string', isSecret: true, scope: 'app', ... }]) ... NODE`
+    returned `current-secret-token-shape: PASS`.
+- Why it matters: The prior high-risk no-scope `isSecret` shape is no longer locally invalid against the installed Devvit validator. However, this still does not prove the live Devvit menu/form response path masks the token correctly or preserves the submitted token value, and the current final lock-form screenshot still shows the pre-fix raw token.
+- Suggested fix: Treat the validator-risk finding as resolved after full local gate, but keep final upload blocked until a controlled live `Lock review` and `Unlock review` form-open proof confirms the forms render and submit with the scoped secret token. Recapture `output/submission/01-live-lock-form-zen.png` after that proof so the final screenshot no longer exposes a raw token.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `node_modules/@devvit/client/effects/helpers/assert-valid-form-fields.js`
+  - `output/submission/01-live-lock-form-zen.png`
+
+## 2026-05-26 19:06 IST - Finding
+
+- Severity: medium
+- Area: Current active-lock layout changes lack fresh mobile/tablet browser proof.
+- Evidence:
+  - The current dirty implementation changes replace the active-lock table with a list/grid layout in `src/client/components/LockTable.ts:71-129` and add new `.lock-list`, `.lock-row`, and `.lock-meta` CSS in `src/client/styles.css:656-726`.
+  - The regenerated final submission artifacts are desktop-sized only: `output/submission/03-local-dashboard-active-locks.png`, `04-local-reopened-after-edit.png`, and `05-local-demo-mode.png` are all `1364 x 768` and were last modified on 2026-05-26 18:58.
+  - The available mobile browser artifacts, `output/playwright/wave32-live-mobile-current.png` and `output/playwright/wave32-demo-mobile-current.png`, are `390px` captures from 2026-05-24 23:15, before the current `LockTable.ts` and `styles.css` dirty changes.
+  - The current desktop lock row uses fixed minimum grid columns, `minmax(130px, 0.75fr) minmax(170px, 1fr) minmax(255px, 1.3fr) minmax(112px, max-content)` (`src/client/styles.css:669-672`), while the dashboard content grid stays two-column until `max-width: 900px` (`src/client/styles.css:305-307`, `1110-1144`). That leaves a plausible small-desktop/tablet width band where the left panel can be narrower than the lock row's minimum content width.
+- Why it matters: The visible desktop screenshots are now much cleaner, but final polish depends on the dashboard not overflowing or clipping on mobile and embedded WebView widths. The latest proof artifacts do not cover the changed active-lock layout at mobile or tablet widths.
+- Suggested fix: After the final active-lock CSS settles, run a fresh browser pass against the built client at desktop, tablet/small-desktop around `1024px`, and mobile around `390px`. Check document horizontal overflow, active-lock row clipping, demo read-only badges, unlock confirmation controls, and the first viewport. Update `docs/BROWSER_REGRESSION.md` with the exact command/results and screenshot paths.
+- Files reviewed:
+  - `src/client/components/LockTable.ts`
+  - `src/client/styles.css`
+  - `docs/BROWSER_REGRESSION.md`
+  - `output/submission/03-local-dashboard-active-locks.png`
+  - `output/submission/04-local-reopened-after-edit.png`
+  - `output/submission/05-local-demo-mode.png`
+  - `output/playwright/wave32-live-mobile-current.png`
+  - `output/playwright/wave32-demo-mobile-current.png`
+
+## 2026-05-26 19:10 IST - Recheck
+
+- Area: Screenshot proof-boundary and forbidden-copy cleanup after the latest submission docs edits.
+- Result: Mostly resolved, with the live lock-form screenshot still open.
+- Evidence:
+  - `docs/SCREENSHOTS.md:13-17` now separates slot 1 as live Reddit proof, slot 2 as a local browser proof artifact, and slots 3-5 as local built-client captures with mocked dashboard API data.
+  - `docs/SCREENSHOTS.md:21-30` explicitly says slot 2 should not be captioned as live Reddit WebView proof unless recaptured inside Reddit.
+  - `docs/DEVPOST_SUBMISSION.md:120-129` and `docs/APP_LISTING.md:40-47` now use the safer reporting-surface framing instead of saying ReviewLock makes content unreportable.
+  - A focused forbidden-copy scan over README, submission docs, app listing copy, screenshot docs, launch checklist, client, and server leaves matches only in claim-audit/test contexts: `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|unreportable|AI decides|automatic removal|permanent|forever" README.md docs/DEVPOST_SUBMISSION.md docs/APP_LISTING.md docs/SCREENSHOTS.md docs/CLAIM_COPY_AUDIT.md docs/LAUNCH_CHECKLIST.md src || true`.
+  - `output/submission/01-live-lock-form-zen.png` is still timestamped 2026-05-26 18:33 IST, before the current scoped-secret form-token patch and before the latest `0.0.7` upload recorded in `docs/RUNTIME_PROOF.md:21-30`.
+- Why it matters: The docs now draw the right proof boundary, but the first screenshot in the final Devpost set can still show stale form UI behavior. The form screenshot is judge-facing evidence of the primary workflow, so it should match the final uploaded app and the final token-masking strategy.
+- Suggested fix: After live-opening the final `Lock review` form on version `0.0.7` or newer, recapture `output/submission/01-live-lock-form-zen.png` and recheck that no raw form token is visible. Keep `r/reviewlock_dev` labeled as controlled proof, not final judging access.
+- Files reviewed:
+  - `docs/SCREENSHOTS.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `output/submission/01-live-lock-form-zen.png`
+
+## 2026-05-26 19:10 IST - Finding
+
+- Severity: low
+- Area: Runtime proof document timestamp is stale relative to the latest upload evidence it now contains.
+- Evidence:
+  - `docs/RUNTIME_PROOF.md:3` says `Last updated: 2026-05-26 19:02 IST`.
+  - The same document now records a later upload completed through `npm run deploy` on 2026-05-26 19:06 IST and uploaded version `0.0.7` at `2026-05-26T13:36:40.112Z`: `docs/RUNTIME_PROOF.md:21-30`.
+  - Fresh `npx devvit view --json` confirms the uploaded app version is `0.0.7`, `uploadedAt: 2026-05-26T13:36:40.112Z`, and `version.about` is populated, while app-level `description`, `marketingInfo`, `privacyPolicy`, and `termsAndConditions` remain empty.
+- Why it matters: This is not a runtime bug, but ReviewLock's submission package relies on proof discipline. A stale `Last updated` timestamp inside the primary runtime proof file makes it harder to tell whether the upload/listing proof was recorded before or after the final deploy.
+- Suggested fix: Update the `Last updated` line when the final proof docs are reconciled after the last upload and browser/WebView recheck. Include the exact `npx devvit view --json` version and uploadedAt values in the final pass.
+- Files reviewed:
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/APP_LISTING.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+
+## 2026-05-26 19:30 IST - Finding
+
+- Severity: medium
+- Area: Submission docs cite stale uploaded Devvit version and listing state.
+- Evidence:
+  - Fresh `npx devvit view --json` reports app `reviewlock`, owner `BrightyBrainiac`, `versionsCount: 360`, latest uploaded version `0.0.8`, `visibility: 1`, `uploadedAt: 2026-05-26T13:54:10.750Z`, and empty app-level `description`, `privacyPolicy`, `termsAndConditions`, and `categories`.
+  - `docs/DEVPOST_SUBMISSION.md:21-24` still says `npm run deploy` uploaded version `0.0.7`, and `docs/DEVPOST_SUBMISSION.md:53-54` says `version.about` is current as of `0.0.7`.
+  - `docs/APP_LISTING.md:7-16` still describes current listing state as upload `0.0.7`, and `docs/APP_LISTING.md:152-154` marks `version.about` confirmation after upload `0.0.7`.
+  - `docs/RUNTIME_PROOF.md:21-31` says `versions count is 359` and current uploaded version is `0.0.7`; `docs/RUNTIME_PROOF.md:95-100` says deploy auto-bumped to `0.0.7`.
+  - `docs/CLAIM_COPY_AUDIT.md:15-16` and `docs/CLAIM_COPY_AUDIT.md:93-96` also cite `0.0.7` and versions count `359` as fresh.
+- Why it matters: Devpost/App Directory reviewers need one authoritative final build story. If final docs claim `0.0.7` while the Developer Portal shows `0.0.8`, reviewers and the main agent can no longer tell which source snapshot, proof boundary, screenshots, and listing copy correspond to the submitted app. This is especially risky because the current `0.0.8` upload is still private (`visibility: 1`) and app-level metadata is still empty, so stale "current listing" language can make the launch checklist look more complete than it is.
+- Suggested fix: After the final form-contract and browser proof pass settle, rerun `npx devvit view --json` and update all final-facing docs to the actual submitted version, uploaded timestamp, version count, visibility/publish-request status, and app-level metadata state. Avoid marking App Directory/listing fields complete until the CLI or Developer Portal evidence shows they are populated or explicitly unavailable.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-26 19:10 IST - Finding
+
+- Severity: low
+- Area: Devpost capability copy still says "active-lock table" after the dashboard source changed active locks to a list layout.
+- Evidence:
+  - `docs/DEVPOST_SUBMISSION.md:111-114` describes the dashboard as including an `Active-lock table`.
+  - The current implementation renders active locks as a list: `src/client/components/LockTable.ts:81-125` emits `<li class="lock-row">` rows inside `<ul class="lock-list">`.
+  - `src/client/styles.css:656-726` defines the new `.lock-list`, `.lock-row`, and `.lock-meta` layout.
+- Why it matters: This is a small copy drift, not a functional bug. Still, the final Devpost copy should match the UI judges see in screenshots and the uploaded app. Calling it a table can make the active-lock layout change look accidental or stale.
+- Suggested fix: Replace `Active-lock table` with `Active-lock list` or `Active locks view` in final Devpost copy after the active-lock layout is settled.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `src/client/components/LockTable.ts`
+  - `src/client/styles.css`
+
+## 2026-05-26 19:12 IST - Recheck
+
+- Area: Scoped-secret form-token patch local validation.
+- Result: Locally resolved for TypeScript and targeted route coverage; live form proof still remains open.
+- Evidence:
+  - `npm run type-check` passed.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts --reporter verbose` passed with 2 files and 50 tests.
+  - `src/routes/menu.ts:129-135` and `src/routes/menu.ts:201-207` keep `formToken` as `isSecret: true` with `scope: 'app'`.
+  - `src/routes/forms.ts:250-277` and `src/routes/forms.ts:310-332` consume the Redis binding and use the bound target/lock identity for lock/unlock operations.
+- Why it matters: This reduces the risk that the token-masking patch is locally invalid or breaks the server-side form submit contract. It does not prove Reddit's live form UI masks the field or submits the secret default value as expected.
+- Suggested fix: Keep the existing live-proof blocker: open and submit controlled `Lock review` and `Unlock review` forms on the final uploaded version, then recapture the lock-form screenshot without a visible raw token.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.ts`
+
+## 2026-05-26 19:20 IST - Recheck
+
+- Area: Current form-binding hardening local gate after main-agent updates.
+- Result: Still blocked, but narrower than the previous high finding.
+- Evidence:
+  - `npm run type-check` still fails with `src/routes/menu.test.ts(77,48): error TS2554: Expected 1-2 arguments, but got 3.`
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts --reporter verbose` now reports 53 passing tests and 9 failing tests.
+  - `src/server/services/formBindings.test.ts` now passes all 12 tests, including the new context-consume coverage at `src/server/services/formBindings.test.ts:37-129`.
+  - The remaining failures are in `src/routes/menu.test.ts` and `src/routes/forms.test.ts`, mainly because those tests still expect the previous submitted `formToken` contract and older stale-form messages.
+- Why it matters: The helper-level expiry/rollback problem from the earlier high finding appears addressed locally, so the remaining release blocker is the route/form contract and its tests. This should keep the fix focused rather than reopening the whole Redis binding helper.
+- Suggested fix: Update or restore the menu/form route contract next, then rerun `npm run type-check` and the same targeted test command. Keep the disabled-field live-proof concern open until a controlled Devvit form open+submit pass proves the final contract.
+- Files reviewed:
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/server/services/formBindings.ts`
+
+## 2026-05-26 19:21 IST - Finding
+
+- Severity: medium
+- Area: Current no-token form strategy does not use Devvit's supported `showForm.data` channel.
+- Evidence:
+  - Installed Devvit types define `ShowForm.data` as supported initial form data: `node_modules/@devvit/shared/types/ui-response.d.ts:21-28`.
+  - The installed build-pack validates `showForm.data` as an object and forwards it into `ctx.ui.showFormInternal(...)`: `node_modules/@devvit/build-pack/esbuild/templatizer/blocks.template.js:159-166` and `node_modules/@devvit/build-pack/esbuild/templatizer/blocks.template.js:230-231`.
+  - The current menu handlers create Redis bindings but return only `showForm.name` and `showForm.form`, with no `showForm.data`: `src/routes/menu.ts:264-268` and `src/routes/menu.ts:321-329`.
+  - The current form handlers therefore rely on user-submitted form field values for `targetId` and `subreddit`: `src/routes/forms.ts:202-210` and `src/routes/forms.ts:289-295`.
+- Why it matters: This is a concrete integration risk and a missed simpler hardening path. The current implementation removed visible/secret `formToken` fields but still needs submitted identity values to find the context binding. Devvit already exposes a form data channel that may let ReviewLock pass non-displayed target/subreddit/lock context into the form submission without relying on disabled field submission behavior or visible token fields. If the final contract uses no visible token, this should be evaluated before live proof and screenshots.
+- Suggested fix: Prototype the final contract using `showForm.data` for `targetId`, `subreddit`, and `lockId` if Devvit preserves that data through form submission in this Web server path. Add route tests that assert the data object is emitted and form-submit tests that work without visible identity fields. If live testing shows `showForm.data` is not returned on submit, document that blocker and use the scoped-secret token fallback instead.
+- Files reviewed:
+  - `node_modules/@devvit/shared/types/ui-response.d.ts`
+  - `node_modules/@devvit/build-pack/esbuild/templatizer/blocks.template.js`
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+
+## 2026-05-26 19:22 IST - Recheck
+
+- Area: Current form-binding hardening local gate after latest main-agent test updates.
+- Result: Locally resolved for TypeScript and the touched route/helper suites; live Devvit form-submit proof remains open.
+- Evidence:
+  - `npm run type-check` passed.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts --reporter verbose` passed with 3 files and 62 tests.
+  - `src/routes/menu.test.ts` now expects the no-visible-token contract, including no `formToken` field in lock/unlock forms.
+  - `src/routes/forms.test.ts` now expects the no-token submit errors and stale-context behavior.
+  - `src/server/services/formBindings.test.ts` now covers context consumption, concurrent context consumption, stale submitted lock IDs, and expiry rollback for both binding/context keys.
+- Why it matters: The immediate red-gate blocker from the earlier high finding is no longer present locally. The remaining risk is not type/test drift; it is whether the final no-token Devvit form contract works in live Reddit form submission, especially around disabled fields and/or `showForm.data`.
+- Suggested fix: Keep final upload/screenshots blocked until a controlled live `Lock review` and `Unlock review` open+submit pass proves the final no-visible-token contract. If that live pass fails due to omitted disabled fields, switch to `showForm.data` or the scoped-secret token fallback and rerun this same local gate.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:23 IST - Finding
+
+- Severity: high
+- Area: Stale unlock forms can unlock a newer lock when Devvit omits the disabled `lockId` field.
+- Evidence:
+  - The context binding key ignores `lockId`; it is only `form-context:${action}:${targetId}`: `src/server/services/formBindings.ts:27-36`.
+  - Opening a later unlock form for the same target overwrites the context key with the new token and deletes the previous token: `src/server/services/formBindings.ts:140-160`.
+  - `consumeFormBindingByContext(...)` only enforces the `lockId` check when a submitted `lockId` is present: `src/server/services/formBindings.ts:256-261`.
+  - The unlock form route passes the submitted `lockId`, but treats it as optional and later only rejects mismatches when `lockId` is truthy: `src/routes/forms.ts:289-323`.
+  - Existing tests intentionally allow unlock submission when Devvit omits the disabled `lockId` field: `src/routes/forms.test.ts:770-804`.
+  - Existing stale-unlock coverage only covers a submitted wrong `lockId`: `src/routes/forms.test.ts:806-839`. It does not cover the stale-form case where the old form submits no `lockId` after a newer unlock binding has replaced the context key.
+- Why it matters: This reopens the stale-confirmation bug that the lock-id binding was meant to prevent. Concrete race: moderator opens an unlock form for lock A and leaves it open; the target is relocked as lock B and another unlock form is opened, replacing the target-scoped context token; the old form submits without `lockId` because Devvit omitted the disabled field; ReviewLock consumes the latest target context and unlocks lock B even though the moderator confirmed the old form. That is a destructive moderation action against the wrong reviewed lock.
+- Suggested fix: Include the lock id in the server-side context key for unlock bindings, or require a non-editable submitted/context-carried lock id for unlock submits. If Devvit can omit disabled fields, use `showForm.data` or a supported secret/hidden field for `lockId`; otherwise do not allow omitted `lockId` to consume a target-only unlock context. Add a regression where an old unlock form submits without `lockId` after a newer unlock binding exists and verify it does not unlock the newer lock.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+
+## 2026-05-26 19:24 IST - Finding
+
+- Severity: high
+- Area: Stale lock forms can lock a newer reviewed snapshot after another lock form overwrites the target-scoped context.
+- Evidence:
+  - The context binding key is target-scoped only: `src/server/services/formBindings.ts:27-36` builds `form-context:${action}:${targetId}`.
+  - Opening a later lock form for the same target replaces the context token and deletes the previous token: `src/server/services/formBindings.ts:139-160`.
+  - The lock submit route no longer consumes the submitted `formToken`; it consumes whatever lock binding currently exists for the submitted target context: `src/routes/forms.ts:202-247`.
+  - The route then uses the consumed binding's `reviewedContentHash` as the expected reviewed snapshot: `src/routes/forms.ts:267-274`.
+  - Existing stale-lock coverage only proves that a single old binding rejects when the current content changed: `src/routes/forms.test.ts:158-185`. There is no regression where an old form submits after a newer lock form for the same target has replaced the target context.
+- Why it matters: This weakens ReviewLock's core safety promise. Concrete race: moderator opens a lock form after reviewing content A; author edits to content B; moderator or another mod opens a new lock form for content B, replacing the target-scoped context; the old content-A form submits without a token; ReviewLock consumes the newer content-B binding and can lock content B even though the submitting moderator confirmed a form that displayed content A. The hash check passes against the newer binding, so the stale review is not detected.
+- Suggested fix: Bind form submission to a per-form nonce that cannot be overwritten by later forms, or carry a trusted reviewed-snapshot identifier through `showForm.data`/a supported hidden or secret field. If target-scoped context is kept, do not delete/replace older lock contexts in a way that lets old forms resolve to newer reviewed snapshots. Add a regression that opens two lock bindings around a content change and proves the old form cannot lock the newer snapshot.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+
+## 2026-05-26 19:25 IST - Finding
+
+- Severity: medium
+- Area: Devpost draft overclaims stale-confirmation hardening while current form contract still has stale-form races.
+- Evidence:
+  - `docs/DEVPOST_SUBMISSION.md:237-239` lists "stale confirmations" among the app behaviors already hardened.
+  - The current form context is target-scoped only: `src/server/services/formBindings.ts:27-36`.
+  - Opening a later form for the same target overwrites the target context and deletes the previous token: `src/server/services/formBindings.ts:139-160`.
+  - The lock submit route consumes the current target context and uses that binding's reviewed hash: `src/routes/forms.ts:247-274`.
+  - The unlock submit route permits omitted `lockId` and only rejects lock mismatches when a submitted `lockId` is present: `src/routes/forms.ts:306-323`.
+- Why it matters: This is a judge-facing claim mismatch. "Stale confirmations" is exactly the class of bug the current no-token context work is trying to harden, but the implementation still has stale lock/unlock races. If the draft is submitted as-is before those races are fixed, it overstates the reliability story in an area reviewers are likely to care about.
+- Suggested fix: Either fix the stale lock/unlock form races and keep the accomplishment, or soften the Devpost line to something narrower like "hardened several stale confirmation paths, with final form-contract live proof pending." Recheck this copy after the form-contract fix and before final Devpost submission.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `src/server/services/formBindings.ts`
+  - `src/routes/forms.ts`
+
+## 2026-05-26 19:25 IST - Recheck
+
+- Area: Current local validation after no-token form-contract changes.
+- Result: Local gate is green, but high-severity stale-form findings remain open.
+- Evidence:
+  - `npm run type-check` passed earlier in this pass.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts --reporter verbose` passed with 3 files and 62 tests earlier in this pass.
+  - `npm run lint` passed.
+  - `npm run test` passed with 43 files and 437 tests.
+  - `npm run build` passed.
+  - `git diff --check` passed.
+  - `rg -n "TODO|FIXME|XXX" src || true` returned no source markers.
+- Why it matters: The main agent can treat the current TypeScript/test/lint/build gate as green. The remaining release blockers are not broad local failures; they are unresolved behavioral risks around target-scoped form context, stale lock/unlock confirmations, live Devvit form-submit proof, stale screenshots, and final publish/judging access.
+- Suggested fix: After addressing the stale form-context findings, rerun the same full local gate before upload/publish and update `docs/RUNTIME_PROOF.md` with the exact commands and results.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:14 IST - Finding
+
+- Severity: medium
+- Area: Current Devpost app-listing status can be read as ready even though the uploaded version is still private owner/test distribution.
+- Evidence:
+  - `docs/DEVPOST_SUBMISSION.md:21-24` says the app listing URL exists and version `0.0.7` has populated `version.about`.
+  - Fresh `npx devvit view --json` reports the latest version as `majorVersion: 0`, `minorVersion: 0`, `patchVersion: 7`, and `visibility: 1`.
+  - Installed Devvit typings define `VersionVisibility.PRIVATE = 1`, `PUBLIC = 0`, and `UNLISTED = 2`: `node_modules/@devvit/protos/json/devvit/dev_portal/app_version/info/app_version_info.js:8-13`.
+  - `npx devvit upload --help` says uploaded apps are only visible to the app owner and can only be installed to a small test subreddit with fewer than 200 subscribers.
+  - `npx devvit publish --help` says `devvit publish` creates a new app version, uploads source for review, and files a publish request; `--public` submits for public review, while unlisted is the default.
+  - `docs/LAUNCH_CHECKLIST.md:140-159` correctly instructs the team to decide whether to file an unlisted or public publish request, but that checklist item is still unchecked.
+- Why it matters: Devpost requires an app listing link and judging access to a working app. A private uploaded version and owner-visible listing may be enough for internal playtest proof, but it should not be treated as final judge-access evidence unless Reddit's hackathon process explicitly accepts private owner-visible upload links. The final submission needs either an unlisted/public publish request or an explicit documented reason that the private upload satisfies the hackathon app-listing requirement.
+- Suggested fix: In the final submission docs, label the current Developer Portal URL as a candidate/private uploaded listing until `npx devvit publish` or `npx devvit publish --public` is run and `npx devvit view --json` shows the requested visibility/status. Record the final visibility, requested version, and any review status before replacing the Devpost app-listing/access fields.
+- Files reviewed:
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/APP_LISTING.md`
+  - `node_modules/@devvit/protos/json/devvit/dev_portal/app_version/info/app_version_info.js`
+## 2026-05-26 19:18 IST - Finding
+
+- Severity: high
+- Area: Current form-binding hardening change leaves the local gate red.
+- Evidence:
+  - `npm run type-check` currently fails with `src/routes/menu.test.ts(77,48): error TS2554: Expected 1-2 arguments, but got 3.`
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts --reporter verbose` currently fails with 10 failing tests across the menu, forms, and form-binding suites.
+  - `src/routes/menu.ts:102-155` now builds the lock form without a `formToken` field, and `src/routes/menu.ts:158-199` builds the unlock form without a `formToken` field.
+  - `src/routes/forms.ts:247` and `src/routes/forms.ts:306-312` now consume server-side bindings by context via `consumeFormBindingByContext(...)`, so submitted `formToken` is no longer part of the route contract.
+  - The tests still assert the previous visible/secret-token contract: `src/routes/menu.test.ts:69`, `src/routes/menu.test.ts:77`, `src/routes/menu.test.ts:128-130`, `src/routes/menu.test.ts:379`, and `src/routes/menu.test.ts:421-423`.
+  - `src/server/services/formBindings.ts:151-156` now writes and expires both a token key and a context key, but `src/server/services/formBindings.test.ts:188-191` still expects only one key write during expiry rollback.
+- Why it matters: This is a hard release blocker. ReviewLock cannot be uploaded, published, or used for final screenshots while the required local gate is failing. It also means the form-token security hardening is not yet reviewable as a coherent contract: the source has moved to context-bound Redis bindings, while tests and some expected error messages still describe the previous token-submission behavior.
+- Suggested fix: Pick one final form contract and make the source, tests, and live proof match it. If the intended final contract is context-bound bindings with no visible `formToken`, update the menu tests to assert no token field is rendered, add focused tests for context-key creation/expiry/rollback and stale-context behavior, update the form-route stale/error-message assertions, then rerun `npm run type-check`, the targeted suites, and the full local gate. If the intended final contract is scoped-secret `formToken`, restore the token field in `buildLockReviewForm`/`buildUnlockReviewForm` and keep the `isSecret: true, scope: 'app'` validator coverage.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:19 IST - Finding
+
+- Severity: medium
+- Area: No-token form-binding contract depends on disabled target fields being submitted by Devvit.
+- Evidence:
+  - `src/routes/menu.ts:112-119` renders the lock `targetId` as a disabled form field, and `src/routes/menu.ts:166-180` renders unlock `targetId` and `lockId` as disabled form fields.
+  - `src/routes/forms.ts:202-209` reads `body.targetId` and rejects the lock form before consuming the context binding when `targetId` is missing.
+  - `src/routes/forms.ts:289-295` reads `body.targetId` and rejects the unlock form before consuming the context binding when `targetId` is missing.
+  - The current context-binding strategy removes the previously submitted `formToken` from the form, so there is no independent submitted nonce the server can use to recover the target identity if Devvit omits disabled fields on submit.
+  - Existing form tests cover an omitted disabled `lockId` on unlock (`src/routes/forms.test.ts:770-804`), but there is no equivalent regression for omitted disabled `targetId` on lock or unlock.
+- Why it matters: This may become a live installability failure even after the local tests are made green. Many form systems treat disabled fields as display-only and omit them from submitted results. If Devvit does that for menu forms, a moderator could open a valid `Lock review` or `Unlock review` form and then receive a required-target toast on submit, while the Redis context binding still contains the correct target. That would break the primary moderation workflow at runtime.
+- Suggested fix: Do not make the final no-token contract depend solely on submitted disabled fields until live Devvit form behavior is proven. Either keep a supported secret/hidden submitted nonce, or add a Devvit-supported non-editable submitted field/data mechanism. At minimum, add regressions for missing `targetId` on lock and unlock submissions and live-test the final uploaded form open+submit flow before recapturing the lock-form screenshot.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+  - `src/server/services/formBindings.ts`
+
+## 2026-05-26 19:30 IST - Recheck
+
+- Area: Current reviewer status after fresh repository, proof-doc, Devvit listing, and local-gate checks.
+- Result: Local gate remains green; submission/publish and stale form-context risks remain open.
+- Evidence:
+  - `git status --short` still shows 18 modified files across submission docs, screenshots, dashboard UI, and form-binding routes/helpers.
+  - `git diff --stat` still shows 18 files changed with 959 insertions and 143 deletions.
+  - `npm run type-check` passed.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts --reporter verbose` passed with 3 files and 62 tests.
+  - `git diff --check` passed.
+  - `npm run lint` passed.
+  - `npm run test` passed with 43 files and 437 tests.
+  - `npm run build` passed.
+  - Fresh `npx devvit view --json` reports latest uploaded version `0.0.8`, `visibility: 1`, and empty app-level listing metadata fields.
+- Why it matters: The main agent can treat the current dirty worktree as locally buildable/testable, but should not treat it as final release-ready. The remaining blockers are release and behavior proof issues: unresolved stale form-context findings, no fresh live Devvit form-submit proof for the no-token contract, stale `0.0.7` docs versus the current `0.0.8` upload, private listing visibility, missing final judging Reddit post URL, and browser/WebView recheck after client/screenshot changes.
+- Suggested fix: Address the high stale form-context findings first, rerun this exact gate, then refresh browser/WebView proof and update the submission docs to the final uploaded/published version and judging URL.
+- Files reviewed:
+  - `AGENTS.md`
+  - `plan.md`
+  - `docs/OWNERSHIP.md`
+  - `TODO.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/KNOWN_LIMITATIONS.md`
+  - `docs/MODERATION_METHOD_PROOF.md`
+  - `decisions.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/server/services/formBindings.ts`
+
+## 2026-05-26 19:32 IST - Finding
+
+- Severity: medium
+- Area: Menu form creation Redis failures are not converted into valid Devvit UI responses.
+- Evidence:
+  - The lock menu handler calls `createFormBinding(...)` directly before returning `showForm` and does not catch failures from Redis `set`/`expire`: `src/routes/menu.ts:255-268`.
+  - The unlock menu handler does the same after loading the active lock: `src/routes/menu.ts:313-329`.
+  - `createFormBinding(...)` performs Redis writes that can throw before a form is returned, including `redis.set(bindingKey, ...)`, `redis.set(contextKey, ...)`, and both expiry calls: `src/server/services/formBindings.ts:147-156`.
+  - Existing form-binding tests cover helper rollback when expiry fails (`src/server/services/formBindings.test.ts:269-289`), but the menu route tests do not cover a Redis write/expiry failure during `Lock review` or `Unlock review` form creation. The only nearby menu Redis-failure coverage is config-read fallback at `src/routes/menu.test.ts:188`.
+- Why it matters: A Redis blip while opening `Lock review` or `Unlock review` can escape the route handler as a server error instead of a valid Devvit `showToast`. That weakens the core installability story: moderators should get a clear retryable ReviewLock message, not a blank/failed Devvit form action, especially because Redis form bindings are now on the critical path before every lock/unlock form can open.
+- Suggested fix: Wrap `createFormBinding(...)` in the menu lock/unlock handlers and return a neutral retry toast such as `ReviewLock could not prepare the confirmation form. Reopen the menu and try again.` Add menu route regressions with a Redis store whose `set` or `expire` fails, asserting no `showForm` is returned and the response is still valid `UiResponse` JSON. If the helper can leave an orphan binding when the second `set` fails, add rollback there too.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:39 IST - Recheck
+
+- Area: Current no-visible-token form-binding hardening after main-agent follow-up edits.
+- Result: TypeScript and the focused form/menu/full-scenario gate are green; the earlier stale target-scoped context race appears addressed by timestamp-scoped context keys. Menu Redis failure handling remains open.
+- Evidence:
+  - `npm run type-check` passed.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts src/fullScenario.test.ts --reporter verbose` passed with 4 files and 64 tests.
+  - `git diff --check` passed.
+  - Form binding context keys now include the opened snapshot timestamp: `src/server/services/formBindings.ts:27-45`.
+  - `createFormBinding(...)` writes contexts under `action`, `targetId`, and `createdAt` instead of replacing every same-target context: `src/server/services/formBindings.ts:142-151`.
+  - Form submission consumes by `targetId` plus `reviewOpenedAt`: `src/routes/forms.ts:258-264` and `src/routes/forms.ts:332-339`.
+  - Regression coverage now proves same-target contexts remain separate by opened timestamp: `src/server/services/formBindings.test.ts:176-209`.
+  - Regression coverage still allows omitted disabled `lockId` only inside the matching timestamp-scoped binding: `src/routes/forms.test.ts:770-804`.
+- Why it matters: The main agent can treat the stale-form race findings from 19:23 and 19:24 as likely resolved in the current source, subject to live Devvit form-submit proof. The remaining blocker in this area is now narrower: whether Devvit reliably submits the visible identity fields and how Redis failures while preparing forms are surfaced to moderators.
+- Suggested fix: Keep the timestamp-scoped form contract, add live Devvit open+submit proof for final `Lock review` and `Unlock review`, and still address the open 19:32 finding by returning a neutral `showToast` if Redis form binding creation fails before `showForm`.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/routes/forms.ts`
+  - `src/routes/forms.test.ts`
+  - `src/routes/menu.test.ts`
+  - `src/fullScenario.test.ts`
+
+## 2026-05-26 19:40 IST - Recheck
+
+- Area: Broad local validation after current form-binding, dashboard, screenshot, and submission-doc edits.
+- Result: Full local gate is green in the current dirty worktree; release/publish/browser/live-proof risks remain open.
+- Evidence:
+  - `npm run type-check` passed earlier in this pass.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/formBindings.test.ts src/fullScenario.test.ts --reporter verbose` passed with 4 files and 64 tests.
+  - `git diff --check` passed.
+  - `npm run lint` passed.
+  - `npm run test` passed with 43 files and 438 tests.
+  - `npm run build` passed.
+- Why it matters: The main agent can treat the current source as locally buildable and testable again. This does not make the app release-ready by itself because the current source is still dirty, not yet re-uploaded/published after these edits, and still needs final browser/Devvit form-submit proof plus updated submission version metadata.
+- Suggested fix: Before final upload or publish, address the remaining open form-creation Redis failure path, rerun this gate, then run the browser/WebView and Devvit upload/publish checks and update `docs/RUNTIME_PROOF.md`, `docs/APP_LISTING.md`, and `docs/DEVPOST_SUBMISSION.md` to the final submitted version.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/client/components/LockTable.ts`
+  - `src/client/styles.css`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/RUNTIME_PROOF.md`
+
+## 2026-05-26 19:41 IST - Finding
+
+- Severity: medium
+- Area: Form binding creation can leak a permanent token key if the context-key write fails.
+- Evidence:
+  - `createFormBinding(...)` writes the token binding first and then writes the context pointer: `src/server/services/formBindings.ts:150-151`.
+  - The rollback `try/catch` starts only around the later expiry calls, not around the second `redis.set(...)`: `src/server/services/formBindings.ts:153-160`.
+  - If `redis.set(bindingKey, ...)` succeeds and `redis.set(contextKey, binding.token)` throws, the function exits before any `expire(...)` calls and before the rollback catch can delete `bindingKey`.
+  - The current rollback test covers expiry failure after both keys are written: `src/server/services/formBindings.test.ts:358-378`. It does not cover context write failure after the binding write.
+- Why it matters: The no-visible-token contract makes context bindings the normal path for every lock/unlock form. A Redis partial-write failure should not leave unreachable form token records without TTL under `reviewlock:{subreddit}:form:*`. This is unlikely to unlock or lock the wrong content because the token is not surfaced, but it can create persistent orphan Redis keys and makes failure behavior less clean than the production-hardening story claims.
+- Suggested fix: Wrap both `redis.set(...)` calls and both `expire(...)` calls in one rollback block, or explicitly delete `bindingKey` if the context-key write fails. Add a regression with a Redis store that throws only on the context `set`, then assert the helper rejects and the token binding key no longer exists.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:43 IST - Finding
+
+- Severity: medium
+- Area: Timestamp-scoped form contexts are not guaranteed unique under same-millisecond form openings.
+- Evidence:
+  - Form context identity is `action + targetId + createdAt`: `src/server/services/formBindings.ts:27-45`.
+  - Menu handlers pass `deps.clock.now()` as `createdAt` for lock and unlock form bindings: `src/routes/menu.ts:273-280` and `src/routes/menu.ts:331-337`.
+  - The production clock uses `new Date().toISOString()`, which has millisecond precision and is not a unique nonce: `src/server/adapters/clock.ts:5-7`.
+  - `createFormBinding(...)` writes `redis.set(contextKey, binding.token)` without NX or collision handling: `src/server/services/formBindings.ts:142-151`.
+  - Current regression coverage proves same-target contexts are separate when timestamps differ: `src/server/services/formBindings.test.ts:176-209`. It does not cover two same-target bindings with the same timestamp.
+- Why it matters: The timestamp addition fixes the common stale-form overwrite, but a same-millisecond double-open for the same target/action can still overwrite the context pointer. In that case two visible forms have the same `reviewOpenedAt`, and the older submit can consume the newer binding. For lock forms, that can bind the submit to a newer reviewed fingerprint than the moderator saw; for unlock forms, it can bind to the newer lock if the lock changed and both forms share the same timestamp.
+- Suggested fix: Make context identity include an actual per-form nonce, not just `createdAt`, while keeping that nonce out of moderator-facing screenshots if possible. Options: use supported `showForm.data`, a hidden/scoped secret field if Devvit supports it for submit callbacks, or include a random `formId` field marked as non-editable. Add a regression that creates two same-target bindings with identical `createdAt` and proves the first form cannot consume the second binding.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/routes/menu.ts`
+  - `src/server/adapters/clock.ts`
+
+## 2026-05-26 19:47 IST - Finding
+
+- Severity: medium
+- Area: Context-based form consumption does not clean malformed binding records.
+- Evidence:
+  - Token-based consumption deletes the binding key whenever raw data exists, even if `parseBinding(...)` returns `undefined`: `src/server/services/formBindings.ts:196-204`.
+  - Existing token-consumption regressions prove malformed JSON and mismatched token/subreddit records are deleted: `src/server/services/formBindings.test.ts:229-259`.
+  - Context-based consumption reads the context token and raw binding, but if `parseBinding(...)` fails or the binding action/target/timestamp check fails, it returns before deleting either the malformed binding key or the context pointer: `src/server/services/formBindings.ts:245-264`.
+  - There is no equivalent context-consumption regression for malformed JSON, stored token mismatch, stored subreddit mismatch, or malformed createdAt/action data: `rg -n "malformed|context|valid-shaped|stored token|stored subreddit" src/server/services/formBindings.test.ts`.
+- Why it matters: The no-visible-token flow now depends on `consumeFormBindingByContext(...)` for normal lock/unlock submissions. A corrupted or partially migrated context binding can stay reachable until expiry and keep returning a generic expired-form response instead of being cleaned on first observation. This is especially relevant because the current dirty tree is hardening form bindings for release and already treats malformed token bindings as something worth cleaning.
+- Suggested fix: Mirror token-based cleanup in the context path. When a context key resolves to a token and raw binding data exists but fails validation, delete the binding key and context key before returning `undefined`; keep the stale-lock-id mismatch retryable only if that behavior is intentional. Add context-consumption regressions for malformed binding JSON and stored token/subreddit mismatches.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+
+## 2026-05-26 19:49 IST - Recheck
+
+- Area: Earlier disabled-field dependency finding after latest no-visible-token form changes.
+- Result: The specific disabled-field omission risk from the 19:19 finding no longer matches current source; the remaining issue is a polish/trust tradeoff around visible editable identity fields.
+- Evidence:
+  - `buildLockReviewForm(...)` now renders `targetId`, `subreddit`, and `reviewOpenedAt` as normal required string fields, not disabled fields: `src/routes/menu.ts:112-135`.
+  - `buildUnlockReviewForm(...)` now renders `targetId`, `lockId`, `subreddit`, and `reviewOpenedAt` as normal required string fields, not disabled fields: `src/routes/menu.ts:175-205`.
+  - Route tests now assert these identity fields are not disabled and that no `formToken` field is visible: `src/routes/menu.test.ts:81-85`, `src/routes/menu.test.ts:141-150`, and `src/routes/menu.test.ts:428-439`.
+  - Form submit handlers still validate the submitted identity values against the server-side context binding before moderation side effects: `src/routes/forms.ts:258-282` and `src/routes/forms.ts:332-354`.
+- Why it matters: The old live-risk concern that Devvit might omit disabled `targetId`/`lockId` fields should be considered superseded in the current tree. However, final screenshots and live moderator UX will now show implementation identity fields such as `Snapshot time`/`Confirmation time`, `Target ID`, and `Current lock ID`. That is safer than a raw review token but still less polished than a production-grade Devvit form carrying identity through hidden data.
+- Suggested fix: Do not spend time fixing the obsolete disabled-field concern unless the source changes back. For final polish, prefer a supported hidden data path such as `showForm.data` if live Devvit submit behavior proves it works; otherwise keep the visible fields but make the final screenshot/story avoid implying the form is fully streamlined.
+- Files reviewed:
+  - `src/routes/menu.ts`
+  - `src/routes/menu.test.ts`
+  - `src/routes/forms.ts`
+
+## 2026-05-26 19:55 IST - Recheck
+
+- Area: Product-guardrail copy scan after current submission-doc and form-contract edits.
+- Result: No new unsafe judge-facing product framing found in the current source/docs scan.
+- Evidence:
+  - Ran `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|unreportable|AI decides|automatic removal|permanent|forever|ignore reports wrapper|disable user reporting" README.md docs/DEVPOST_SUBMISSION.md docs/APP_LISTING.md docs/SCREENSHOTS.md docs/CLAIM_COPY_AUDIT.md docs/LAUNCH_CHECKLIST.md src`.
+  - Matches are limited to explicit forbidden-phrase audit/checklist/test contexts and one config test fixture using `lockExpiryDays: 'forever'`: `docs/CLAIM_COPY_AUDIT.md:25-58`, `docs/LAUNCH_CHECKLIST.md:39`, `src/client/render.test.ts:19-28`, and `src/server/services/config.test.ts:44`.
+  - The current production/user-facing copy still uses the safer frame in source, including `Lock reviewed content until it changes.` in the lock form: `src/routes/menu.ts:110-111`.
+- Why it matters: The submission docs and app copy remain aligned with ReviewLock's core thesis rather than drifting into forbidden "make content unreportable" framing. This lowers product-story risk while the remaining blockers are mostly form reliability, stale screenshot/version metadata, publish status, and final judging access.
+- Suggested fix: Keep this scan in the final launch checklist, and rerun it after any Devpost/README/listing edits before upload or submission.
+- Files reviewed:
+  - `README.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/SCREENSHOTS.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `src/routes/menu.ts`
+
+## 2026-05-26 20:20 IST - Codex Resolution Notes
+
+- Reviewed the reviewer-agent additions made during the offline window:
+  list-based active-lock UI, regenerated submission screenshots, claim-boundary
+  doc edits, Devvit listing drift notes, and the active no-visible-token
+  form-binding findings.
+- Addressed the open menu/form-binding findings:
+  - menu `Lock review` and `Unlock review` now catch binding creation failures
+    and return `ReviewLock could not prepare the confirmation form. Reopen the
+    menu and try again.`;
+  - context binding creation reserves context keys with NX semantics, shifts
+    same-millisecond collisions, expires both binding records, and rolls back
+    partial writes;
+  - context consumption cleans malformed or mismatched binding/context records
+    while preserving intentional stale-lock retry behavior.
+- Added regression coverage for same-millisecond form openings, malformed
+  context records, stored subreddit mismatches, context reservation rollback,
+  and menu form-preparation failure toasts.
+- Rechecked the final no-visible-token form contract live in Zen on playtest
+  `v0.0.10.2`; the `Lock review` form for `t3_1tnfgqf` opened without a raw
+  token field and submitted successfully.
+- Rechecked the audit timeline formatting live in Zen on playtest `v0.0.10.2`;
+  the timeline no longer shows the overlapping timestamp/detail columns from
+  the user screenshots.
+- Updated `docs/RUNTIME_PROOF.md`, `docs/APP_LISTING.md`,
+  `docs/CLAIM_COPY_AUDIT.md`, `docs/DEVPOST_SUBMISSION.md`, and
+  `docs/SCREENSHOTS.md` to the current uploaded version `0.0.10` and live
+  screenshot sources.
+- Validation:
+  - `npm run test -- src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/fullScenario.test.ts src/client/render.test.ts --reporter verbose`
+    passed with 5 files and 89 tests.
+  - `npm run type-check`, `git diff --check`, `npm run lint`, `npm run test`,
+    and `npm run build` all passed; full test gate passed with 43 files and
+    444 tests.
+  - `npm run deploy` passed and uploaded version `0.0.10`.
+  - `npx devvit view --json` passed and showed app `reviewlock`, owner
+    `BrightyBrainiac`, install count `1`, visibility `1`, uploaded
+    `2026-05-26T14:17:37.752Z`, built `2026-05-26T14:17:40.373Z`, populated
+    `version.about`, and empty app-level description/privacy/terms fields.

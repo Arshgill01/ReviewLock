@@ -158,6 +158,15 @@
 - [x] Require update-trigger runtime proof to include successful report unignore.
 - [x] Keep dashboard headline counts independent from bounded display lists.
 - [x] Keep unchanged update-trigger deliveries from verifying edit-break runtime proof rows.
+- [x] Replace visible form tokens with timestamp-scoped server-side form
+      bindings.
+- [x] Convert menu form-preparation Redis failures into neutral retry toasts.
+- [x] Recheck live no-visible-token `Lock review` form proof on playtest
+      `v0.0.10.2`.
+- [x] Recheck live Zen WebView audit timeline formatting on playtest
+      `v0.0.10.2`.
+- [x] Update submission proof docs and screenshot manifest to uploaded version
+      `0.0.10`.
 - [x] Keep changed-report trigger proof unverified when reopening cannot unignore reports.
 - [x] Accept unlock form submissions when Devvit omits the disabled display-only lock id field.
 - [x] Reject wrong-kind prefixed target ids at endpoint boundaries.

@@ -78,7 +78,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         actor: 'mod',
         lockReason: 'reviewed_policy_compliant',
       }),
@@ -105,7 +105,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         actor: { name: 'bad' },
         lockReason: 'reviewed_policy_compliant',
         customNote: { text: 'bad' },
@@ -125,7 +125,7 @@ describe('form routes', () => {
     expect(savedLock?.expiresAt).toBeUndefined();
   });
 
-  it('rejects lock expiry strings before consuming the form token', async () => {
+  it('rejects lock expiry strings before consuming the form binding', async () => {
     const redis = new InMemoryRedisStore();
     const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
     const reddit = new FakeRedditAdapter([target()]);
@@ -139,7 +139,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
         expiresAt: '2026-06-01T00:00:00.000Z',
       }),
@@ -171,7 +171,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         actor: 'mod',
         lockReason: 'reviewed_policy_compliant',
       }),
@@ -187,7 +187,7 @@ describe('form routes', () => {
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
-  it('validates required lock form token and reason fields', async () => {
+  it('validates required lock form target, subreddit, snapshot time, and reason fields', async () => {
     const router = createFormsRouter({
       reddit: new FakeRedditAdapter([target()]),
       redis: new InMemoryRedisStore(),
@@ -200,7 +200,7 @@ describe('form routes', () => {
 
     expect(await response.json()).toMatchObject({
       showToast: {
-        text: 'ReviewLock form token and reason are required.',
+        text: 'ReviewLock target, subreddit, snapshot time, and reason are required.',
       },
     });
   });
@@ -218,14 +218,14 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_other',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
 
     expect(await response.json()).toMatchObject({
       showToast: {
-        text: 'ReviewLock form target changed. Reopen the menu and try again.',
+        text: 'ReviewLock form expired. Reopen the menu and try again.',
       },
     });
   });
@@ -243,7 +243,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'repeat_false_reports',
       }),
     });
@@ -255,7 +255,7 @@ describe('form routes', () => {
     });
   });
 
-  it('rejects lock reasons disabled by subreddit config before consuming the form token', async () => {
+  it('rejects lock reasons disabled by subreddit config before consuming the form binding', async () => {
     const redis = new InMemoryRedisStore();
     await saveConfig(redis, {
       ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
@@ -273,7 +273,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -311,7 +311,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -339,7 +339,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -367,7 +367,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -402,7 +402,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockReason: 'reviewed_policy_compliant',
       }),
     });
@@ -751,7 +751,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockId: 'lock-1',
         actor: 'client_supplied_actor',
       }),
@@ -789,7 +789,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
       }),
     });
 
@@ -825,14 +825,14 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockId: 'old-lock',
       }),
     });
 
     expect(await response.json()).toMatchObject({
       showToast: {
-        text: 'ReviewLock form target changed. Reopen the menu and try again.',
+        text: 'ReviewLock form expired. Reopen the menu and try again.',
       },
     });
     expect(reddit.calls).toEqual([]);
@@ -861,7 +861,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockId: 'lock-1',
       }),
     });
@@ -904,7 +904,7 @@ describe('form routes', () => {
       body: JSON.stringify({
         targetId: 't3_post',
         subreddit: 'alpha',
-        formToken: binding.token,
+        reviewOpenedAt: binding.createdAt,
         lockId: 'lock-1',
       }),
     });

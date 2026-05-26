@@ -6,7 +6,7 @@ Target listing: `https://developers.reddit.com/apps/reviewlock`
 
 Current listing state:
 
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.5`.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.10`.
 - `npx devvit view --json` after that upload returned `version.about` populated
   from the self-contained README/App Directory summary.
 - The root `README.md` includes a self-contained App Directory summary, proof
@@ -40,7 +40,7 @@ ReviewLock is built for the safer version of ignore-reports workflows:
 - every lock, unlock, suppress, reopen, dismiss, and runtime failure is audited;
 - demo mode is visibly labeled and separated from live subreddit data.
 
-ReviewLock does not make content unreportable, does not remove content
+ReviewLock does not change Reddit's reporting surface, does not remove content
 automatically, does not store reporter usernames, and does not use AI or
 external services.
 
@@ -151,7 +151,7 @@ Suggested category framing:
       Directory review is required.
 - [x] Confirm the root README is self-contained enough for `version.about`.
 - [x] Confirm `version.about` contains the post-`4a6a98a` self-contained README
-      after upload `0.0.5`.
+      after upload `0.0.10`.
 - [ ] Confirm `app.description` is no longer empty, or confirm the current
       Developer Portal workflow does not expose this field for manual editing before
       public submission.

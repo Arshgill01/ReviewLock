@@ -58,7 +58,7 @@ describe('full ReviewLock scenario walkthrough', () => {
       jsonPost({
         targetId: 't3_scenario_post',
         subreddit: 'alpha',
-        formToken: postBinding.token,
+        reviewOpenedAt: postBinding.createdAt,
         actor: 'mod_alex',
         lockReason: 'reviewed_policy_compliant',
       }),
@@ -146,7 +146,7 @@ describe('full ReviewLock scenario walkthrough', () => {
       jsonPost({
         targetId: 't1_scenario_comment',
         subreddit: 'alpha',
-        formToken: commentBinding.token,
+        reviewOpenedAt: commentBinding.createdAt,
         actor: 'mod_alex',
         lockReason: 'reviewed_policy_compliant',
       }),

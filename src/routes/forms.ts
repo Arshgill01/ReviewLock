@@ -8,7 +8,7 @@ import { isIsoTimestamp, type LockReasonPreset } from '../shared/schema';
 import { LOCK_REASON_PRESETS } from '../shared/constants';
 import { appendAuditEvent } from '../server/services/audit';
 import { loadConfig } from '../server/services/config';
-import { consumeFormBinding } from '../server/services/formBindings';
+import { consumeFormBindingByContext } from '../server/services/formBindings';
 import { keys } from '../server/services/keys';
 import { lockReviewedContent } from '../server/services/lockFlow';
 import { dismissReopenEvent, getReopenEvent } from '../server/services/reopenQueue';
@@ -24,7 +24,7 @@ interface RouteDeps {
 interface LockSubmitBody {
   targetId?: unknown;
   subreddit?: unknown;
-  formToken?: unknown;
+  reviewOpenedAt?: unknown;
   actor?: unknown;
   lockReason?: unknown;
   customNote?: unknown;
@@ -34,7 +34,7 @@ interface LockSubmitBody {
 interface UnlockSubmitBody {
   targetId?: unknown;
   subreddit?: unknown;
-  formToken?: unknown;
+  reviewOpenedAt?: unknown;
   lockId?: unknown;
   actor?: unknown;
 }
@@ -204,17 +204,25 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     const body = await readJson<LockSubmitBody>(context);
     const targetId = stringValue(body.targetId);
     const subredditInput = stringValue(body.subreddit);
-    const formToken = stringValue(body.formToken);
+    const reviewOpenedAt = stringValue(body.reviewOpenedAt);
     const customNote = stringValue(body.customNote);
     const expiresAt = stringValue(body.expiresAt);
     const lockReason = selectedLockReason(body.lockReason);
 
-    if (!formToken || !subredditInput || !lockReason) {
-      return context.json<UiResponse>(uiToast('ReviewLock form token and reason are required.'));
+    if (!targetId || !subredditInput || !reviewOpenedAt || !lockReason) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock target, subreddit, snapshot time, and reason are required.'),
+      );
     }
 
     if (!validLockReason(lockReason)) {
       return context.json<UiResponse>(uiToast('ReviewLock lock reason is not valid.'));
+    }
+
+    if (!isIsoTimestamp(reviewOpenedAt)) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock form snapshot is not valid. Reopen the menu and try again.'),
+      );
     }
 
     if (expiresAt) {
@@ -247,7 +255,13 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const binding = await consumeFormBinding(deps.redis, subreddit, formToken);
+    const binding = await consumeFormBindingByContext(
+      deps.redis,
+      subreddit,
+      'lock',
+      targetId,
+      reviewOpenedAt,
+    );
 
     if (!binding || binding.action !== 'lock') {
       return context.json<UiResponse>(
@@ -293,10 +307,18 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     const targetId = stringValue(body.targetId);
     const lockId = stringValue(body.lockId);
     const subredditInput = stringValue(body.subreddit);
-    const formToken = stringValue(body.formToken);
+    const reviewOpenedAt = stringValue(body.reviewOpenedAt);
 
-    if (!formToken || !subredditInput) {
-      return context.json<UiResponse>(uiToast('ReviewLock form token and lock are required.'));
+    if (!targetId || !subredditInput || !reviewOpenedAt) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock target, subreddit, and confirmation time are required.'),
+      );
+    }
+
+    if (!isIsoTimestamp(reviewOpenedAt)) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock form confirmation is not valid. Reopen the menu and try again.'),
+      );
     }
 
     const subreddit = await scopedFormSubreddit(deps.reddit, subredditInput);
@@ -307,7 +329,14 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
       );
     }
 
-    const binding = await consumeFormBinding(deps.redis, subreddit, formToken);
+    const binding = await consumeFormBindingByContext(
+      deps.redis,
+      subreddit,
+      'unlock',
+      targetId,
+      reviewOpenedAt,
+      lockId,
+    );
 
     if (!binding || binding.action !== 'unlock' || !binding.lockId) {
       return context.json<UiResponse>(

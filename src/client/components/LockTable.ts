@@ -78,35 +78,36 @@ export const renderLockTable = (
   const rows = activeLocks
     .map(
       (lock) => `
-        <tr>
-          <td>
+        <li class="lock-row">
+          <div class="lock-target">
             ${renderTargetLink(lock)}
-          </td>
-          <td>
             <span class="target-author">u/${escapeText(lock.targetAuthor)}</span>
-          </td>
-          <td>
-            <div class="content-summary">
-              <strong>${escapeText(lock.title ?? lock.targetId)}</strong>
-              <span class="content-preview" title="${escapeAttr(lock.contentPreview)}">
-                ${escapeText(lock.contentPreview)}
-              </span>
-              ${renderRuntimeWarnings(lock.runtimeWarnings)}
+          </div>
+          <div class="content-summary">
+            <strong>${escapeText(lock.title ?? lock.targetId)}</strong>
+            <span class="content-preview" title="${escapeAttr(lock.contentPreview)}">
+              ${escapeText(lock.contentPreview)}
+            </span>
+            ${renderRuntimeWarnings(lock.runtimeWarnings)}
+          </div>
+          <dl class="lock-meta">
+            <div>
+              <dt>Reason</dt>
+              <dd><span class="count-badge reason-badge">${escapeText(labelFromToken(lock.lockReason))}</span></dd>
             </div>
-          </td>
-          <td>
-            <span class="count-badge reason-badge">${escapeText(labelFromToken(lock.lockReason))}</span>
-          </td>
-          <td class="number-cell">
-            <span class="number-pill">${lock.suppressedReportCount}</span>
-          </td>
-          <td class="date-cell">
-            ${formatLocalDate(lock.lockedAt)}
-          </td>
-          <td>
+            <div>
+              <dt>Reports suppressed</dt>
+              <dd><span class="number-pill">${lock.suppressedReportCount}</span></dd>
+            </div>
+            <div>
+              <dt>Locked</dt>
+              <dd class="date-cell">${formatLocalDate(lock.lockedAt)}</dd>
+            </div>
+          </dl>
+          <div class="lock-action">
             ${renderUnlockAction(lock, confirmation, readOnly)}
-          </td>
-        </tr>
+          </div>
+        </li>
       `,
     )
     .join('');
@@ -120,22 +121,7 @@ export const renderLockTable = (
       ${
         activeLocks.length
           ? `
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Target</th>
-                    <th>Author</th>
-                    <th>Content</th>
-                    <th>Reason</th>
-                    <th>Reports suppressed</th>
-                    <th>Locked</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-              </table>
-            </div>
+            <ul class="lock-list">${rows}</ul>
           `
           : '<p class="empty-text">No active locks.</p>'
       }
