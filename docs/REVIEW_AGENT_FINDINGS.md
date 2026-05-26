@@ -6772,3 +6772,23 @@
   - PASS, 43 files / 427 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-26 16:45 IST - Finding
+
+- Severity: medium
+- Area: Wrapped report trigger event ids and timestamps are not extracted from nested report payloads.
+- Evidence:
+  - `src/routes/triggers.report.ts:35-39` builds payload candidates from the raw body plus nested `postReport` and `commentReport` payloads.
+  - `src/routes/triggers.report.ts:50-63`, `81-104` use those candidates for target ids, subreddit scope, and report counts, but `eventId()` and `reportedAt()` at `src/routes/triggers.report.ts:65-67` and `106-107` read only the top-level body.
+  - `src/routes/triggers.report.ts:130-139` passes those values into `handleReportTrigger()`.
+  - `src/server/services/reportTriggers.ts:53-60` falls back to `missing-event:${targetId}:count-${reportCount}` or an unknown-count minute bucket when `eventId` is missing; `src/server/services/reportTriggers.ts:64-74` also loses the stable event identity for report audit ids.
+  - `src/routes/triggers.report.test.ts:133-156` and `246-278` cover wrapped report payloads only when the wrapper-level body carries the id/timestamp; there is no nested-only `postReport.id`, `commentReport.id`, `postReport.timestamp`, or `commentReport.timestamp` regression.
+  - `decisions.md:900-913` and `docs/RUNTIME_PROOF.md:182-185` say wrapped report payload hardening includes event ids and timestamps from wrapped report payloads.
+- Why it matters: If Devvit supplies the stable event id or timestamp inside the nested report payload rather than the top-level wrapper, ReviewLock treats distinct report deliveries as missing-id deliveries. That increases duplicate-collapse risk for same-target/same-count reports and weakens audit/runtime traceability on the core report-suppression proof path.
+- Suggested fix: Make `eventId()` and `reportedAt()` inspect `payloads(body)` just like `targetId()`, `subreddit()`, and `reportCount()`. Prefer top-level values, then nested `postReport`/`commentReport` `eventId`/`id` and `reportedAt`/`timestamp`. Add route regressions proving nested-only event ids dedupe independently and nested malformed timestamps fall back to the server clock.
+- Files reviewed:
+  - `src/routes/triggers.report.ts`
+  - `src/routes/triggers.report.test.ts`
+  - `src/server/services/reportTriggers.ts`
+  - `docs/RUNTIME_PROOF.md`
+  - `decisions.md`
