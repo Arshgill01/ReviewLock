@@ -2948,3 +2948,31 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 13:58 IST - Config reason preset hardening
+
+- Loaded subreddit config when rendering `Lock review` forms.
+- Built form reason options and defaults from configured `reasonPresets`,
+  falling back to the shared presets only when the config has no enabled
+  reasons.
+- Rejected lock submissions that use globally valid reason presets disabled by
+  the current subreddit config without consuming the form token.
+- Kept lock expiry out of moderator UI and submission claims until an expiry
+  enforcement path exists.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+  - PASS, 3 files and 44 tests.
+  - `npm run type-check`
+  - PASS.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 390 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

@@ -7,6 +7,7 @@ import type { RedditAdapter } from '../server/adapters/reddit';
 import { isIsoTimestamp, type LockReasonPreset } from '../shared/schema';
 import { LOCK_REASON_PRESETS } from '../shared/constants';
 import { appendAuditEvent } from '../server/services/audit';
+import { loadConfig } from '../server/services/config';
 import { consumeFormBinding } from '../server/services/formBindings';
 import { keys } from '../server/services/keys';
 import { lockReviewedContent } from '../server/services/lockFlow';
@@ -84,6 +85,14 @@ const selectedLockReason = (value: unknown): LockReasonPreset | undefined => {
 
 const validLockReason = (value: string | undefined): value is LockReasonPreset =>
   LOCK_REASON_PRESETS.includes(value as LockReasonPreset);
+
+const configuredLockReasons = async (
+  redis: RedisStore,
+  subreddit: string,
+): Promise<readonly LockReasonPreset[]> => {
+  const config = await loadConfig(redis, subreddit);
+  return config.reasonPresets.length ? config.reasonPresets : LOCK_REASON_PRESETS;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -180,6 +189,14 @@ export const createFormsRouter = (deps: RouteDeps = {}): Hono => {
     if (!subreddit) {
       return context.json<UiResponse>(
         uiToast('ReviewLock form subreddit does not match the current Devvit context.'),
+      );
+    }
+
+    const allowedReasons = await configuredLockReasons(deps.redis, subreddit);
+
+    if (!allowedReasons.includes(lockReason)) {
+      return context.json<UiResponse>(
+        uiToast('ReviewLock lock reason is not enabled for this subreddit.'),
       );
     }
 

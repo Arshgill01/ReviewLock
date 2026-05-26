@@ -3,6 +3,7 @@ import { fixedClock } from '../server/adapters/clock';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import { listAuditEvents } from '../server/services/audit';
+import { defaultConfig, saveConfig } from '../server/services/config';
 import { createFormBinding } from '../server/services/formBindings';
 import { keys } from '../server/services/keys';
 import { getActiveLockByTarget, saveLock } from '../server/services/locks';
@@ -252,6 +253,38 @@ describe('form routes', () => {
         text: 'ReviewLock lock reason is not valid.',
       },
     });
+  });
+
+  it('rejects lock reasons disabled by subreddit config before consuming the form token', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveConfig(redis, {
+      ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
+      reasonPresets: ['repeat_report_churn'],
+    });
+    const binding = await createFormBinding(redis, 'lock', target(), '2026-05-24T00:00:00.000Z');
+    const reddit = new FakeRedditAdapter([target()]);
+    const router = createFormsRouter({
+      reddit,
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken: binding.token,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock lock reason is not enabled for this subreddit.',
+      },
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.exists(`reviewlock:alpha:form:${binding.token}`)).toBe(true);
   });
 
   it('rejects lock form submissions outside the current runtime subreddit before moderation', async () => {

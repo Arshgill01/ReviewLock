@@ -3894,6 +3894,22 @@
     PASS, 3 files / 76 tests.
   - `npm run type-check` PASS.
 
+## 2026-05-26 13:59 IST - Codex Resolution Notes
+
+- Partially resolved the moderator configuration gap by applying configured
+  reason presets to the actual lock workflow.
+- `Lock review` forms now load subreddit config and render the configured
+  `reasonPresets` as the select options/default.
+- Lock submissions now reject globally valid reason presets that are disabled by
+  the current subreddit config, without consuming the form token.
+- Explicitly did not surface `lockExpiryDays` because ReviewLock does not yet
+  have an expiry enforcement path; expiry remains out of product/submission
+  claims until implemented.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+    PASS, 3 files / 44 tests.
+  - `npm run type-check` PASS.
+
 ## 2026-05-26 13:45 IST - Finding
 
 - Severity: medium
@@ -4105,3 +4121,242 @@
 - Files reviewed: `waves/wave-14/spec.md`, `README.md`, `plan.md`,
   `docs/RUNTIME_PROOF.md`, `docs/KNOWN_LIMITATIONS.md`, Devpost official rules,
   Reddit launch guide.
+
+## 2026-05-26 13:55 IST - Finding
+
+- Severity: high
+- Area: Current Devvit app listing metadata is not judge/App Directory grade.
+- Evidence:
+  - Fresh command `npx devvit view --json` passed on 2026-05-26 13:55 IST and
+    returned the existing app identity:
+    - app id `5201a616-7c35-48d6-a030-743e41456e69`
+    - slug/name `reviewlock`
+    - owner `BrightyBrainiac`
+    - app listing URL target `https://developers.reddit.com/apps/reviewlock`
+    - install count `1`
+    - versions count `351`
+  - The same response shows `app.description` is an empty string, `categories`
+    and `categoriesV2` are empty arrays, `marketingInfo` is empty, and
+    `termsAndConditions` / `privacyPolicy` are empty.
+  - The same response shows the latest uploaded version's `about` field is
+    still the current 17-line development README, including agent/workflow
+    instructions rather than a moderator-facing overview.
+  - The same response shows the latest uploaded version was uploaded at
+    `2026-05-24T13:13:58.832Z`; substantial runtime proof, UI, trigger, and
+    dashboard hardening has happened after that in `log.md`.
+  - Reddit's launch guide says `README.md` should be user-friendly before
+    `npx devvit publish`, and public listing requires a detailed README with a
+    comprehensive overview, installer-facing instructions, and changelogs:
+    `https://developers.reddit.com/docs/guides/launch/launch-guide`.
+- Why it matters: Devpost requires an app listing link, and judges may inspect
+  the developer listing before or instead of reading every repository doc. Right
+  now that listing undersells ReviewLock, exposes internal agent instructions,
+  and does not reflect the latest hardening. This directly weakens Polish,
+  Reliable UX, and Ecosystem Impact.
+- Suggested fix: Before final Devpost submission, rewrite `README.md`, run the
+  full local gate, then upload a final version so the listing `about` field is
+  the polished moderator-facing README. Preserve the existing app slug and app
+  id; do not create a new app. If Devvit supports editing app-level description,
+  categories, marketing, terms, or privacy metadata in the developer UI/CLI,
+  fill those with concise moderator-facing copy or document why they could not
+  be edited before the deadline. Record the final `npx devvit view --json`
+  result in `docs/LAUNCH_CHECKLIST.md`.
+- Files reviewed: live `npx devvit view --json` output, `README.md`,
+  `docs/INSTALL_DEPLOY_REHEARSAL.md`, `docs/RUNTIME_PROOF.md`, Reddit launch
+  guide.
+
+## 2026-05-26 13:57 IST - Finding
+
+- Severity: high
+- Area: Final submission path must distinguish upload, unlisted publish, and
+  public App Directory listing.
+- Evidence:
+  - Fresh local CLI command `npx devvit upload --help` says uploaded apps are
+    only visible to the app owner and can only be installed to a small test
+    subreddit with fewer than 200 subscribers.
+  - Fresh local CLI command `npx devvit publish --help` says publish creates a
+    new app version, uploads source for review, and files a publish request. It
+    also exposes `--public` for public listing; without `--public`, the publish
+    request is unlisted by default.
+  - Reddit's launch guide matches that distinction: `npx devvit publish` enters
+    launch review, while `npx devvit publish --public` requests App Directory
+    listing for broadly installable apps:
+    `https://developers.reddit.com/docs/guides/launch/launch-guide`.
+  - Devpost requires the app listing link and judge testing access through a
+    Reddit post running the app in a public subreddit with fewer than 200
+    members: `https://mod-tools-migration.devpost.com/rules`.
+  - Current `package.json` intentionally makes `npm run launch` fail closed, so
+    no accidental publish can happen. That is good, but it means final publish
+    is now a manual owner-approved checklist item.
+- Why it matters: The earlier private upload proved the app exists, but if an
+  uploaded listing remains owner-visible only, a judge may not be able to
+  inspect the app listing itself. Conversely, `publish --public` may be too
+  strong to run blindly because it asks for broad App Directory listing. The
+  launch checklist needs an explicit decision path so the team does not either
+  under-submit or accidentally request public listing before the final claim
+  boundary is reviewed.
+- Suggested fix: In `docs/LAUNCH_CHECKLIST.md`, make the final path explicit:
+  1. Run the full local gate.
+  2. Run `npx devvit upload` after README/submission copy is final so the app
+     listing about text refreshes.
+  3. Install or update the controlled public test subreddit under 200 members
+     and create the judge-access Reddit post running ReviewLock.
+  4. With owner approval, run `npx devvit publish` for unlisted launch review
+     unless Reddit/Devpost support confirms upload-only listings are judge
+     visible.
+  5. Treat `npx devvit publish --public` as a separate owner decision for App
+     Directory listing after final README, claim, privacy, and install-flow
+     review.
+- Files reviewed: `package.json`, local `npx devvit upload --help`,
+  local `npx devvit publish --help`, Devpost official rules, Reddit launch
+  guide.
+
+## 2026-05-26 13:58 IST - Finding
+
+- Severity: high
+- Area: Current worktree fails the full local gate.
+- Evidence:
+  - I ran `npm run type-check`; it passed.
+  - I ran `npm run lint`; it failed with:
+    `src/routes/menu.ts:7:10 error 'loadConfig' is defined but never used @typescript-eslint/no-unused-vars`.
+  - I ran `npm run test -- src/routes/menu.test.ts --reporter verbose`; it
+    passed, 1 file / 11 tests, which confirms the existing menu tests do not
+    catch the incomplete config application.
+  - Current dirty `src/routes/menu.ts` imports `loadConfig` and adds
+    config-aware `buildLockReviewForm(..., config?)`, but `lockHandler()` still
+    calls `buildLockReviewForm(resolution.target, binding.token)` without
+    loading config: `src/routes/menu.ts:227-238`.
+- Why it matters: This blocks final upload/publish and means the partial
+  moderator-config surfacing patch is not complete. It also reinforces the
+  earlier UX finding: config should either be genuinely applied in the lock
+  form or not claimed in submission copy.
+- Suggested fix: In the lock menu path, load config for
+  `resolution.target.subreddit` before building the form, pass it into
+  `buildLockReviewForm`, and add/adjust menu tests proving configured reason
+  presets appear and the default reason is the first configured preset. If Redis
+  config load fails or is malformed, fall back to `defaultConfig()` behavior
+  through `loadConfig()` rather than blocking the moderator from locking
+  reviewed content. Then rerun `npm run lint`, `npm run type-check`, targeted
+  menu tests, and the full gate.
+- Files reviewed: `src/routes/menu.ts`, `src/server/services/config.ts`,
+  `package.json`.
+
+## 2026-05-26 13:58 IST - Integration Status
+
+- The prior lint-blocking `loadConfig` import issue is addressed in the current
+  dirty worktree.
+- Current dirty config-surfacing behavior:
+  - `src/routes/menu.ts` loads subreddit config and passes configured
+    `reasonPresets` into the lock form.
+  - `src/routes/forms.ts` loads subreddit config during lock submit and rejects
+    valid-but-disabled reason presets.
+  - `src/routes/menu.test.ts` now covers `buildLockReviewForm()` with configured
+    reason options and the `/lock-post` menu path with configured reason
+    options.
+- Focused validation I ran:
+  - `npm run lint` PASS.
+  - `npm run type-check` PASS.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts --reporter verbose`
+    PASS, 2 files / 35 tests.
+  - `git diff --check` PASS.
+- Remaining gap: submit-side enforcement for disabled-but-globally-valid lock
+  reasons is implemented but not directly covered by a route test.
+
+## 2026-05-26 13:58 IST - Finding
+
+- Severity: medium
+- Area: Configured lock-reason enforcement lacks a submit-path regression.
+- Evidence:
+  - New dirty code in `src/routes/forms.ts:89-95` loads configured lock reasons
+    from Redis, and `src/routes/forms.ts:195-201` rejects a lock submission when
+    the selected reason is a valid global preset but not enabled for the
+    subreddit.
+  - Existing form tests still cover only an invalid global reason:
+    `src/routes/forms.test.ts:232-255` posts `repeat_false_reports` and expects
+    `ReviewLock lock reason is not valid.`
+  - `rg -n "not enabled|saveConfig|reasonPresets|configured" src/routes/forms.test.ts`
+    returned no submit-route coverage for the new
+    `ReviewLock lock reason is not enabled for this subreddit.` branch.
+  - The menu side is covered by new tests in `src/routes/menu.test.ts:45-116`,
+    but menu rendering does not prove a tampered/stale submitted form is
+    rejected before moderation side effects.
+- Why it matters: The config patch is part of app hardening for installability.
+  Without a submit-path regression, a future refactor could keep showing
+  configured reasons in the menu while accidentally allowing disabled valid
+  reasons through the form endpoint. That would make moderator configuration
+  appear stronger than it is.
+- Suggested fix: Add a form-route test that saves config for `alpha` with
+  `reasonPresets: ['repeat_report_churn']`, creates a valid lock form binding,
+  submits `lockReason: 'reviewed_policy_compliant'`, expects
+  `ReviewLock lock reason is not enabled for this subreddit.`, asserts no
+  Reddit moderation calls were made, and asserts the form binding remains
+  retryable because rejection happens before `consumeFormBinding()`.
+- Files reviewed: `src/routes/forms.ts`, `src/routes/forms.test.ts`,
+  `src/routes/menu.ts`, `src/routes/menu.test.ts`,
+  `src/server/services/config.ts`.
+
+## 2026-05-26 13:59 IST - Integration Status
+
+- The configured lock-reason submit-path regression finding from 13:58 is
+  addressed in the current dirty worktree.
+- Evidence:
+  - `src/routes/forms.test.ts` now adds
+    `rejects lock reasons disabled by subreddit config before consuming the form token`.
+  - The test saves config for `alpha` with only `repeat_report_churn`, submits
+    globally valid but disabled `reviewed_policy_compliant`, expects
+    `ReviewLock lock reason is not enabled for this subreddit.`, asserts no
+    Reddit moderation calls, and asserts the form binding remains present.
+  - `src/routes/menu.test.ts` covers both direct form building and route-level
+    menu rendering for configured reason options.
+- Focused validation:
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts --reporter verbose`
+    PASS, 2 files / 38 tests.
+  - `npm run lint` PASS.
+  - `npm run type-check` PASS.
+
+## 2026-05-26 14:00 IST - Finding
+
+- Severity: medium
+- Area: Lock menu config read failure can raw-fail after creating a form
+  binding.
+- Evidence:
+  - Current dirty `src/routes/menu.ts:230-236` creates the Redis form binding
+    first, then calls `loadConfig(deps.redis, resolution.target.subreddit)`.
+  - `loadConfig()` directly awaits `redis.get(keys.config(subreddit))` and does
+    not catch Redis read failures: `src/server/services/config.ts:29-35`.
+  - If the binding write succeeds but the config `get` throws, the menu route
+    has no `try/catch`, does not return a `UiResponse` toast, and leaves behind
+    a lock form binding that the moderator never received.
+  - Current config tests cover malformed JSON and malformed config shape, but
+    not Redis read exceptions: `src/server/services/config.test.ts:27-72`.
+  - Current menu tests cover configured success paths, but not config-read
+    failure fallback: `src/routes/menu.test.ts:45-116`.
+- Why it matters: Reason presets are a convenience/configuration feature. A
+  transient config read failure should not turn the primary `Lock review` menu
+  into an unhandled Devvit route error, especially this late in publishability
+  hardening. ReviewLock has generally preferred honest neutral toasts or
+  fail-open-to-safe-default behavior for optional metadata reads.
+- Suggested fix: Load config before creating the form binding, and wrap config
+  load with a safe fallback to `defaultConfig(resolution.target.subreddit)` or
+  the static `LOCK_REASON_PRESETS` if the config record cannot be read. Add a
+  menu-route regression with a Redis store whose `get(keys.config('alpha'))`
+  throws, asserting the route still returns a lock form with default reasons and
+  does not create more than one form binding.
+- Files reviewed: `src/routes/menu.ts`, `src/routes/menu.test.ts`,
+  `src/server/services/config.ts`, `src/server/services/config.test.ts`.
+
+## 2026-05-26 14:01 IST - Integration Status
+
+- Current dirty worktree local verification after config reason-preset
+  hardening:
+  - `npm run type-check` PASS.
+  - `npm run lint` PASS.
+  - `npm run test -- src/routes/menu.test.ts src/routes/forms.test.ts src/server/services/config.test.ts --reporter verbose`
+    PASS, 3 files / 44 tests.
+  - `npm run build` PASS.
+  - `npm run test` PASS, 43 files / 390 tests.
+  - `git diff --check` PASS.
+- This verifies the current dirty config patch mechanically, but it does not
+  close the still-open reviewer findings around unsafe cached dashboard
+  permalink reuse, stale dashboard launch copy, launch/submission artifacts, or
+  the lock-menu config read failure fallback.

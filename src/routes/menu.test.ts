@@ -3,6 +3,7 @@ import { fixedClock } from '../server/adapters/clock';
 import { InMemoryRedisStore } from '../server/adapters/redis';
 import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockTarget } from '../shared/schema';
+import { defaultConfig, saveConfig } from '../server/services/config';
 import { saveLock } from '../server/services/locks';
 import { buildLockReviewForm, createMenuRouter } from './menu';
 
@@ -41,6 +42,26 @@ describe('menu routes', () => {
     });
   });
 
+  it('builds lock review form reason options from subreddit config', () => {
+    expect(
+      buildLockReviewForm(target(), 'token-1', {
+        ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
+        reasonPresets: ['repeat_report_churn', 'custom'],
+      }),
+    ).toMatchObject({
+      fields: expect.arrayContaining([
+        expect.objectContaining({
+          name: 'lockReason',
+          defaultValue: ['repeat_report_churn'],
+          options: [
+            { label: 'Repeat report churn', value: 'repeat_report_churn' },
+            { label: 'Custom reason', value: 'custom' },
+          ],
+        }),
+      ]),
+    });
+  });
+
   it('serves a lock form for post menu requests', async () => {
     const router = createMenuRouter({
       reddit: new FakeRedditAdapter([target()]),
@@ -56,6 +77,40 @@ describe('menu routes', () => {
       showForm: {
         name: 'lockReview',
         form: { title: 'Lock review' },
+      },
+    });
+  });
+
+  it('serves configured lock reason options for post menu requests', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveConfig(redis, {
+      ...defaultConfig('alpha', '2026-05-24T00:00:00.000Z'),
+      reasonPresets: ['repeat_report_churn', 'custom'],
+    });
+    const router = createMenuRouter({
+      reddit: new FakeRedditAdapter([target()]),
+      redis,
+      clock: fixedClock('2026-05-24T00:00:00.000Z'),
+    });
+    const response = await router.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+
+    expect(await response.json()).toMatchObject({
+      showForm: {
+        form: {
+          fields: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'lockReason',
+              defaultValue: ['repeat_report_churn'],
+              options: [
+                { label: 'Repeat report churn', value: 'repeat_report_churn' },
+                { label: 'Custom reason', value: 'custom' },
+              ],
+            }),
+          ]),
+        },
       },
     });
   });

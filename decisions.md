@@ -2477,3 +2477,25 @@ Reason:
   subreddit clutter.
 - Creating an untracked duplicate post on every launch would undermine polish
   and make live proof harder to interpret.
+
+### D138 - Apply configured lock reason presets but do not surface expiry yet
+
+ReviewLock has a persisted subreddit config model with reason presets and lock
+expiry days.
+
+Decision:
+
+- Load subreddit config when rendering the `Lock review` form.
+- Build the form reason select from configured `reasonPresets`.
+- Reject lock submissions for reasons that are valid globally but disabled by
+  the current subreddit config.
+- Do not render or claim configurable lock expiry until an expiry enforcement
+  path exists.
+
+Reason:
+
+- Reason presets are immediately useful and safely enforceable at form submit
+  time.
+- Showing an expiry setting without a scheduler or trigger-time expiry
+  enforcement would overclaim runtime behavior. ReviewLock remains proof-bound:
+  locks are edit-aware today, and expiry is not product copy until implemented.

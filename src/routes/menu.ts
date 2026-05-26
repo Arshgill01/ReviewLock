@@ -4,10 +4,12 @@ import type { FormField, UiResponse } from '@devvit/web/shared';
 import type { Clock } from '../server/adapters/clock';
 import type { RedisStore } from '../server/adapters/redis';
 import type { RedditAdapter } from '../server/adapters/reddit';
+import { loadConfig } from '../server/services/config';
 import { createFormBinding } from '../server/services/formBindings';
 import { getActiveLockByTarget } from '../server/services/locks';
 import { normalizeTargetId, resolveTargetById } from '../server/services/targetResolver';
-import type { TargetKind } from '../shared/schema';
+import { LOCK_REASON_PRESETS } from '../shared/constants';
+import type { LockReasonPreset, ReviewLockConfig, TargetKind } from '../shared/schema';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
@@ -56,64 +58,80 @@ const targetSummary = (target: {
     `Preview: ${(target.body ?? target.title ?? '').slice(0, 240)}`,
   ].join('\n');
 
-export const buildLockReviewForm = (target: Parameters<typeof targetSummary>[0], token = '') => ({
-  title: 'Lock review',
-  description: 'Lock reviewed content until it changes.',
-  fields: [
-    {
-      name: 'targetId',
-      label: 'Target ID',
-      type: 'string',
-      required: true,
-      defaultValue: target.id,
-      disabled: true,
-    },
-    {
-      name: 'subreddit',
-      label: 'Subreddit',
-      type: 'string',
-      required: true,
-      defaultValue: target.subreddit,
-    },
-    {
-      name: 'formToken',
-      label: 'Review token',
-      type: 'string',
-      required: true,
-      defaultValue: token,
-    },
-    {
-      name: 'targetSummary',
-      label: 'Reviewed content',
-      type: 'paragraph',
-      defaultValue: targetSummary(target),
-      disabled: true,
-    },
-    {
-      name: 'lockReason',
-      label: 'Reason',
-      type: 'select',
-      required: true,
-      defaultValue: ['reviewed_policy_compliant'],
-      options: [
-        { label: 'Reviewed and policy-compliant', value: 'reviewed_policy_compliant' },
-        { label: 'Approved with known context', value: 'approved_context_known' },
-        { label: 'Repeat report churn', value: 'repeat_report_churn' },
-        { label: 'Mod team consensus', value: 'mod_team_consensus' },
-        { label: 'Custom reason', value: 'custom' },
-      ],
-    },
-    {
-      name: 'customNote',
-      label: 'Moderator note',
-      type: 'paragraph',
-      defaultValue: '',
-      helpText: 'Optional. Stored only for moderation workflow context.',
-    },
-  ] satisfies FormField[],
-  acceptLabel: 'Lock review',
-  cancelLabel: 'Cancel',
-});
+const lockReasonLabels: Record<LockReasonPreset, string> = {
+  reviewed_policy_compliant: 'Reviewed and policy-compliant',
+  approved_context_known: 'Approved with known context',
+  repeat_report_churn: 'Repeat report churn',
+  mod_team_consensus: 'Mod team consensus',
+  custom: 'Custom reason',
+};
+
+const configuredReasonPresets = (config?: ReviewLockConfig): LockReasonPreset[] =>
+  config?.reasonPresets.length ? config.reasonPresets : [...LOCK_REASON_PRESETS];
+
+export const buildLockReviewForm = (
+  target: Parameters<typeof targetSummary>[0],
+  token = '',
+  config?: ReviewLockConfig,
+) => {
+  const reasonPresets = configuredReasonPresets(config);
+
+  return {
+    title: 'Lock review',
+    description: 'Lock reviewed content until it changes.',
+    fields: [
+      {
+        name: 'targetId',
+        label: 'Target ID',
+        type: 'string',
+        required: true,
+        defaultValue: target.id,
+        disabled: true,
+      },
+      {
+        name: 'subreddit',
+        label: 'Subreddit',
+        type: 'string',
+        required: true,
+        defaultValue: target.subreddit,
+      },
+      {
+        name: 'formToken',
+        label: 'Review token',
+        type: 'string',
+        required: true,
+        defaultValue: token,
+      },
+      {
+        name: 'targetSummary',
+        label: 'Reviewed content',
+        type: 'paragraph',
+        defaultValue: targetSummary(target),
+        disabled: true,
+      },
+      {
+        name: 'lockReason',
+        label: 'Reason',
+        type: 'select',
+        required: true,
+        defaultValue: [reasonPresets[0]],
+        options: reasonPresets.map((preset) => ({
+          label: lockReasonLabels[preset],
+          value: preset,
+        })),
+      },
+      {
+        name: 'customNote',
+        label: 'Moderator note',
+        type: 'paragraph',
+        defaultValue: '',
+        helpText: 'Optional. Stored only for moderation workflow context.',
+      },
+    ] satisfies FormField[],
+    acceptLabel: 'Lock review',
+    cancelLabel: 'Cancel',
+  };
+};
 
 export const buildUnlockReviewForm = (
   targetId: string,
@@ -215,11 +233,12 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       resolution.target,
       deps.clock.now(),
     );
+    const config = await loadConfig(deps.redis, resolution.target.subreddit);
 
     return context.json<UiResponse>({
       showForm: {
         name: 'lockReview',
-        form: buildLockReviewForm(resolution.target, binding.token),
+        form: buildLockReviewForm(resolution.target, binding.token, config),
       },
     });
   };
