@@ -17,6 +17,15 @@ const auditDetails = (event: AuditEvent): AuditDetail[] =>
     event.data.reason ? { label: 'Reason', value: String(event.data.reason) } : undefined,
   ].filter((detail): detail is AuditDetail => Boolean(detail));
 
+const formatAuditTimestamp = (value: string): { date: string; time: string } => {
+  const date = new Date(value);
+
+  return {
+    date: new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date),
+    time: new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date),
+  };
+};
+
 const renderAuditDetails = (event: AuditEvent): string => {
   const details = auditDetails(event);
 
@@ -44,6 +53,7 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
   const rows = events
     .map((event) => {
       const createdAt = formatLocalDateTime(event.createdAt);
+      const timestamp = formatAuditTimestamp(event.createdAt);
       const details = auditDetails(event);
       const summary = [
         labelFromToken(event.kind),
@@ -55,7 +65,10 @@ export const renderAuditTimeline = (events: AuditEvent[]): string => {
 
       return `
         <li class="audit-row" aria-label="${escapeAttr(summary)}">
-          <time class="audit-time" datetime="${escapeAttr(event.createdAt)}">${createdAt}</time>
+          <time class="audit-time" datetime="${escapeAttr(event.createdAt)}" title="${escapeAttr(createdAt)}">
+            <span class="audit-date">${escapeText(timestamp.date)}</span>
+            <span class="audit-clock">${escapeText(timestamp.time)}</span>
+          </time>
           <div class="audit-row-body">
             <div class="audit-row-header">
               <strong class="audit-kind">${labelFromToken(event.kind)}</strong>

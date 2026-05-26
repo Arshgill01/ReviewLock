@@ -246,6 +246,9 @@ describe('client render helpers', () => {
     expect(html).toContain('Repeat report suppressed');
     expect(html).toContain('Target post t3_reviewed');
     expect(html).toContain('Lock lock-1');
+    expect(html).toContain('class="audit-date"');
+    expect(html).toContain('class="audit-clock"');
+    expect(html).toContain('title="');
     expect(html).toContain('aria-label="report suppressed');
     expectSafeCopy(html);
   });

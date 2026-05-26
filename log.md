@@ -3094,3 +3094,35 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 15:28 IST - Audit timeline timestamp polish
+
+- Shortened audit timeline timestamps from full locale date/time strings to a
+  compact date/time stack while preserving full timestamp context in `title`
+  and row aria labels.
+- Tightened audit timeline desktop/mobile CSS so kind, actor, message, target,
+  lock, and reason fields render as a readable vertical flow.
+- Regenerated the tracked desktop and mobile audit timeline screenshots with
+  ReviewLock CSS loaded over localhost after an initial blocked `file://`
+  stylesheet attempt produced unstyled artifacts.
+- Focused validation:
+  - `npm run test -- src/client/render.test.ts src/client/state/store.test.ts --reporter verbose`
+  - PASS, 2 files and 35 tests.
+  - `npm run build`
+  - PASS.
+- Browser proof:
+  - `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh screenshot --filename /Users/arshdeepsingh/Developer/ReviewLock/output/playwright/audit-timeline-layout-fixed.png`
+  - `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh screenshot --filename /Users/arshdeepsingh/Developer/ReviewLock/output/playwright/audit-timeline-layout-fixed-mobile.png`
+  - PASS, styled screenshots captured at 1280x720 and 390x720.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 417 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

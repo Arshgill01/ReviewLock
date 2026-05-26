@@ -810,10 +810,10 @@ td strong {
 
 .audit-row {
   display: grid;
-  grid-template-columns: 118px minmax(0, 1fr);
-  column-gap: 14px;
+  grid-template-columns: 78px minmax(0, 1fr);
+  column-gap: 16px;
   position: relative;
-  padding: 12px 0 14px;
+  padding: 14px 0 16px;
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
@@ -831,7 +831,7 @@ td strong {
   content: '';
   position: absolute;
   left: -16px;
-  top: 17px;
+  top: 19px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -841,16 +841,34 @@ td strong {
 }
 
 .audit-time {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
   color: var(--light);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.audit-date,
+.audit-clock {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audit-clock {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .audit-row-body {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -877,7 +895,7 @@ td strong {
 
 .audit-message,
 .audit-details {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.8rem;
   line-height: 1.4;
   color: var(--muted);
@@ -890,7 +908,7 @@ td strong {
 
 .audit-details {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   max-width: 100%;
 }
 
@@ -1001,8 +1019,8 @@ code {
   }
 
   .audit-row {
-    grid-template-columns: 104px minmax(0, 1fr);
-    column-gap: 12px;
+    grid-template-columns: 74px minmax(0, 1fr);
+    column-gap: 14px;
   }
 }
 
@@ -1025,8 +1043,14 @@ code {
     row-gap: 4px;
   }
 
+  .audit-time {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
   .audit-row::before {
-    top: 15px;
+    top: 18px;
   }
 
   .audit-detail {

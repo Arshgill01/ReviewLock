@@ -181,6 +181,7 @@
 - [x] Keep runtime-uncertain report/update refetch failures retryable with active lock warnings.
 - [x] Clear report-trigger dedupe markers when retryable runtime-failure audit persistence fails.
 - [x] Rework audit timeline detail rows and verify desktop/mobile browser screenshots.
+- [x] Shorten audit timeline timestamps and recapture styled desktop/mobile screenshots.
 - [x] Block dismissals for reopened items with unresolved runtime warnings.
 - [x] Clear resolved `target_resolution_failed` warnings after successful report/update retries.
 - [x] Reuse the existing dashboard custom post on repeated dashboard launches.

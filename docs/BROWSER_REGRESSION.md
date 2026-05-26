@@ -162,6 +162,10 @@ with mocked API responses, not live Reddit trigger proof.
 After the audit timeline detail-row fix, a local browser render was checked with
 representative long target and lock ids matching the live Reddit embed issue.
 
+Artifact note: the screenshot paths in this section were later recaptured for
+the timestamp-specific pass below. Use "Audit Timeline Timestamp Recheck" for
+the current files at those paths.
+
 Commands:
 
 - `npx vite --host 127.0.0.1 --port 5197`
@@ -180,3 +184,31 @@ Result: PASS. The audit timestamp, kind, actor, message, target, lock, and
 reason fields render as separate rows without overlap at desktop width and at a
 420px mobile viewport. This was local browser proof of the client CSS/markup,
 not live Reddit WebView proof.
+
+## Audit Timeline Timestamp Recheck
+
+After the live Reddit screenshot showed long locale timestamps crowding the
+audit timeline, the timestamp presentation was shortened to a date/time stack
+while preserving the full timestamp in the `time` title and the row aria label.
+
+Commands:
+
+- `npm run test -- src/client/render.test.ts src/client/state/store.test.ts --reporter verbose`
+- `npm run build`
+- `python3 -m http.server 8765 --directory /tmp`
+- `python3 -m http.server 8766 --directory /Users/arshdeepsingh/Developer/ReviewLock`
+- `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh goto http://127.0.0.1:8765/reviewlock-audit-timeline.html`
+- `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh resize 1280 720`
+- `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh screenshot --filename /Users/arshdeepsingh/Developer/ReviewLock/output/playwright/audit-timeline-layout-fixed.png`
+- `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh resize 390 720`
+- `bash ~/.codex/skills/playwright/scripts/playwright_cli.sh screenshot --filename /Users/arshdeepsingh/Developer/ReviewLock/output/playwright/audit-timeline-layout-fixed-mobile.png`
+
+Generated screenshot paths:
+
+- `output/playwright/audit-timeline-layout-fixed.png`
+- `output/playwright/audit-timeline-layout-fixed-mobile.png`
+
+Result: PASS. The regenerated screenshots load the ReviewLock CSS, show compact
+`May 25` / `3:29 PM` style timestamps, preserve spacing between audit kind and
+actor, and keep target/lock/reason details readable at desktop and 390px mobile
+widths. This is styled local browser proof, not live Reddit WebView proof.

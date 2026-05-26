@@ -5967,3 +5967,274 @@
   - PASS, 6 files / 99 tests.
 - This validates the local test claim for the dirty target-namespace patch. It
   does not add any live Devvit/playtest proof.
+
+## 2026-05-26 15:23 IST - Post-Commit Reviewer Handoff
+
+- Current repository state:
+  - `git status --short` returned clean.
+  - Latest commit is `74068f76550c6c9b53354af4e3edb376ce9ecdce`.
+  - Commit subject: `fix: normalize target namespaces`.
+  - Commit timestamp: `2026-05-26T15:21:46+05:30`.
+- Files included in the commit:
+  - `TODO.md`
+  - `decisions.md`
+  - `docs/DATA_NAMESPACE_AUDIT.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+  - `log.md`
+  - `src/routes/menu.test.ts`
+  - `src/routes/menu.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/lockFlow.test.ts`
+  - `src/server/services/lockFlow.ts`
+  - `src/server/services/unlockFlow.test.ts`
+  - `src/server/services/unlockFlow.ts`
+- Reviewer interpretation:
+  - The previously logged high-risk target-derived namespace split is addressed
+    in committed code and direct regressions.
+  - The local validation claims for this patch are documented above and in
+    `log.md` / `docs/DATA_NAMESPACE_AUDIT.md`.
+  - I did not rerun the full local release gate after the commit hash changed;
+    the main agent's logged full gate should be treated as the validation basis
+    unless a fresh post-commit run is added.
+- Still open for main agent:
+  - Submission/app listing hardening remains the highest-priority
+    honorable-mention blocker.
+  - Live Devvit/playtest proof gaps remain proof-bounded and must not be
+    upgraded to "verified" in README, Devpost copy, listing copy, or video
+    narration until exact runtime commands are logged.
+  - Client permalink sanitization remains a previously logged medium finding
+    unless separately fixed in later commits.
+
+## 2026-05-26 15:24 IST - Resolution
+
+- Addressed finding: report-trigger timestamp validation.
+- Evidence:
+  - `src/server/services/reportTriggers.ts` now imports `isIsoTimestamp`.
+  - `reportTriggerNow()` now uses `input.reportedAt` only when it passes
+    `isIsoTimestamp(input.reportedAt)`; otherwise it falls back to
+    `clock.now()`.
+  - `src/server/services/reportTriggers.test.ts` includes
+    `falls back to the server clock for malformed report timestamps`, covering
+    `reportedAt: 'yesterday'`, daily metrics under the server-clock date,
+    no `yesterday` metrics bucket, audit `createdAt` from the server clock, and
+    the expected dedupe key.
+- Reviewer note: I inspected the current committed code and regression. I did
+  not rerun the report-trigger test in this mini-pass.
+
+## 2026-05-26 15:25 IST - Validation Status
+
+- Main-agent dirty client polish patch observed:
+  - `src/client/components/AuditTimeline.ts`
+  - `src/client/render.test.ts`
+  - `src/client/styles.css`
+- Focused validation run:
+  - `npm run test -- src/client/render.test.ts --reporter verbose`
+  - PASS, 1 file / 17 tests.
+- Reviewer note:
+  - The patch appears scoped to audit timeline date/time rendering and layout.
+  - I did not edit the client implementation files.
+  - This focused render-helper pass does not replace the full release gate.
+
+## 2026-05-26 15:26 IST - Validation Status
+
+- Additional validation against the current dirty worktree:
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+- Dirty files at the time:
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+  - `src/client/components/AuditTimeline.ts`
+  - `src/client/render.test.ts`
+  - `src/client/styles.css`
+
+## 2026-05-26 15:27 IST - Finding
+
+- Severity: medium
+- Area: Playwright screenshot artifacts for audit timeline polish.
+- Evidence:
+  - Dirty tracked screenshots were updated at:
+    `output/playwright/audit-timeline-layout-fixed.png` and
+    `output/playwright/audit-timeline-layout-fixed-mobile.png`.
+  - `file` reports valid PNG dimensions:
+    `1280 x 720` for desktop and `390 x 720` for mobile.
+  - Visual inspection of both dirty PNGs shows default browser styling rather
+    than the ReviewLock dashboard CSS: Times-style text, default list bullets,
+    no panel styling, and no app shell.
+  - The desktop and mobile screenshots also show audit header text collisions,
+    including `Report Suppressedreviewlock`, `Lock CreatedBrightyBrainiac`, and
+    `Lock Unlockedmoderator`.
+  - `docs/BROWSER_REGRESSION.md` currently records the same two screenshot
+    paths under "Audit Timeline Layout Recheck" and says `Result: PASS` with
+    "separate rows without overlap at desktop width and at a 420px mobile
+    viewport."
+  - `TODO.md` also marks `Rework audit timeline detail rows and verify
+    desktop/mobile browser screenshots` complete.
+- Why it matters: These filenames imply the audit timeline layout was fixed,
+  and the browser-regression doc explicitly claims that proof. The artifacts do
+  not demonstrate the real styled WebView or the claimed layout quality. If
+  they are committed or used in submission hardening, they can actively weaken
+  the polish story by showing an unstyled/broken audit timeline and a
+  proof-document mismatch.
+- Suggested fix: Either remove these generated screenshots from the commit if
+  they are only local scratch artifacts, or regenerate them from the actual
+  built dashboard route with CSS loaded and assert that the `.audit-kind` /
+  `.audit-actor` header has visible spacing on desktop and mobile. If screenshot
+  artifacts are kept as proof, add the exact command used to generate them and
+  a short note that they are styled app screenshots, not isolated HTML without
+  app CSS.
+- Files reviewed:
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+  - `src/client/components/AuditTimeline.ts`
+  - `src/client/styles.css`
+
+## 2026-05-26 15:28 IST - Resolution
+
+- Addressed finding: Playwright screenshot artifacts for audit timeline polish.
+- Regenerated both tracked audit-timeline screenshots with ReviewLock CSS loaded
+  over localhost instead of a blocked `file://` stylesheet.
+- Visual result:
+  - Desktop screenshot is styled, uses the ReviewLock panel/timeline layout,
+    and separates audit kind, actor, message, target, lock, and reason text.
+  - Mobile screenshot at 390px stays readable without the
+    `Report Suppressedreviewlock` / actor collision seen in the bad artifacts.
+- Evidence:
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+  - `docs/BROWSER_REGRESSION.md`
+  - `file output/playwright/audit-timeline-layout-fixed.png output/playwright/audit-timeline-layout-fixed-mobile.png`
+    reports valid `1280 x 720` and `390 x 720` PNGs.
+- Boundary: these screenshots prove the styled local browser fixture. They do
+  not prove live Reddit WebView rendering after upload.
+
+## 2026-05-26 15:29 IST - Validation Status
+
+- Reviewer re-opened the current regenerated screenshot artifacts after the
+  resolution above:
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+- Current visual status:
+  - Desktop screenshot is styled with the ReviewLock panel and timeline layout.
+  - Mobile screenshot is styled and no longer shows the
+    `Report Suppressedreviewlock` / actor collision from the bad artifacts.
+  - Audit kind, actor, message, target, lock, and reason fields are visually
+    separated at both widths.
+- Boundary: this verifies the dirty local screenshot artifacts by visual
+  inspection. It does not add live Reddit WebView proof.
+
+## 2026-05-26 15:30 IST - Integration Status
+
+- Fresh Developer Portal state check:
+  - Command: `npx devvit view --json`
+  - Result: PASS, app lookup succeeded.
+- Current uploaded app/listing state:
+  - App id: `5201a616-7c35-48d6-a030-743e41456e69`.
+  - Slug/name: `reviewlock`.
+  - Owner: `BrightyBrainiac`.
+  - Install count: `1`.
+  - Versions count: `351`.
+  - Current uploaded version: `0.0.2`, uploaded `2026-05-24T13:13:58.832Z`.
+  - `app.description` is still empty.
+  - `categories` and `categoriesV2` are still empty.
+  - `marketingInfo` is still empty.
+  - `termsAndConditions` and `privacyPolicy` are still empty.
+  - `version.about` is still the short development README, not a launch-grade
+    app listing README.
+  - `hasCustomSettings` is `false`.
+- Reviewer note: This reconfirms the previously logged submission/listing
+  blocker. The local app may be stronger than the uploaded listing, but judges
+  will see the Developer Portal listing state until a new upload/listing pass is
+  completed and rechecked.
+
+## 2026-05-26 15:31 IST - Validation Status
+
+- Verified the focused validation commands logged for the dirty audit timeline
+  timestamp polish patch:
+  - `npm run test -- src/client/render.test.ts src/client/state/store.test.ts --reporter verbose`
+  - PASS, 2 files / 35 tests.
+  - `npm run build`
+  - PASS.
+- Reviewer note: This validates the local test/build claim for the dirty UI
+  patch. It does not add live Reddit WebView proof.
+
+## 2026-05-26 15:31 IST - Main Agent Commit-Ready Status
+
+- Main agent ran the full local validation gate for the audit timeline
+  timestamp polish patch.
+- Commands completed:
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files and 417 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+  - `rg -n "TODO" src`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+  - Production UI/code clean; matches are guardrail tests, audit docs, prompts,
+    and proof checklists.
+
+## 2026-05-26 15:32 IST - Finding
+
+- Severity: low
+- Area: Browser screenshot proof traceability.
+- Evidence:
+  - `docs/BROWSER_REGRESSION.md` has an existing "Audit Timeline Layout Recheck"
+    section that records `output/playwright/audit-timeline-layout-fixed.png` and
+    `output/playwright/audit-timeline-layout-fixed-mobile.png`, with a
+    `420px mobile viewport` result.
+  - The new "Audit Timeline Timestamp Recheck" section records the same two
+    screenshot paths after resizing to `390 720`.
+  - The current file metadata confirms the mobile screenshot is now `390 x 720`,
+    so the previous 420px artifact has been overwritten.
+- Why it matters: This is not an app behavior bug, but it weakens proof
+  traceability. A final auditor or submission writer can read the older section
+  and believe the linked artifact still proves the 420px pass, while the file
+  now belongs to the later 390px timestamp pass.
+- Suggested fix: Either mark the older "Audit Timeline Layout Recheck" section
+  as superseded by the timestamp recheck, or use distinct screenshot filenames
+  for each browser proof pass, for example
+  `audit-timeline-detail-layout-420.png` and
+  `audit-timeline-timestamp-390.png`.
+- Files reviewed:
+  - `docs/BROWSER_REGRESSION.md`
+  - `output/playwright/audit-timeline-layout-fixed.png`
+  - `output/playwright/audit-timeline-layout-fixed-mobile.png`
+
+## 2026-05-26 15:33 IST - Validation Status
+
+- Verified the full local gate logged for the dirty audit timeline timestamp
+  polish patch:
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 417 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+  - `rg -n "TODO" src`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+  - Production UI/code clean; matches are guardrail tests, audit docs, prompts,
+    and proof checklists.
+- Reviewer note: This validates the local gate claim for the current dirty
+  worktree. It does not close the Developer Portal listing blocker or add live
+  Reddit WebView proof for the refreshed screenshots.
+
+## 2026-05-26 15:32 IST - Resolution
+
+- Addressed finding: browser screenshot proof traceability.
+- Updated `docs/BROWSER_REGRESSION.md` so the earlier "Audit Timeline Layout
+  Recheck" explicitly says its screenshot paths were later recaptured by the
+  timestamp-specific pass.
+- Current source of truth for those two screenshot artifacts is now the "Audit
+  Timeline Timestamp Recheck" section.
