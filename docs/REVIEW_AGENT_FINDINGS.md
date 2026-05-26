@@ -6354,3 +6354,27 @@
   - No browser run for this patch yet. The behavior is an HTML-output/security
     guard with focused render tests, not a layout change. Final submission still
     needs a WebView/browser pass before screenshots or public judging.
+
+## 2026-05-26 15:44 IST - Resolution
+
+- Addressed finding: stale proof/listing metadata in current claim docs.
+- Change:
+  - Updated `docs/RUNTIME_PROOF.md` from the stale `versions count is 38` line
+    to the latest verified `npx devvit view --json` state: install count `1`,
+    owner `BrightyBrainiac`, versions count `351`, current uploaded version
+    `0.0.2`, uploaded `2026-05-24T13:13:58.832Z`.
+  - Added the current Developer Portal blocker directly to
+    `docs/RUNTIME_PROOF.md`: empty app description, empty marketing info, empty
+    privacy/terms fields, and old short README text in `version.about`.
+  - Updated `docs/RUNTIME_PROOF.md` local validation counts to the latest full
+    gate after the permalink hardening patch: 43 files / 419 tests.
+  - Updated `docs/CLAIM_COPY_AUDIT.md` so app upload/playtest proof no longer
+    anchors only to early `v0.0.1.30` evidence and now includes the current
+    listing boundary.
+- Validation source:
+  - `npx devvit view --json` run at 2026-05-26 15:40 IST.
+  - `npm run test` run at 2026-05-26 15:43 IST.
+- Files reviewed:
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - fresh `npx devvit view --json` output

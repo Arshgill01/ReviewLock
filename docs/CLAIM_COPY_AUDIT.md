@@ -13,7 +13,7 @@ Core phrases preserved:
 | Claim                                                                                                           | Status                                     | Evidence                                                                                                                                                                                      | Safe wording                                                                                             |
 | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | ReviewLock is a Reddit Devvit moderation app.                                                                   | verified                                   | `npx devvit view --json` and repeated playtest uploads in `docs/DEVVIT_REGISTRATION_PROOF.md`.                                                                                                | "ReviewLock is a Reddit Devvit moderation app."                                                          |
-| The Devvit app can be uploaded and playtested on `r/reviewlock_dev`.                                            | verified                                   | Wave 21 reached `Playtest ready` repeatedly and logged versions through `v0.0.1.30`.                                                                                                          | "Playtest boot has been verified on `r/reviewlock_dev`."                                                 |
+| The Devvit app can be uploaded and playtested on `r/reviewlock_dev`.                                            | verified                                   | Wave 21 reached `Playtest ready`; later runtime/WebView proof documents playtest versions through `v0.0.2.317`, and fresh `npx devvit view --json` on 2026-05-26 showed app `reviewlock`, owner `BrightyBrainiac`, install count `1`, and versions count `351`. | "Playtest boot has been verified on `r/reviewlock_dev`."                                                 |
 | The dashboard custom post can launch.                                                                           | verified                                   | `docs/RUNTIME_PROOF.md` records a created dashboard custom post and valid menu response hardening.                                                                                            | "Dashboard launch has playtest proof."                                                                   |
 | The dashboard client renders active locks, reports suppressed, reopened items, audit, runtime, and demo states. | verified locally                           | `docs/UI_AUDIT.md` and client render tests exercise the built client with mocked API responses.                                                                                               | "The built dashboard UI renders these states in local browser tests."                                    |
 | Dashboard API and client response contracts are aligned.                                                        | verified locally                           | `docs/API_CLIENT_CONTRACT_PROOF.md` and route/client tests.                                                                                                                                   | "Local route and client tests verify the dashboard API contract."                                        |
@@ -86,3 +86,13 @@ Not allowed:
 ## Outcome
 
 No inflated production-facing claim needed a copy rewrite in Wave 27. The audit records the current claim boundary, and render tests now cover the full forbidden phrase set from the wave spec.
+
+## 2026-05-26 Current Listing Boundary
+
+Fresh `npx devvit view --json` on 2026-05-26 still shows the Developer Portal
+listing as submission-incomplete: empty app description, empty marketing info,
+empty privacy/terms fields, and old short README text in `version.about`.
+
+Safe submission wording may cite the app listing URL, but must not claim the
+public listing copy has been updated until a final upload/listing pass verifies
+that metadata.

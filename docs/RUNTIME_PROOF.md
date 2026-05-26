@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-26 13:38 IST.
+Last updated: 2026-05-26 15:44 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -19,7 +19,14 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - `npx devvit whoami`
   - Result: PASS, logged in as `u/BrightyBrainiac`.
 - `npx devvit view --json`
-  - Result: PASS, app `reviewlock` exists, install count is `1`, owner is `BrightyBrainiac`, versions count is `38`.
+  - Result: PASS, app `reviewlock` exists, install count is `1`, owner is
+    `BrightyBrainiac`, versions count is `351`.
+  - Latest listing check at 2026-05-26 15:40 IST showed current uploaded version
+    `0.0.2`, uploaded `2026-05-24T13:13:58.832Z`.
+  - Listing blocker: `app.description`, `marketingInfo`, `privacyPolicy`, and
+    `termsAndConditions` are still empty, and `version.about` still contains
+    the old short README. A final upload/listing pass is still required before
+    Devpost submission.
 - `npm run dev -- reviewlock_dev`
   - Result: PASS, playtest served `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.
   - Latest observed hot reload in the Wave 31 live WebView smoke pass: `v0.0.2.6`.
@@ -65,11 +72,12 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, Devvit emitted sanitized `reviewlock.trigger.payload_shape` for `on-comment-update`.
   - Result: PASS, dashboard showed active locks decrease from `3` to `2`, `Reopened after edit` increase from `1` to `2`, latest reopen `comment:ontlx1k` with reason `content changed`, reopen queue fingerprint delta `9da841c1` to `20abf990`, audit `Lock Reopened 5/25/2026, 11:05:07 PM`, and runtime proof `commentUpdateTrigger verified`.
 - `npm run type-check`
-  - Result: PASS after runtime hardening patches.
+  - Result: PASS after submission documentation and dashboard permalink
+    hardening patches.
 - `npm run test -- --run src/integration.test.ts src/client/state/runtimeContext.test.ts src/client/state/store.test.ts src/client/render.test.ts src/server/services/runtimeHardening.test.ts`
   - Result: PASS, 5 files and 27 tests.
 - `npm run test`
-  - Result: PASS, 36 files and 117 tests.
+  - Result: PASS on latest local gate, 43 files and 419 tests.
 - `npm run lint`
   - Result: PASS.
 - `npm run build`
