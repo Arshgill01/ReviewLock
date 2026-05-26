@@ -6668,3 +6668,64 @@
   - `src/client/render.test.ts`
   - `README.md`
   - `docs/DEVPOST_SUBMISSION.md`
+
+## 2026-05-26 16:29 IST - Finding
+
+- Severity: low
+- Area: Uploaded app `version.about` is launch-grade but not App Directory self-contained.
+- Evidence:
+  - Fresh `npx devvit view --json` shows uploaded version `0.0.4` and `version.about` populated from the root `README.md`, while app-level `description`, `marketingInfo`, `privacyPolicy`, and `termsAndConditions` remain empty.
+  - `README.md:57-78` says the latest proof matrix lives in `docs/RUNTIME_PROOF.md` and lists verified/unverified rows, but the uploaded App Directory about text cannot guarantee judges can open repository-local `docs/...` paths from the listing.
+  - `README.md:101-127` includes local developer validation and playtest commands such as `npm install`, `npm run test`, and `npm run dev -- reviewlock_dev`; those are useful for a repository README but less useful as the primary App Directory about copy.
+  - `README.md:140-150` includes a repository documentation map with internal paths like `docs/SAFETY_PRIVACY_AUDIT.md`, `docs/DEVPOST_SUBMISSION.md`, and `docs/LAUNCH_CHECKLIST.md`.
+  - `docs/APP_LISTING.md:17-119` already has a more self-contained listing-oriented description, permissions explanation, data-stored section, privacy draft, and terms draft.
+  - `docs/DEVPOST_SUBMISSION.md:21-27` and `docs/APP_LISTING.md:7-15` correctly record that listing metadata still needs a final pass, but the current uploaded about text is still the root README rather than the cleaner listing copy.
+- Why it matters: The app listing is a required Devpost submission artifact. Even though the README is no longer stub-grade, judges or moderators who land on the Developer Platform listing should not need repository-local docs or local CLI commands to understand the tool, proof boundary, data use, and safety terms. This is lower risk than empty metadata, but it is an avoidable polish gap for the honorable-mention target.
+- Suggested fix: Before final upload/publish, either make the root `README.md` double as a self-contained App Directory about page or configure the upload/listing flow so `version.about` uses the cleaner copy from `docs/APP_LISTING.md`. Keep repository-only validation commands and doc maps in a later "Developer notes" section or link to a public repository explicitly if that will be provided. Re-run `npx devvit view --json` afterward and confirm `version.about` reads like listing copy without depending on inaccessible `docs/...` paths.
+- Files reviewed:
+  - `README.md`
+  - `docs/APP_LISTING.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-26 16:30 IST - Finding
+
+- Severity: low
+- Area: Demo reset does not clear stale demo ledger indexes before reseeding.
+- Evidence:
+  - `src/server/services/demoMode.ts:65-100` seeds the deterministic demo scenario by saving locks, reopen events, audit events, metrics, runtime proof, marker, and config under `reviewlock_demo`.
+  - `src/server/services/demoMode.ts:112-122` implements both `enableDemoMode()` and `resetDemoMode()` as direct calls to `seedDemoData()`.
+  - `seedDemoData()` overwrites records with matching ids, but it does not clear `keys.activeLocks(reviewlock_demo)`, `keys.activeLocksByTarget(reviewlock_demo)`, `keys.reopenQueue(reviewlock_demo)`, `keys.audit(reviewlock_demo)`, `keys.metricsDailyIndex(reviewlock_demo)`, or `keys.metricsTargetIndex(reviewlock_demo)` before writing the current scenario.
+  - Dashboard aggregation reads those indexes directly through `listActiveLocks()`, `listOpenReopenEvents()`, `listAuditEvents()`, `listDailyMetrics()`, and `listTopTargetMetrics()`: `src/server/services/dashboard.ts:59-77`.
+  - `src/server/services/demoMode.test.ts:34-42` proves idempotency only when the same scenario is seeded twice; it does not cover an older or hand-seeded demo namespace containing extra valid demo records that are absent from the current scenario.
+- Why it matters: Demo mode is the judge-facing safety net for showing the full lock -> suppress -> edit -> reopen loop. If the seeded scenario changes between uploads, or if a previous demo seed left extra valid records in the demo namespace, reset can leave old index members visible in the dashboard. That can make screenshot/video proof look inconsistent with the intended deterministic 18-record scenario, without affecting live subreddit data.
+- Suggested fix: Make demo reset/enable clear the bounded demo namespace indexes and known demo records before seeding, or add a scenario version marker that triggers a clear-and-reseed when the version changes. Add a regression that seeds an older scenario with an extra active lock/reopen/metric/audit row, then calls `resetDemoMode()` with the current scenario and asserts the dashboard lists only current scenario records.
+- Files reviewed:
+  - `src/server/services/demoMode.ts`
+  - `src/server/services/demoMode.test.ts`
+  - `src/server/services/dashboard.ts`
+  - `src/server/services/locks.ts`
+  - `src/server/services/reopenQueue.ts`
+  - `src/shared/demoScenario.ts`
+
+## 2026-05-26 16:33 IST - Finding
+
+- Severity: medium
+- Area: Form binding consumption is not atomic for concurrent submit callbacks.
+- Evidence:
+  - `src/server/services/formBindings.ts:125-138` consumes a form binding with separate `redis.get(bindingKey)`, parse, and `redis.del(bindingKey)` calls.
+  - `src/server/adapters/redis.ts:6-21` exposes `get`, `setIfNotExists`, and `del`, but no atomic get-and-delete operation or token-consume lease.
+  - `src/routes/forms.ts:248-276` and `src/routes/forms.ts:309-330` treat a consumed binding as authorization to execute the lock or unlock flow.
+  - Lock submissions are mostly neutralized downstream by the lock creation guard in `src/server/services/lockFlow.ts:215-248`, but unlock submissions go from active-lock read to `unignoreReports()` in `src/server/services/unlockFlow.ts:93-118` without an equivalent per-target unlock guard.
+  - `src/server/services/unlockFlow.ts:151-204` then persists unlocked status and writes a `lock_unlocked` audit event, so two concurrent callbacks that both read the binding before either deletes it can double-call `unignoreReports()` and double-attempt unlock/audit writes.
+  - `src/server/services/formBindings.test.ts:20-36` proves sequential one-time consumption, and `src/server/services/unlockFlow.test.ts:64-82` proves normal unlock behavior, but there is no regression for concurrent consumption of the same form token or concurrent unlock submit callbacks.
+- Why it matters: This is unlikely to corrupt content because `unignoreReports()` should be idempotent and the lock ends in an unlocked state, but it weakens the "human confirmation once" boundary around a core moderation action. Devvit form callbacks can be retried or double-submitted at the HTTP layer, and a reviewer/judge looking for reliable UX may reasonably expect confirmation tokens to be single-use under concurrency, not only sequentially.
+- Suggested fix: Add an atomic consume primitive for form bindings, either by extending the Redis adapter with a Devvit-supported get/delete transaction if available, or by acquiring a short `setIfNotExists()` consume lease before reading/deleting the token. Add regressions that two concurrent `consumeFormBinding()` calls return exactly one binding, and that concurrent unlock submit callbacks produce at most one `unignoreReports` call and one `lock_unlocked` audit event.
+- Files reviewed:
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/server/services/unlockFlow.ts`
+  - `src/server/services/unlockFlow.test.ts`
+  - `src/routes/forms.ts`
+  - `src/server/adapters/redis.ts`
