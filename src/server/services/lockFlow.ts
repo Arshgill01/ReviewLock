@@ -214,10 +214,21 @@ export const lockReviewedContent = async (
 
   const guardKey = keys.targetLockCreation(target.subreddit, target.id);
   const guardToken = `${now}:${target.id}:${Date.now()}:${Math.random()}`;
-  const guardAcquired = await deps.redis.setIfNotExists(
-    guardKey,
-    guardToken,
-  );
+  let guardAcquired: boolean;
+
+  try {
+    guardAcquired = await deps.redis.setIfNotExists(
+      guardKey,
+      guardToken,
+    );
+  } catch {
+    return {
+      ok: false,
+      message:
+        'ReviewLock could not reserve this lock attempt, so reports were not locked. Try again in a moment.',
+      warnings: ['redis_write_failed'],
+    };
+  }
 
   if (!guardAcquired) {
     const inFlightLock = await getActiveLockByTarget(

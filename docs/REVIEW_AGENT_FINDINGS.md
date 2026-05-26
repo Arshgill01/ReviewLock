@@ -6729,3 +6729,24 @@
   - `src/server/services/unlockFlow.test.ts`
   - `src/routes/forms.ts`
   - `src/server/adapters/redis.ts`
+
+## 2026-05-26 16:38 IST - Resolution
+
+- Addressed findings:
+  - Lock creation guard acquisition failure is not converted to a retryable lock result.
+  - Form binding consumption is not atomic for concurrent submit callbacks.
+- Change:
+  - `src/server/services/lockFlow.ts` now catches Redis `setIfNotExists()` failures when reserving the per-target lock creation guard and returns a structured `LockFlowResult` before any Reddit moderation calls.
+  - `src/server/services/formBindings.ts` now acquires a short Redis `setIfNotExists()` consume lease before reading/deleting a form binding, so concurrent submit callbacks cannot both consume the same confirmation token.
+  - Added regressions for guard acquisition failure, concurrent form-token consumption, consume-lease reservation failure, and consume-lease expiry failure.
+- Validation:
+  - `npm test -- src/server/services/formBindings.test.ts src/server/services/lockFlow.test.ts`
+  - PASS, 2 files / 27 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm test`
+  - PASS, 43 files / 423 tests.
+  - `npm run build`
+  - PASS.

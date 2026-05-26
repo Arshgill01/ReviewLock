@@ -247,6 +247,43 @@ describe('lockReviewedContent', () => {
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
+  it('fails closed before moderation when the lock creation guard cannot be reserved', async () => {
+    class GuardWriteFailingRedisStore extends InMemoryRedisStore {
+      override async setIfNotExists(keyName: string, value: string): Promise<boolean> {
+        if (keyName === keys.targetLockCreation('alpha', 't3_post')) {
+          throw new Error('guard write down');
+        }
+
+        return super.setIfNotExists(keyName, value);
+      }
+    }
+
+    const reddit = new FakeRedditAdapter([target()]);
+    const redis = new GuardWriteFailingRedisStore();
+    const result = await lockReviewedContent(
+      {
+        reddit,
+        redis,
+        clock: fixedClock('2026-05-24T00:00:00.000Z'),
+      },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockReason: 'reviewed_policy_compliant',
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      message:
+        'ReviewLock could not reserve this lock attempt, so reports were not locked. Try again in a moment.',
+      warnings: ['redis_write_failed'],
+    });
+    expect(reddit.calls).toEqual([]);
+    expect(await redis.get(keys.targetLockCreation('alpha', 't3_post'))).toBeUndefined();
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+  });
+
   it('does not delete a newer lock creation guard when an older owner finishes', async () => {
     class PausingIgnoreReportsRedditAdapter extends FakeRedditAdapter {
       private firstIgnoreStartedResolver: (() => void) | undefined;
