@@ -6452,3 +6452,48 @@
   - This was a non-public upload, not a public `devvit publish`.
   - Public judging post URL is still not recorded.
   - Comment report and post NSFW/spoiler/flair live proof remain unverified.
+
+## 2026-05-26 15:59 IST - Finding
+
+- Severity: medium
+- Area: Reopen failure auditability / runtime proof ledger.
+- Evidence:
+  - Report-trigger changed-content reopen queues the reopen event and then calls `markLockReopenedAfterQueue()` before entering the `try` block that records reopened metrics and success/runtime-failure audit entries: `src/server/services/reportTriggers.ts:416-424`.
+  - `markLockReopenedAfterQueue()` removes active indexes when the lock status write fails, then rethrows: `src/server/services/reportTriggers.ts:152-162`.
+  - The outer catch returns `runtime_uncertain` with `redis_write_failed` but does not append a `runtime_failure` audit for that status-write failure: `src/server/services/reportTriggers.ts:509-533`.
+  - The update-trigger path has the same structure: `src/server/services/reopenFlow.ts:254-263` calls `markLockReopenedAfterQueue()` before the post-reopen audit/metric `try`, while `markLockReopenedAfterQueue()` rethrows after removing indexes at `src/server/services/reopenFlow.ts:96-106`; the outer catch at `src/server/services/reopenFlow.ts:329-349` returns `runtime_uncertain` without a `runtime_failure` audit.
+  - Existing regressions assert the reopen event remains visible and active indexes are removed, but they do not assert a runtime-failure audit for this failure: `src/server/services/reportTriggers.test.ts:710-745` and `src/server/services/reopenFlow.test.ts:408-443`.
+- Why it matters: The compensation prevents continued suppression, which is the critical safety behavior, but it leaves a visible reopen queue item without a durable audit row explaining that the lock status persistence failed. ReviewLock's product contract and docs emphasize an audit log for runtime failures; this edge can make the dashboard/proof ledger less explainable exactly when Redis persistence partially failed.
+- Suggested fix: Wrap the queue-plus-status transition so a status-write failure appends a best-effort `runtime_failure` audit with operation `markLockReopenedAfterQueue` or `updateLockStatus`, target id, lock id, and original Redis error. Add report-trigger and update-trigger regressions extending the existing status-write-failure tests to assert the runtime-failure audit is present while the reopen event remains visible and active indexes are removed.
+- Files reviewed:
+  - `src/server/services/reportTriggers.ts`
+  - `src/server/services/reopenFlow.ts`
+  - `src/server/services/reportTriggers.test.ts`
+  - `src/server/services/reopenFlow.test.ts`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+
+## 2026-05-26 16:03 IST - Resolution
+
+- Addressed finding: Reopen failure auditability / runtime proof ledger.
+- Change:
+  - `src/server/services/reportTriggers.ts` now writes a best-effort
+    `runtime_failure` audit if a changed-report trigger has already queued a
+    reopen event but fails to persist the lock status transition.
+  - `src/server/services/reopenFlow.ts` now writes the same class of
+    best-effort `runtime_failure` audit for update-trigger reopen status
+    persistence failures.
+  - Existing status-write-failure regressions now assert that the reopen event
+    remains visible, active indexes are removed, and the runtime-failure audit
+    records `operation: markLockReopenedAfterQueue` with the Redis error.
+- Validation:
+  - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
+  - PASS, 2 files / 60 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files / 419 tests.
+  - `npm run build`
+  - PASS.

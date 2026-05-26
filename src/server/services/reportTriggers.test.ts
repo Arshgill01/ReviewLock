@@ -742,6 +742,16 @@ describe('handleReportTrigger', () => {
       expect.objectContaining({ reason: 'content_changed' }),
     ]);
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'Report trigger queued a reopen event, but lock status persistence failed.',
+        data: expect.objectContaining({
+          operation: 'markLockReopenedAfterQueue',
+          error: 'lock status down',
+        }),
+      }),
+    ]);
   });
 
   it('reopens changed comment reports with the comment moderation operation', async () => {
@@ -982,9 +992,7 @@ describe('handleReportTrigger', () => {
       action: 'runtime_uncertain',
       warnings: ['redis_write_failed'],
     });
-    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-runtime-audit-fail')).toBe(
-      false,
-    );
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:evt-runtime-audit-fail')).toBe(false);
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
       status: 'active',
       runtimeWarnings: ['target_resolution_failed'],
@@ -1274,9 +1282,9 @@ describe('handleReportTrigger', () => {
         kind: 'report_suppressed',
       }),
     ]);
-    expect(
-      await redis.exists('reviewlock:alpha:report:dedupe:missing-event:t3_post:count-6'),
-    ).toBe(true);
+    expect(await redis.exists('reviewlock:alpha:report:dedupe:missing-event:t3_post:count-6')).toBe(
+      true,
+    );
   });
 
   it('rolls back suppression metrics when the success audit write fails', async () => {
@@ -1322,11 +1330,7 @@ describe('handleReportTrigger', () => {
   });
 
   it('rolls back partial suppression metric writes when the metrics helper fails mid-write', async () => {
-    const failurePoints = [
-      'target-record',
-      'daily-index',
-      'target-index',
-    ] as const;
+    const failurePoints = ['target-record', 'daily-index', 'target-index'] as const;
 
     for (const failurePoint of failurePoints) {
       class PartialMetricWriteFailingRedisStore extends InMemoryRedisStore {

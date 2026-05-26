@@ -440,6 +440,16 @@ describe('breakLockForChangedContent', () => {
       expect.objectContaining({ reason: 'content_changed' }),
     ]);
     expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    expect(await listAuditEvents(redis, 'alpha')).toEqual([
+      expect.objectContaining({
+        kind: 'runtime_failure',
+        message: 'Update trigger queued a reopen event, but lock status persistence failed.',
+        data: expect.objectContaining({
+          operation: 'markLockReopenedAfterQueue',
+          error: 'lock status down',
+        }),
+      }),
+    ]);
   });
 
   it('records runtime failure when update reopen audit fails after state is reopened', async () => {
@@ -544,7 +554,8 @@ describe('breakLockForChangedContent', () => {
     );
     expect(
       actions.some(
-        (action) => action === 'duplicate' || action === 'no_lock' || action === 'runtime_uncertain',
+        (action) =>
+          action === 'duplicate' || action === 'no_lock' || action === 'runtime_uncertain',
       ),
     ).toBe(true);
     if (reportResult.action === 'runtime_uncertain') {

@@ -97,11 +97,29 @@ const markLockReopenedAfterQueue = async (
   redis: RedisStore,
   lock: ReviewLockRecord,
   updates: Partial<ReviewLockRecord>,
+  auditId: string,
+  now: string,
 ): Promise<void> => {
   try {
     await updateLockStatus(redis, lock.subreddit, lock.id, 'reopened', updates);
   } catch (error) {
     await removeActiveLockIndexes(redis, lock).catch(() => undefined);
+    await appendAuditEvent(redis, {
+      id: auditId,
+      kind: 'runtime_failure',
+      subreddit: lock.subreddit,
+      targetId: lock.targetId,
+      targetKind: lock.targetKind,
+      lockId: lock.id,
+      actor: 'reviewlock',
+      createdAt: now,
+      message: 'Update trigger queued a reopen event, but lock status persistence failed.',
+      data: {
+        operation: 'markLockReopenedAfterQueue',
+        error: error instanceof Error ? error.message : 'unknown error',
+      },
+      demo: lock.demo,
+    }).catch(() => undefined);
     throw error;
   }
 };
@@ -194,8 +212,7 @@ export const breakLockForChangedContent = async (
           lockId: lock.id,
           actor: 'reviewlock',
           createdAt: now,
-          message:
-            'Update trigger could not load current content; active lock kept for retry.',
+          message: 'Update trigger could not load current content; active lock kept for retry.',
           data: {
             reason: 'target_resolution_failed',
             triggerCapabilityName: input.triggerCapabilityName,
@@ -242,22 +259,25 @@ export const breakLockForChangedContent = async (
       const reason = input.reasonHint ?? 'content_changed';
       const recoveredLock = clearResolvedTargetWarnings(lock);
       const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, currentTarget);
-      await recordModerationOperationStatus(
-        deps.redis,
-        lock.subreddit,
-        unignoreResult,
-        now,
-      ).catch(() => undefined);
+      await recordModerationOperationStatus(deps.redis, lock.subreddit, unignoreResult, now).catch(
+        () => undefined,
+      );
       const warnings = unignoreResult.warnings;
       const event = buildReopenEvent(recoveredLock, currentTarget, reason, now, warnings);
 
       await enqueueReopenEvent(deps.redis, event);
-      await markLockReopenedAfterQueue(deps.redis, recoveredLock, {
-        reopenedAt: now,
-        reopenReason: reason,
-        reopenEventId: event.id,
-        runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
-      });
+      await markLockReopenedAfterQueue(
+        deps.redis,
+        recoveredLock,
+        {
+          reopenedAt: now,
+          reopenReason: reason,
+          reopenEventId: event.id,
+          runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
+        },
+        `audit-update-reopen-status-failed-${Date.parse(now)}-${lock.id}`,
+        now,
+      );
 
       try {
         await incrementReopenedMetric(deps.redis, currentTarget, now, lock.demo);
@@ -301,8 +321,7 @@ export const breakLockForChangedContent = async (
         return {
           ok: false,
           action: 'runtime_uncertain',
-          message:
-            'Lock reopened, but ReviewLock could not persist post-reopen proof.',
+          message: 'Lock reopened, but ReviewLock could not persist post-reopen proof.',
           event,
           warnings: [...warnings, 'redis_write_failed'],
         };

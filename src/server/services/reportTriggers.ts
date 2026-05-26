@@ -153,11 +153,29 @@ const markLockReopenedAfterQueue = async (
   redis: RedisStore,
   lock: ReviewLockRecord,
   updates: Partial<ReviewLockRecord>,
+  auditId: string,
+  now: string,
 ): Promise<void> => {
   try {
     await updateLockStatus(redis, lock.subreddit, lock.id, 'reopened', updates);
   } catch (error) {
     await removeActiveLockIndexes(redis, lock).catch(() => undefined);
+    await appendAuditEvent(redis, {
+      id: auditId,
+      kind: 'runtime_failure',
+      subreddit: lock.subreddit,
+      targetId: lock.targetId,
+      targetKind: lock.targetKind,
+      lockId: lock.id,
+      actor: 'reviewlock',
+      createdAt: now,
+      message: 'Report trigger queued a reopen event, but lock status persistence failed.',
+      data: {
+        operation: 'markLockReopenedAfterQueue',
+        error: error instanceof Error ? error.message : 'unknown error',
+      },
+      demo: lock.demo,
+    }).catch(() => undefined);
     throw error;
   }
 };
@@ -233,8 +251,7 @@ export const handleReportTrigger = async (
               lockId: lock.id,
               actor: 'reviewlock',
               createdAt: now,
-              message:
-                'Report trigger could not load current content; active lock kept for retry.',
+              message: 'Report trigger could not load current content; active lock kept for retry.',
               data: {
                 error: resolution.error,
                 reason: 'target_resolution_failed',
@@ -365,8 +382,7 @@ export const handleReportTrigger = async (
               lockId: lock.id,
               actor: 'reviewlock',
               createdAt: now,
-              message:
-                'Redis failed after report suppression and unignoreReports rollback failed.',
+              message: 'Redis failed after report suppression and unignoreReports rollback failed.',
               data: { operation: 'unignoreReports', error: rollbackResult.errorMessage },
               demo: lock.demo,
             }).catch(() => undefined);
@@ -407,19 +423,20 @@ export const handleReportTrigger = async (
         const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, target);
         await recordRuntimeProof(deps, lock.subreddit, unignoreResult, now);
         const warnings = unignoreResult.warnings;
-        const reopenEvent = buildReopenFromReportDecision(
-          recoveredLock,
-          target,
-          now,
-          warnings,
-        );
+        const reopenEvent = buildReopenFromReportDecision(recoveredLock, target, now, warnings);
         await enqueueReopenEvent(deps.redis, reopenEvent);
-        await markLockReopenedAfterQueue(deps.redis, recoveredLock, {
-          reopenedAt: now,
-          reopenReason: 'content_changed',
-          reopenEventId: reopenEvent.id,
-          runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
-        });
+        await markLockReopenedAfterQueue(
+          deps.redis,
+          recoveredLock,
+          {
+            reopenedAt: now,
+            reopenReason: 'content_changed',
+            reopenEventId: reopenEvent.id,
+            runtimeWarnings: [...recoveredLock.runtimeWarnings, ...warnings],
+          },
+          reportAuditId('audit-report-reopen-status-failed', input, now, lock.id),
+          now,
+        );
         try {
           await incrementReopenedMetric(deps.redis, target, now, lock.demo);
           await appendAuditEvent(deps.redis, {
@@ -445,8 +462,7 @@ export const handleReportTrigger = async (
             lockId: lock.id,
             actor: 'reviewlock',
             createdAt: now,
-            message:
-              'Report trigger reopened the lock, but post-reopen persistence failed.',
+            message: 'Report trigger reopened the lock, but post-reopen persistence failed.',
             data: {
               operation: 'postReopenPersistence',
               error: error instanceof Error ? error.message : 'unknown error',
@@ -457,8 +473,7 @@ export const handleReportTrigger = async (
           return {
             ok: false,
             action: 'runtime_uncertain',
-            message:
-              'Lock reopened, but ReviewLock could not persist post-reopen proof.',
+            message: 'Lock reopened, but ReviewLock could not persist post-reopen proof.',
             reopenEvent,
             warnings: [...warnings, 'redis_write_failed'],
           };
