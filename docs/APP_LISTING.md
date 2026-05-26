@@ -9,6 +9,9 @@ Current listing state:
 - `npm run deploy` on 2026-05-26 uploaded version `0.0.4`.
 - `npx devvit view --json` after that upload returned `version.about` populated
   from the launch-grade README.
+- The root `README.md` now includes a self-contained App Directory summary,
+  proof boundary, permissions explanation, data/privacy summary, and terms of
+  use summary before the repository documentation map.
 - App-level `description`, `marketingInfo`, `privacyPolicy`, and
   `termsAndConditions` are still empty in the CLI response.
 - Treat this file as ready-to-use listing copy. It is not proof that the
@@ -143,15 +146,17 @@ Suggested category framing:
 - [ ] Run `npx devvit upload` only after the local gate passes.
 - [ ] Run `npx devvit view --json`.
 - [ ] Run `npx devvit publish` only after final approval if an unlisted publish
-  request is required for judging access.
+      request is required for judging access.
 - [ ] Run `npx devvit publish --public` only after final approval if public App
-  Directory review is required.
-- [x] Confirm `version.about` contains the updated README/listing copy.
+      Directory review is required.
+- [x] Confirm the root README is self-contained enough for `version.about`.
+- [x] Confirm `version.about` contains the updated README/listing copy as of
+      upload `0.0.4`.
 - [ ] Confirm `app.description` is no longer empty, or confirm the current
-  Developer Portal workflow does not expose this field for manual editing before
-  public submission.
+      Developer Portal workflow does not expose this field for manual editing before
+      public submission.
 - [ ] Confirm `marketingInfo`, privacy, and terms fields are either populated
-  or intentionally left unavailable by the current Developer Portal workflow.
+      or intentionally left unavailable by the current Developer Portal workflow.
 - [ ] Confirm the app listing URL opens: `https://developers.reddit.com/apps/reviewlock`.
 - [ ] Confirm the public judging post URL works in a public subreddit with
-  fewer than 200 members.
+      fewer than 200 members.

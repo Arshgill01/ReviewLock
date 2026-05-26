@@ -789,7 +789,7 @@
   (`src/routes/api.ts:145-183`). `/api/smoke/reddit` records
   `redditContext verified` on success (`src/routes/api.ts:214-234`), but its
   catch block only returns `{ ok: false, capability: 'redditContext',
-  status: 'failed', error }` and never writes the failed result to runtime proof
+status: 'failed', error }` and never writes the failed result to runtime proof
   (`src/routes/api.ts:243-254`). The contract tests include a regression for
   failed Redis smoke proof persistence (`src/routes/api.contract.test.ts:110-149`)
   but no corresponding failing Reddit-context case.
@@ -1384,7 +1384,7 @@
   no-id deliveries with explicit report counts 5 and 6, and delayed duplicates
   with the same count (`src/server/services/reportTriggers.test.ts:236-306`),
   but there is no regression for `eventId === undefined` and `reportCount ===
-  undefined`.
+undefined`.
 - Why it matters: The live post-report payload happened to expose
   `post.numReports`, but comment report proof is still unverified and Devvit
   payload shape is treated as runtime evidence, not a permanent contract. If a
@@ -1557,7 +1557,7 @@
   `src/server/services/reopenFlow.ts:109-121`).
 - Why it matters: Demo/live separation is a product guardrail, and the seeded
   demo status explicitly warns `Demo data only. Seeded records are not runtime
-  proof.` (`src/shared/demoScenario.ts:642`). A later capability write under a
+proof.` (`src/shared/demoScenario.ts:642`). A later capability write under a
   warning-bearing namespace can erase that warning from the runtime proof panel,
   even though the recent TODO/log entries say explicit demo warnings are
   preserved. The same pattern would also drop any future non-generic runtime
@@ -1885,7 +1885,7 @@
   inspect `comment.numberOfReports` and `comment.numReports` before generic or
   parent post counts (`src/routes/triggers.report.ts`).
 - Regression coverage sends `/on-comment-report` a parent `post.numReports =
-  99` and target `comment.numReports = 5`, then asserts the active lock
+99` and target `comment.numReports = 5`, then asserts the active lock
   `lastReportCount` and `report_suppressed` audit data use `5`
   (`src/routes/triggers.report.test.ts`).
 - Resolved update-trigger mutex contention as retryable instead of terminal.
@@ -3486,8 +3486,8 @@
      - runtime proof/known limitation state if visible.
 - Copy guardrails for every submission artifact:
   - Prefer: `Lock reviewed content until it changes`, `suppress repeat reports
-    on unchanged reviewed content`, `reopened after edit`, `reports
-    suppressed`, `review state tied to content integrity`.
+on unchanged reviewed content`, `reopened after edit`, `reports
+suppressed`, `review state tied to content integrity`.
   - Avoid: `not reportable`, `reports disabled`, `disable reports`,
     `unreportable`, `forever`, `permanent`, `AI decides`, or any wording that
     implies users cannot submit reports.
@@ -3622,7 +3622,7 @@
     warning list is empty after a successful report-trigger retry.
   - `src/server/services/reopenFlow.test.ts` already contains a focused
     regression named `clears resolved target-resolution warnings after an
-    unchanged update retry succeeds`.
+unchanged update retry succeeds`.
 - Validation:
   - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts --reporter verbose`
     PASS, 2 files / 50 tests.
@@ -3654,7 +3654,7 @@
   behavior.
 - Suggested fix: Rename the historical checked item to match the current
   behavior, for example `Keep known active locks retryable when report-trigger
-  target resolution is uncertain`, or add an indented note that D133 superseded
+target resolution is uncertain`, or add an indented note that D133 superseded
   the earlier reopen wording.
 - Files reviewed: `TODO.md`, `decisions.md`, `docs/RUNTIME_PROOF.md`,
   `docs/TRIGGER_PROOF.md`.
@@ -3677,8 +3677,8 @@
     `src/server/services/reopenFlow.test.ts:225-250`.
   - Existing changed-content tests cover ordinary reopen and unignore failure,
     but not the sequence `target refetch failure -> active lock warning ->
-    later changed-content retry -> reopened record does not carry stale
-    target_resolution_failed`: `src/server/services/reportTriggers.test.ts:623-760`
+later changed-content retry -> reopened record does not carry stale
+target_resolution_failed`: `src/server/services/reportTriggers.test.ts:623-760`
     and `src/server/services/reopenFlow.test.ts:137-186`.
 - Why it matters: The changed-content path is the core demo story. A regression
   here would make reopened items show stale target-resolution warnings, or worse
@@ -3807,7 +3807,7 @@
   - `docs/TRIGGER_PROOF.md:12-17` documents accepted Devvit-shaped nested
     update wrappers including `nsfwPostUpdate` and `spoilerPostUpdate`.
   - Current route tests named `accepts method-named wrapped NSFW update
-    payloads` and `accepts method-named wrapped spoiler update payloads` still
+payloads` and `accepts method-named wrapped spoiler update payloads` still
     use `postNsfwUpdate` and `postSpoilerUpdate` payload keys:
     `src/routes/triggers.update.test.ts:577-615`.
   - `rg -n "nsfwPostUpdate|spoilerPostUpdate" src/routes/triggers.update.test.ts`
@@ -3818,11 +3818,11 @@
   is hardened, the local tests should directly prove every documented alias.
 - Suggested fix: Add two small route tests:
   - `POST /on-post-nsfw-update` with `{ nsfwPostUpdate: { post: { id },
-    subreddit: { name } } }`.
+subreddit: { name } } }`.
   - `POST /on-post-spoiler-update` with `{ spoilerPostUpdate: { post: { id },
-    subreddit: { name } } }`.
-  Keep runtime wording as local-test-only unless Reddit payload logs verify
-  those exact wrappers in playtest.
+subreddit: { name } } }`.
+    Keep runtime wording as local-test-only unless Reddit payload logs verify
+    those exact wrappers in playtest.
 - Files reviewed: `src/routes/triggers.update.ts`,
   `src/routes/triggers.update.test.ts`, `docs/TRIGGER_PROOF.md`, `TODO.md`.
 
@@ -3933,7 +3933,7 @@
   navigation record. If that Redis record is malformed, stale, or corrupted,
   ReviewLock can return a Devvit `navigateTo` outside Reddit or outside the
   current subreddit while showing the success toast `Opening ReviewLock
-  dashboard`. Earlier hardening has consistently treated Redis-backed records
+dashboard`. Earlier hardening has consistently treated Redis-backed records
   as untrusted at read boundaries; this route should follow that standard
   before it becomes part of the public install story.
 - Suggested fix: Validate cached dashboard permalinks before reuse. Accept only
@@ -3984,10 +3984,10 @@
     post on first launch or malformed-record replacement:
     `src/routes/forms.ts:295-313` and `src/routes/forms.ts:328-346`.
   - The subreddit menu form still tells moderators `This creates a visible
-    ReviewLock dashboard custom post in this subreddit...` and the accept
+ReviewLock dashboard custom post in this subreddit...` and the accept
     button still says `Create dashboard post`: `src/routes/menu.ts:172-188`.
   - `devvit.json` still describes the subreddit action as `Create and open the
-    ReviewLock dashboard for this subreddit`: `devvit.json:61-65`.
+ReviewLock dashboard for this subreddit`: `devvit.json:61-65`.
 - Why it matters: The implementation now has the right publishability shape:
   one stable dashboard post per subreddit. But the user-facing copy still
   implies every launch creates visible subreddit content. During judge testing
@@ -3996,7 +3996,7 @@
   dashboard.
 - Suggested fix: Update the menu and manifest copy to match the new behavior.
   For example: `Open the ReviewLock dashboard. ReviewLock creates a dashboard
-  post the first time, then reuses it for future launches.` Use an accept label
+post the first time, then reuses it for future launches.` Use an accept label
   like `Open dashboard` instead of `Create dashboard post`. Add/update a menu
   route test if one asserts the old copy.
 - Files reviewed: `src/routes/menu.ts`, `devvit.json`,
@@ -4041,12 +4041,12 @@
   covered by focused tests:
   - `src/server/services/reportTriggers.test.ts` adds
     `clears resolved target-resolution warnings when a changed-report retry
-    reopens`, proving a prior `target_resolution_failed` warning is not carried
+reopens`, proving a prior `target_resolution_failed` warning is not carried
     into the reopened lock/event when the retry loads changed content and a new
     `unignoreReports` warning is generated.
   - `src/server/services/reopenFlow.test.ts` already contains
     `clears resolved target-resolution warnings when a changed-update retry
-    reopens`, proving the update-trigger side.
+reopens`, proving the update-trigger side.
   - `src/routes/triggers.update.test.ts` now directly covers both alternate
     wrappers: `nsfwPostUpdate` and `spoilerPostUpdate`.
 - Focused validation:
@@ -4388,7 +4388,7 @@
   because moderators may not know whether a moderation action happened.
 - Suggested fix: Wrap `configuredLockReasons()` in the form submit route. For
   the safest behavior, return a neutral toast such as `ReviewLock could not
-  load subreddit lock settings. Reopen the menu and try again.`, assert no
+load subreddit lock settings. Reopen the menu and try again.`, assert no
   Reddit moderation calls, and assert the form binding still exists. If the
   product decision is to fall back to shared defaults instead, record that in
   `decisions.md` and add a regression proving the fallback does not consume the
@@ -4429,7 +4429,7 @@
   but not yet test-addressed.
   - `src/routes/forms.ts` now catches `configuredLockReasons()` failures and
     returns `ReviewLock could not load subreddit lock settings. Reopen the menu
-    and try again.`
+and try again.`
   - `src/routes/forms.test.ts` still has no regression for config read failure
     on submit; it covers disabled configured reasons but not a throwing config
     `get()`.
@@ -4507,7 +4507,7 @@
     the first time and reuses it for future launches, with `Open dashboard` as
     the accept label.
   - `devvit.json:63-65` now describes the subreddit menu item as `Open the
-    ReviewLock dashboard for this subreddit.`
+ReviewLock dashboard for this subreddit.`
 - Remaining review request:
   - Add/update a menu-route copy regression if this copy is meant to be locked
     for submission. The current route test suite passes, but it does not assert
@@ -4528,9 +4528,9 @@
     problem, moderator workflow, safety boundary, verified proof matrix,
     install/setup path, impact model, or known limitations.
   - `find . -maxdepth 2 \( -name 'DEVPOST_SUBMISSION.md' -o -name
-    'APP_LISTING.md' -o -name 'LAUNCH_CHECKLIST.md' -o -name 'DEMO_SCRIPT.md'
-    -o -name 'SCREENSHOT_PLAN.md' -o -name 'FINAL_AUDIT.md' -o -name
-    'CLAIM_CHECK.md' \) -print` returns no submission artifacts.
+'APP_LISTING.md' -o -name 'LAUNCH_CHECKLIST.md' -o -name 'DEMO_SCRIPT.md'
+-o -name 'SCREENSHOT_PLAN.md' -o -name 'FINAL_AUDIT.md' -o -name
+'CLAIM_CHECK.md' \) -print` returns no submission artifacts.
 - Why it matters: Devpost explicitly requires an app listing link, tool
   overview, participant usernames, and project-impact explanation. The judging
   criteria score Polish, Reliable UX, Community Impact, and Ecosystem Impact;
@@ -5334,13 +5334,13 @@
     `app.description: ""`, empty `categories`, empty `marketingInfo`, and a
     stub `version.about`.
   - `docs/RUNTIME_PROOF.md:72` still says `npm run test` passed `36 files and
-    117 tests`.
+117 tests`.
   - The current local gate run recorded above passed `43 test files and 395
-    tests`.
+tests`.
   - `docs/INSTALL_DEPLOY_REHEARSAL.md` is explicitly historical, but its
     `Account and App Status` section still lists `Versions count after upload:
-    32`, and `Required Local Verification` still lists `40 test files and 182
-    tests passed`.
+32`, and `Required Local Verification` still lists `40 test files and 182
+tests passed`.
   - `docs/CLAIM_COPY_AUDIT.md:16` cites older playtest evidence "through
     `v0.0.1.30`" even though later runtime proof rows cite `v0.0.2.*`
     playtests.
@@ -5489,11 +5489,11 @@
     passed.
   - `src/server/services/reopenFlow.test.ts:206` expects the
     `keeps runtime-uncertain refetch failures retryable when target cannot be
-    refetched` case to return `warnings: ['subreddit_missing']`, but the
+refetched` case to return `warnings: ['subreddit_missing']`, but the
     implementation returns `warnings: ['target_resolution_failed']`.
   - `src/server/services/reopenFlow.test.ts:252` expects the
     `ignores malformed fallback subreddit namespaces when update refetch cannot
-    load target` case to return `warnings: ['target_resolution_failed']`, but
+load target` case to return `warnings: ['target_resolution_failed']`, but
     the implementation returns `warnings: ['subreddit_missing']`.
   - The report-trigger tests in the same command passed; the failure is
     isolated to the dirty reopen-flow expectations/semantics.
@@ -5529,7 +5529,7 @@
     `subreddit` for the trigger mutex.
   - But `src/server/services/reportTriggers.ts:279-283` still calls
     `getActiveLockByTarget(deps.redis, resolution.target.subreddit,
-    resolution.target.id)` on the successful-refetch path.
+resolution.target.id)` on the successful-refetch path.
   - `src/server/adapters/reddit.ts:98-105` and `src/server/adapters/reddit.ts:117-125`
     still map missing or malformed `subredditName` to `subreddit: 'unknown'`.
   - Current new tests cover target-refetch failure fallback
@@ -5578,7 +5578,7 @@
   but the user-facing response is not controlled.
 - Suggested fix: Wrap only the `submitDashboardPost()` call in a catch that
   returns a neutral toast such as `ReviewLock could not create the dashboard
-  post. Try again.` while preserving the existing guard cleanup. Add a focused
+post. Try again.` while preserving the existing guard cleanup. Add a focused
   `forms.test.ts` regression with a fake adapter whose `submitDashboardPost`
   throws, asserting the toast response and that
   `keys.dashboardPostCreation(subreddit)` is cleared.
@@ -6070,7 +6070,7 @@
     "separate rows without overlap at desktop width and at a 420px mobile
     viewport."
   - `TODO.md` also marks `Rework audit timeline detail rows and verify
-    desktop/mobile browser screenshots` complete.
+desktop/mobile browser screenshots` complete.
 - Why it matters: These filenames imply the audit timeline layout was fixed,
   and the browser-regression doc explicitly claims that proof. The artifacts do
   not demonstrate the real styled WebView or the claimed layout quality. If
@@ -6905,3 +6905,14 @@
 - Validation:
   - `npm test -- src/routes/api.demo.test.ts`
   - PASS, 1 file / 4 tests.
+
+## 2026-05-26 17:03 IST - Resolution
+
+- Addressed finding: Uploaded app `version.about` is launch-grade but not App Directory self-contained.
+- Change:
+  - `README.md` now includes a self-contained app listing summary, inline current proof boundary, permissions explanation, data/privacy summary, and terms-of-use summary before the repository-only documentation map.
+  - The README no longer tells listing readers that the proof boundary requires opening `docs/RUNTIME_PROOF.md`; repository docs are now clearly labeled as source-reviewer and maintainer material.
+  - `docs/APP_LISTING.md` now records that the root README is self-contained enough for `version.about`, while still preserving the checklist items for final Developer Portal metadata and publish verification.
+- Validation:
+  - `git diff --check`
+  - PASS.

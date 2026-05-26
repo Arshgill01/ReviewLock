@@ -13,6 +13,23 @@ item back in the dashboard reopen queue.
 ReviewLock is not a promise that users cannot report content. It is an
 edit-aware moderation ledger for reviewed content.
 
+## App listing summary
+
+Short description:
+
+> Lock reviewed posts and comments until they change.
+
+ReviewLock is built for moderator teams that need a safer reviewed-content
+memory. It combines Devvit menu actions, forms, report/update triggers, Redis
+persistence, and a dashboard custom post to answer one operational question:
+
+> Has this exact content already been reviewed, and has it changed since then?
+
+If the answer is yes and unchanged, ReviewLock suppresses repeat report churn
+using Reddit moderation capabilities and records the time saved. If the answer
+is no because the content changed or runtime state is uncertain, ReviewLock
+fails open by reopening moderator attention instead of silently suppressing.
+
 ## Why moderators would use it
 
 Native report tools can ignore reports, but they do not give a team a clear
@@ -57,7 +74,7 @@ The dashboard is built for repeated mod-tool use, not marketing. It includes:
 ## Current proof boundary
 
 ReviewLock keeps verified behavior separate from implemented-but-unverified
-behavior. The latest proof matrix lives in `docs/RUNTIME_PROOF.md`.
+behavior. For the current submission build, the live proof boundary is:
 
 Verified in controlled `r/reviewlock_dev` playtest:
 
@@ -98,7 +115,19 @@ ReviewLock uses Devvit Reddit and Redis capabilities:
 - Redis is used for namespaced lock records, target indexes, reopen queues,
   audit logs, metrics, runtime proof, form tokens, and demo data.
 
-## Install and test
+## Terms of use summary
+
+ReviewLock is a moderation workflow tool for Reddit communities. Moderators are
+responsible for their moderation decisions and should test the app in a
+controlled subreddit before production use.
+
+ReviewLock does not guarantee that users cannot report content. It attempts to
+suppress repeat reports on unchanged reviewed content using Reddit-provided
+moderation capabilities. If content changes or ReviewLock cannot verify content
+state with confidence, the app is designed to surface the item for moderator
+attention.
+
+## App listing and validation
 
 App listing:
 
@@ -106,7 +135,7 @@ App listing:
 https://developers.reddit.com/apps/reviewlock
 ```
 
-Local validation:
+Developer validation for this repository:
 
 ```bash
 npm install
@@ -116,7 +145,7 @@ npm run test
 npm run build
 ```
 
-Controlled playtest:
+Controlled Devvit playtest commands:
 
 ```bash
 npx devvit whoami
@@ -124,7 +153,8 @@ npx devvit view --json
 npm run dev -- reviewlock_dev
 ```
 
-Do not claim live behavior unless it is recorded in `docs/RUNTIME_PROOF.md`.
+Do not claim additional live behavior unless it has been recorded in the runtime
+proof log and reproduced in controlled playtest.
 
 ## Known limitations
 
@@ -137,7 +167,11 @@ Do not claim live behavior unless it is recorded in `docs/RUNTIME_PROOF.md`.
 - Public App Directory listing approval is separate from having an uploaded app
   listing URL.
 
-## Documentation map
+## Repository documentation map
+
+These files are for source reviewers and maintainers. The product summary,
+permissions, data use, safety boundary, and runtime proof boundary above are
+intended to stand alone for App Directory and Devpost reviewers.
 
 - Runtime proof: `docs/RUNTIME_PROOF.md`
 - Known limitations: `docs/KNOWN_LIMITATIONS.md`
