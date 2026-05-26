@@ -3,6 +3,7 @@ import type { RedisStore } from '../adapters/redis';
 import type { ReviewLockTarget } from '../../shared/schema';
 import { fingerprintTarget } from './fingerprint';
 import { key } from './keys';
+import { normalizeRuntimeSubreddit } from './runtimeHardening';
 
 export type FormBindingAction = 'lock' | 'unlock';
 
@@ -91,13 +92,17 @@ export const createFormBinding = async (
   createdAt: string,
   lockId?: string,
 ): Promise<ReviewLockFormBinding> => {
+  const canonicalTarget = {
+    ...target,
+    subreddit: normalizeRuntimeSubreddit(target.subreddit),
+  };
   const reviewedFingerprint =
-    action === 'lock' ? fingerprintTarget(target, createdAt) : undefined;
+    action === 'lock' ? fingerprintTarget(canonicalTarget, createdAt) : undefined;
   const binding: ReviewLockFormBinding = {
     token: `form-${action}-${randomUUID()}`,
     action,
-    subreddit: target.subreddit,
-    targetId: target.id,
+    subreddit: canonicalTarget.subreddit,
+    targetId: canonicalTarget.id,
     lockId,
     reviewedContentHash: reviewedFingerprint?.hash,
     reviewedFingerprintVersion: reviewedFingerprint?.version,

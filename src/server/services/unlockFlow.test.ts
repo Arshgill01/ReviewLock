@@ -9,7 +9,7 @@ import { keys } from './keys';
 import { loadRuntimeProofStatus } from './runtimeProof';
 import { unlockReviewedContent } from './unlockFlow';
 
-const target = (): ReviewLockTarget => ({
+const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't3_post',
   kind: 'post',
   subreddit: 'alpha',
@@ -19,6 +19,7 @@ const target = (): ReviewLockTarget => ({
   body: 'Reviewed body',
   edited: false,
   reportCount: 4,
+  ...overrides,
 });
 
 const lock = (): ReviewLockRecord => ({
@@ -78,6 +79,51 @@ describe('unlockReviewedContent', () => {
         expect.objectContaining({ name: 'unignoreReports', status: 'verified' }),
       ]),
     });
+  });
+
+  it('normalizes mixed-case resolved target subreddit before dashboard unlock scope checks', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target({ subreddit: 'Alpha' })], 'mod', 'Alpha');
+    await saveLock(redis, lock());
+
+    const result = await unlockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T01:00:00.000Z') },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockId: 'lock-1',
+        expectedSubreddit: 'alpha',
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
+    await expect(loadRuntimeProofStatus(redis, 'alpha')).resolves.toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'unignoreReports', status: 'verified' }),
+      ]),
+    });
+  });
+
+  it('uses the validated expected subreddit when Reddit returns unknown target context', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target({ subreddit: 'unknown' })]);
+    await saveLock(redis, lock());
+
+    const result = await unlockReviewedContent(
+      { reddit, redis, clock: fixedClock('2026-05-24T01:00:00.000Z') },
+      {
+        targetId: 't3_post',
+        actor: 'mod',
+        lockId: 'lock-1',
+        expectedSubreddit: 'alpha',
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(reddit.calls).toEqual(['unignoreReports:t3_post']);
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
   it('clears active indexes when unlock status persistence fails after unignoreReports', async () => {

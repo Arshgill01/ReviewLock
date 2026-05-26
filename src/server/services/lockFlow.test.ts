@@ -57,6 +57,31 @@ describe('lockReviewedContent', () => {
     });
   });
 
+  it('stores locks, metrics, and runtime proof under the canonical lowercase subreddit', async () => {
+    const reddit = new FakeRedditAdapter([target({ subreddit: 'Alpha' })], 'mod', 'Alpha');
+    const dependencies = deps(reddit);
+    const result = await lockReviewedContent(dependencies, {
+      targetId: 't3_post',
+      actor: 'mod',
+      lockReason: 'reviewed_policy_compliant',
+    });
+
+    expect(result).toMatchObject({ ok: true, lock: { subreddit: 'alpha' } });
+    expect(await getActiveLockByTarget(dependencies.redis, 'alpha', 't3_post')).toMatchObject({
+      id: result.lock?.id,
+    });
+    expect(await getActiveLockByTarget(dependencies.redis, 'Alpha', 't3_post')).toBeUndefined();
+    expect(await listActiveLocks(dependencies.redis, 'Alpha')).toEqual([]);
+    await expect(loadRuntimeProofStatus(dependencies.redis, 'alpha')).resolves.toMatchObject({
+      capabilities: expect.arrayContaining([
+        expect.objectContaining({ name: 'ignoreReports', status: 'verified' }),
+      ]),
+    });
+    expect(await getDailyMetrics(dependencies.redis, 'alpha', '2026-05-24')).toMatchObject({
+      locksCreated: 1,
+    });
+  });
+
   it('fails when target cannot be resolved', async () => {
     const result = await lockReviewedContent(deps(new FakeRedditAdapter()), {
       targetId: 't3_missing',

@@ -3067,3 +3067,30 @@
   build, diff whitespace check, and source TODO scan.
 - Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
   proof checklists; no production UI copy match was found.
+
+## 2026-05-26 15:19 IST - Target namespace hardening
+
+- Reviewed the active reviewer-agent findings after the handoff.
+- Canonicalized lock creation target subreddit namespaces before Redis creation
+  guards, active-lock lookup, persisted lock records, metrics, audit events,
+  and runtime proof writes.
+- Canonicalized lock/unlock menu form bindings and rendered subreddit fields
+  so mixed-case target payloads do not create immediately expired forms.
+- Canonicalized manual/dashboard unlock target scope before expected-subreddit
+  comparison and active-lock lookup, with validated expected-subreddit fallback
+  for `unknown` target context.
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 6 files and 99 tests.
+- Full validation:
+  - `npm run type-check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run build`
+  - `git diff --check`
+  - `rg -n "TODO" src`
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+- Pass/fail status: PASS for type-check, lint, 43 test files / 417 tests,
+  build, diff whitespace check, and source TODO scan.
+- Forbidden-copy scan matched only guardrail tests, audit docs, prompts, and
+  proof checklists; no production UI copy match was found.

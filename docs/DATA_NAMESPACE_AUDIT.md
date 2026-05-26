@@ -17,6 +17,10 @@ Evidence:
 - Runtime-facing subreddit inputs are validated and canonicalized to lowercase
   before scope comparison or key construction in forms, dashboard APIs, runtime
   smoke, dashboard launch, and trigger fallback paths.
+- Target-derived subreddit inputs are canonicalized to lowercase before lock
+  creation guard keys, active-lock indexes, lock records, form bindings,
+  metrics, audit events, runtime proof writes, and manual/dashboard unlock
+  lookups.
 - `rg -n "reviewlock:" src --glob '!**/*.test.ts'` returns only the helper definition in `src/server/services/keys.ts`.
 - `rg -n "redis\\.(get|set|del|exists|expire|hget|hset|hgetall|hdel|hincrby|zAdd|zRange|zRem|zRemRangeByScore|zIncrBy|setIfNotExists)\\(" src --glob '!**/*.test.ts'` shows service and route Redis calls using `keys.*` or `key(...)`.
 
@@ -73,6 +77,10 @@ Covered readers:
 - Report trigger refetch scoping: successful target refetches still use the
   canonical selected subreddit namespace for lock lookup and metrics, so
   `unknown` or mixed-case target subreddit fields do not split Redis state.
+- Lock/menu/unlock target scoping: mixed-case Reddit target subreddit fields
+  are normalized before writing form bindings or ReviewLock records, and
+  `unknown` unlock target context can fall back to a validated expected
+  subreddit instead of missing an existing lowercase lock.
 
 ## Schema and Migration Note
 
@@ -92,5 +100,6 @@ Commands run for this audit:
 - `npm run test -- --run src/server/services/keys.test.ts src/server/adapters/redis.test.ts src/server/services/demoMode.test.ts src/server/services/locks.test.ts`
 - `npm run test -- src/routes/forms.test.ts src/routes/menu.test.ts src/server/services/keys.test.ts --reporter verbose`
 - `npm run test -- src/server/services/reportTriggers.test.ts src/server/services/reopenFlow.test.ts src/routes/forms.test.ts src/routes/api.contract.test.ts src/routes/api.dashboard.test.ts src/server/services/runtimeHardening.test.ts src/client/state/runtimeContext.test.ts --reporter verbose`
+- `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
 - `rg -n "reviewlock:" src --glob '!**/*.test.ts'`
 - `rg -n "redis\\.(get|set|del|exists|expire|hget|hset|hgetall|hdel|hincrby|zAdd|zRange|zRem|zRemRangeByScore|zIncrBy|setIfNotExists)\\(" src --glob '!**/*.test.ts'`

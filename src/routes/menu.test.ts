@@ -5,10 +5,11 @@ import { FakeRedditAdapter } from '../server/adapters/reddit';
 import type { ReviewLockTarget } from '../shared/schema';
 import { defaultConfig, saveConfig } from '../server/services/config';
 import { keys } from '../server/services/keys';
-import { saveLock } from '../server/services/locks';
+import { getActiveLockByTarget, saveLock } from '../server/services/locks';
+import { createFormsRouter } from './forms';
 import { buildLockReviewForm, createMenuRouter } from './menu';
 
-const target = (): ReviewLockTarget => ({
+const target = (overrides: Partial<ReviewLockTarget> = {}): ReviewLockTarget => ({
   id: 't3_post',
   kind: 'post',
   subreddit: 'alpha',
@@ -18,6 +19,7 @@ const target = (): ReviewLockTarget => ({
   body: 'Reviewed body',
   edited: true,
   reportCount: 4,
+  ...overrides,
 });
 
 const commentTarget = (): ReviewLockTarget => ({
@@ -30,6 +32,17 @@ const commentTarget = (): ReviewLockTarget => ({
   edited: false,
   reportCount: 2,
 });
+
+const fieldValue = (
+  body: unknown,
+  name: string,
+): string | undefined => {
+  const fields = (body as {
+    showForm?: { form?: { fields?: Array<{ name?: string; defaultValue?: string }> } };
+  }).showForm?.form?.fields ?? [];
+
+  return fields.find((field) => field.name === name)?.defaultValue;
+};
 
 describe('menu routes', () => {
   it('builds lock review form fields with target context', () => {
@@ -80,6 +93,45 @@ describe('menu routes', () => {
         form: { title: 'Lock review' },
       },
     });
+  });
+
+  it('normalizes mixed-case target subreddits across menu lock form submission', async () => {
+    const redis = new InMemoryRedisStore();
+    const reddit = new FakeRedditAdapter([target({ subreddit: 'Alpha' })], 'mod_test', 'Alpha');
+    const clock = fixedClock('2026-05-24T00:00:00.000Z');
+    const menuRouter = createMenuRouter({ reddit, redis, clock });
+    const formsRouter = createFormsRouter({ reddit, redis, clock });
+    const menuResponse = await menuRouter.request('/lock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+    const menuBody = await menuResponse.json();
+    const formToken = fieldValue(menuBody, 'formToken');
+
+    expect(fieldValue(menuBody, 'subreddit')).toBe('alpha');
+    expect(typeof formToken).toBe('string');
+    expect(await redis.exists(`reviewlock:alpha:form:${formToken}`)).toBe(true);
+    expect(await redis.exists(`reviewlock:Alpha:form:${formToken}`)).toBe(false);
+
+    const submitResponse = await formsRouter.request('/lock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        subreddit: 'alpha',
+        formToken,
+        lockReason: 'reviewed_policy_compliant',
+      }),
+    });
+
+    expect(await submitResponse.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock locked this reviewed content until it changes.',
+      },
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toMatchObject({
+      status: 'active',
+    });
+    expect(await getActiveLockByTarget(redis, 'Alpha', 't3_post')).toBeUndefined();
   });
 
   it('serves configured lock reason options for post menu requests', async () => {
@@ -312,6 +364,63 @@ describe('menu routes', () => {
         },
       },
     });
+  });
+
+  it('normalizes mixed-case target subreddits across menu unlock form submission', async () => {
+    const redis = new InMemoryRedisStore();
+    await saveLock(redis, {
+      id: 'lock-1',
+      subreddit: 'alpha',
+      targetId: 't3_post',
+      targetKind: 'post',
+      targetAuthor: 'u_author',
+      permalink: '/r/alpha/comments/post',
+      contentPreview: 'Reviewed body',
+      contentHash: 'hash',
+      fingerprintVersion: 'content-v1',
+      lockedBy: 'mod',
+      lockedAt: '2026-05-24T00:00:00.000Z',
+      lockReason: 'reviewed_policy_compliant',
+      status: 'active',
+      lastKnownEdited: false,
+      lastReportCount: 4,
+      suppressedReportCount: 0,
+      runtimeWarnings: [],
+      demo: false,
+    });
+
+    const reddit = new FakeRedditAdapter([target({ subreddit: 'Alpha' })], 'mod_test', 'Alpha');
+    const clock = fixedClock('2026-05-24T00:00:00.000Z');
+    const menuRouter = createMenuRouter({ reddit, redis, clock });
+    const formsRouter = createFormsRouter({ reddit, redis, clock });
+    const menuResponse = await menuRouter.request('/unlock-post', {
+      method: 'POST',
+      body: JSON.stringify({ targetId: 't3_post' }),
+    });
+    const menuBody = await menuResponse.json();
+    const formToken = fieldValue(menuBody, 'formToken');
+
+    expect(fieldValue(menuBody, 'subreddit')).toBe('alpha');
+    expect(typeof formToken).toBe('string');
+    expect(await redis.exists(`reviewlock:alpha:form:${formToken}`)).toBe(true);
+    expect(await redis.exists(`reviewlock:Alpha:form:${formToken}`)).toBe(false);
+
+    const submitResponse = await formsRouter.request('/unlock-review-submit', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: 't3_post',
+        lockId: 'lock-1',
+        subreddit: 'alpha',
+        formToken,
+      }),
+    });
+
+    expect(await submitResponse.json()).toMatchObject({
+      showToast: {
+        text: 'ReviewLock unlocked this reviewed content.',
+      },
+    });
+    expect(await getActiveLockByTarget(redis, 'alpha', 't3_post')).toBeUndefined();
   });
 
   it('prefers comment ids for comment unlock menu payload fallbacks', async () => {

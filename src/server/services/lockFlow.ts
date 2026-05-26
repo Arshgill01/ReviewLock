@@ -1,7 +1,12 @@
 import type { Clock } from '../adapters/clock';
 import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
-import type { LockReasonPreset, ReopenEvent, ReviewLockRecord } from '../../shared/schema';
+import type {
+  LockReasonPreset,
+  ReopenEvent,
+  ReviewLockRecord,
+  ReviewLockTarget,
+} from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import { fingerprintTarget } from './fingerprint';
 import { keys } from './keys';
@@ -25,6 +30,7 @@ import {
 } from './moderation';
 import { enqueueReopenEvent } from './reopenQueue';
 import { recordModerationOperationStatus } from './runtimeProof';
+import { normalizeRuntimeSubreddit } from './runtimeHardening';
 import { resolveTargetById } from './targetResolver';
 
 export interface LockReviewInput {
@@ -53,6 +59,18 @@ export interface LockFlowResult {
 const LOCK_CREATION_GUARD_SECONDS = 30;
 
 const safeIdPart = (value: string): string => value.replace(/[^a-zA-Z0-9_]+/g, '-');
+
+const normalizeLockTarget = (target: ReviewLockTarget): ReviewLockTarget | undefined => {
+  if (target.subreddit === 'unknown') {
+    return undefined;
+  }
+
+  try {
+    return { ...target, subreddit: normalizeRuntimeSubreddit(target.subreddit) };
+  } catch {
+    return undefined;
+  }
+};
 
 const recordRuntimeProof = async (
   deps: LockFlowDependencies,
@@ -160,7 +178,17 @@ export const lockReviewedContent = async (
     };
   }
 
-  const fingerprint = fingerprintTarget(resolution.target, now);
+  const target = normalizeLockTarget(resolution.target);
+
+  if (!target) {
+    return {
+      ok: false,
+      message: 'ReviewLock could not determine the subreddit for this content.',
+      warnings: ['subreddit_missing'],
+    };
+  }
+
+  const fingerprint = fingerprintTarget(target, now);
 
   if (!fingerprint) {
     return {
@@ -184,8 +212,8 @@ export const lockReviewedContent = async (
     };
   }
 
-  const guardKey = keys.targetLockCreation(resolution.target.subreddit, resolution.target.id);
-  const guardToken = `${now}:${resolution.target.id}:${Date.now()}:${Math.random()}`;
+  const guardKey = keys.targetLockCreation(target.subreddit, target.id);
+  const guardToken = `${now}:${target.id}:${Date.now()}:${Math.random()}`;
   const guardAcquired = await deps.redis.setIfNotExists(
     guardKey,
     guardToken,
@@ -194,8 +222,8 @@ export const lockReviewedContent = async (
   if (!guardAcquired) {
     const inFlightLock = await getActiveLockByTarget(
       deps.redis,
-      resolution.target.subreddit,
-      resolution.target.id,
+      target.subreddit,
+      target.id,
     );
 
     if (
@@ -237,8 +265,8 @@ export const lockReviewedContent = async (
   try {
     const existingLock = await getActiveLockByTarget(
       deps.redis,
-      resolution.target.subreddit,
-      resolution.target.id,
+      target.subreddit,
+      target.id,
     );
 
     if (existingLock) {
@@ -254,14 +282,14 @@ export const lockReviewedContent = async (
         };
       }
 
-      const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+      const staleUnignoreResult = await unignoreReportsForReviewLock(deps.reddit, target);
       await recordRuntimeProof(deps, existingLock.subreddit, staleUnignoreResult, now);
 
       if (!staleUnignoreResult.ok) {
         const updatedLock = await updateLock(deps.redis, {
           ...existingLock,
-          lastKnownEdited: resolution.target.edited,
-          lastReportCount: resolution.target.reportCount,
+          lastKnownEdited: target.edited,
+          lastReportCount: target.reportCount,
           runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
         });
         await appendAuditEvent(deps.redis, {
@@ -306,7 +334,7 @@ export const lockReviewedContent = async (
           reopenEventId: reopenEvent.id,
           runtimeWarnings: [...existingLock.runtimeWarnings, ...staleUnignoreResult.warnings],
         });
-        await incrementReopenedMetric(deps.redis, resolution.target, now, existingLock.demo);
+        await incrementReopenedMetric(deps.redis, target, now, existingLock.demo);
         await appendAuditEvent(deps.redis, {
           id: `audit-${existingLock.id}-lock-review-reopened-${Date.parse(now)}`,
           kind: 'lock_reopened',
@@ -368,14 +396,14 @@ export const lockReviewedContent = async (
       }
     }
 
-    const approveResult = await approveForReviewLock(deps.reddit, resolution.target);
-    const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, resolution.target);
+    const approveResult = await approveForReviewLock(deps.reddit, target);
+    const ignoreResult = await ignoreReportsForReviewLock(deps.reddit, target);
     const warnings = [...approveResult.warnings, ...ignoreResult.warnings];
 
     if (!ignoreResult.ok) {
       const failedLock = createLockRecord(
         input,
-        resolution.target,
+        target,
         fingerprint.hash,
         fingerprint.version,
         now,
@@ -409,7 +437,7 @@ export const lockReviewedContent = async (
 
     const lock = createLockRecord(
       input,
-      resolution.target,
+      target,
       fingerprint.hash,
       fingerprint.version,
       now,
@@ -420,7 +448,7 @@ export const lockReviewedContent = async (
 
     try {
       await saveLock(deps.redis, lock);
-      await recordLockCreatedMetric(deps.redis, resolution.target, now);
+      await recordLockCreatedMetric(deps.redis, target, now);
       lockCreatedMetricRecorded = true;
       await appendAuditEvent(deps.redis, {
         id: `audit-${lock.id}-created`,
@@ -432,7 +460,7 @@ export const lockReviewedContent = async (
         actor: input.actor,
         createdAt: now,
         message: 'Reviewed content locked until it changes.',
-        data: { lockReason: input.lockReason, reportCount: resolution.target.reportCount },
+        data: { lockReason: input.lockReason, reportCount: target.reportCount },
         demo: false,
       });
       await recordRuntimeProof(deps, lock.subreddit, approveResult, now);
@@ -445,13 +473,13 @@ export const lockReviewedContent = async (
         warnings,
       };
     } catch (error) {
-      const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+      const rollbackResult = await unignoreReportsForReviewLock(deps.reddit, target);
       await recordRuntimeProof(deps, lock.subreddit, rollbackResult, now);
 
       if (rollbackResult.ok) {
         await removeLock(deps.redis, lock).catch(() => undefined);
         if (lockCreatedMetricRecorded) {
-          await decrementLockCreatedMetric(deps.redis, resolution.target, now).catch(
+          await decrementLockCreatedMetric(deps.redis, target, now).catch(
             () => undefined,
           );
         }

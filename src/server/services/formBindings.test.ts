@@ -35,6 +35,24 @@ describe('form bindings', () => {
     expect(await consumeFormBinding(redis, 'alpha', binding.token)).toBeUndefined();
   });
 
+  it('stores mixed-case target subreddits under the canonical lowercase binding key', async () => {
+    const redis = new InMemoryRedisStore();
+    const binding = await createFormBinding(
+      redis,
+      'lock',
+      { ...target(), subreddit: 'Alpha' },
+      '2026-05-24T00:00:00.000Z',
+    );
+
+    expect(binding.subreddit).toBe('alpha');
+    expect(await redis.exists(key('alpha', `form:${binding.token}`))).toBe(true);
+    expect(await redis.exists(key('Alpha', `form:${binding.token}`))).toBe(false);
+    await expect(consumeFormBinding(redis, 'alpha', binding.token)).resolves.toMatchObject({
+      subreddit: 'alpha',
+      targetId: 't3_post',
+    });
+  });
+
   it('deletes malformed binding JSON instead of returning an unchecked shape', async () => {
     const redis = new InMemoryRedisStore();
     const token = 'form-lock-corrupt';

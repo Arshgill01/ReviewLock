@@ -196,4 +196,7 @@
 - [x] Ignore malformed trigger fallback subreddit namespaces on refetch-failure paths.
 - [x] Use canonical report-trigger namespaces after successful target refetches.
 - [x] Return retryable dashboard launch toast when dashboard post creation fails.
+- [x] Canonicalize lock creation target namespaces before guard, lock, metric, audit, and runtime proof writes.
+- [x] Canonicalize menu lock/unlock form bindings before rendering or consuming confirmation forms.
+- [x] Canonicalize dashboard/manual unlock target namespaces before scope comparison and active-lock lookup.
 - [ ] Live-verify repeated dashboard launch reuses the existing dashboard post.

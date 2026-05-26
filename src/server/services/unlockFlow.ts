@@ -1,7 +1,7 @@
 import type { Clock } from '../adapters/clock';
 import type { RedisStore } from '../adapters/redis';
 import type { RedditAdapter } from '../adapters/reddit';
-import type { ReviewLockRecord } from '../../shared/schema';
+import type { ReviewLockRecord, ReviewLockTarget } from '../../shared/schema';
 import { appendAuditEvent } from './audit';
 import {
   getActiveLockByTarget,
@@ -11,6 +11,7 @@ import {
 } from './locks';
 import { unignoreReportsForReviewLock } from './moderation';
 import { recordModerationOperationStatus } from './runtimeProof';
+import { normalizeRuntimeSubreddit } from './runtimeHardening';
 import { resolveTargetById } from './targetResolver';
 
 export interface UnlockReviewInput {
@@ -33,6 +34,18 @@ export interface UnlockFlowResult {
   warnings: string[];
 }
 
+const normalizeSubredditCandidate = (value: string | undefined): string | undefined => {
+  if (!value || value === 'unknown') {
+    return undefined;
+  }
+
+  try {
+    return normalizeRuntimeSubreddit(value);
+  } catch {
+    return undefined;
+  }
+};
+
 export const unlockReviewedContent = async (
   deps: UnlockFlowDependencies,
   input: UnlockReviewInput,
@@ -47,7 +60,10 @@ export const unlockReviewedContent = async (
     };
   }
 
-  if (input.expectedSubreddit && input.expectedSubreddit !== resolution.target.subreddit) {
+  const targetSubreddit = normalizeSubredditCandidate(resolution.target.subreddit);
+  const expectedSubreddit = normalizeSubredditCandidate(input.expectedSubreddit);
+
+  if (input.expectedSubreddit && !expectedSubreddit) {
     return {
       ok: false,
       message: 'ReviewLock target is outside the current subreddit context.',
@@ -55,11 +71,26 @@ export const unlockReviewedContent = async (
     };
   }
 
-  const activeLock = await getActiveLockByTarget(
-    deps.redis,
-    resolution.target.subreddit,
-    resolution.target.id,
-  );
+  if (targetSubreddit && expectedSubreddit && targetSubreddit !== expectedSubreddit) {
+    return {
+      ok: false,
+      message: 'ReviewLock target is outside the current subreddit context.',
+      warnings: ['subreddit_scope_mismatch'],
+    };
+  }
+
+  const canonicalSubreddit = targetSubreddit ?? expectedSubreddit;
+
+  if (!canonicalSubreddit) {
+    return {
+      ok: false,
+      message: 'ReviewLock could not determine the subreddit for this content.',
+      warnings: ['subreddit_missing'],
+    };
+  }
+
+  const target: ReviewLockTarget = { ...resolution.target, subreddit: canonicalSubreddit };
+  const activeLock = await getActiveLockByTarget(deps.redis, target.subreddit, target.id);
 
   if (!activeLock) {
     return {
@@ -80,7 +111,7 @@ export const unlockReviewedContent = async (
   }
 
   const now = deps.clock.now();
-  const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, resolution.target);
+  const unignoreResult = await unignoreReportsForReviewLock(deps.reddit, target);
   await recordModerationOperationStatus(
     deps.redis,
     activeLock.subreddit,

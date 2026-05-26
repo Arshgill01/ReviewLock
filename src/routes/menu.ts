@@ -7,9 +7,15 @@ import type { RedditAdapter } from '../server/adapters/reddit';
 import { defaultConfig, loadConfig } from '../server/services/config';
 import { createFormBinding } from '../server/services/formBindings';
 import { getActiveLockByTarget } from '../server/services/locks';
+import { normalizeRuntimeSubreddit } from '../server/services/runtimeHardening';
 import { normalizeTargetId, resolveTargetById } from '../server/services/targetResolver';
 import { LOCK_REASON_PRESETS } from '../shared/constants';
-import type { LockReasonPreset, ReviewLockConfig, TargetKind } from '../shared/schema';
+import type {
+  LockReasonPreset,
+  ReviewLockConfig,
+  ReviewLockTarget,
+  TargetKind,
+} from '../shared/schema';
 
 interface RouteDeps {
   reddit?: RedditAdapter;
@@ -78,6 +84,18 @@ const safeLoadConfig = async (
     return await loadConfig(redis, subreddit);
   } catch {
     return defaultConfig(subreddit, now);
+  }
+};
+
+const normalizeMenuTarget = (target: ReviewLockTarget): ReviewLockTarget | undefined => {
+  if (target.subreddit === 'unknown') {
+    return undefined;
+  }
+
+  try {
+    return { ...target, subreddit: normalizeRuntimeSubreddit(target.subreddit) };
+  } catch {
+    return undefined;
   }
 };
 
@@ -239,19 +257,30 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       });
     }
 
+    const target = normalizeMenuTarget(resolution.target);
+
+    if (!target) {
+      return context.json<UiResponse>({
+        showToast: {
+          text: 'ReviewLock could not determine this target subreddit.',
+          appearance: 'neutral',
+        },
+      });
+    }
+
     const now = deps.clock.now();
-    const config = await safeLoadConfig(deps.redis, resolution.target.subreddit, now);
+    const config = await safeLoadConfig(deps.redis, target.subreddit, now);
     const binding = await createFormBinding(
       deps.redis,
       'lock',
-      resolution.target,
+      target,
       now,
     );
 
     return context.json<UiResponse>({
       showForm: {
         name: 'lockReview',
-        form: buildLockReviewForm(resolution.target, binding.token, config),
+        form: buildLockReviewForm(target, binding.token, config),
       },
     });
   };
@@ -275,11 +304,18 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       });
     }
 
-    const lock = await getActiveLockByTarget(
-      deps.redis,
-      resolution.target.subreddit,
-      resolution.target.id,
-    );
+    const target = normalizeMenuTarget(resolution.target);
+
+    if (!target) {
+      return context.json<UiResponse>({
+        showToast: {
+          text: 'ReviewLock could not determine this target subreddit.',
+          appearance: 'neutral',
+        },
+      });
+    }
+
+    const lock = await getActiveLockByTarget(deps.redis, target.subreddit, target.id);
 
     if (!lock) {
       return context.json<UiResponse>({
@@ -293,7 +329,7 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
     const binding = await createFormBinding(
       deps.redis,
       'unlock',
-      resolution.target,
+      target,
       deps.clock?.now() ?? new Date().toISOString(),
       lock.id,
     );
@@ -302,9 +338,9 @@ export const createMenuRouter = (deps: RouteDeps = {}): Hono => {
       showForm: {
         name: 'unlockReview',
         form: buildUnlockReviewForm(
-          resolution.target.id,
+          target.id,
           lock.id,
-          resolution.target.subreddit,
+          target.subreddit,
           binding.token,
         ),
       },

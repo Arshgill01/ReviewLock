@@ -2554,3 +2554,30 @@ Reason:
 - Trigger payloads and persisted launch records are untrusted boundaries.
 - Failing open is acceptable when context is missing, but creating arbitrary
   namespaces or invalid timestamped records is not.
+
+### D141 - Target-derived lock namespaces are canonical before writes
+
+Lock, unlock, and menu form flows can receive a Reddit target whose
+`subreddit` casing differs from the runtime subreddit context.
+
+Decision:
+
+- Normalize resolved target subreddits to lowercase before lock creation
+  guards, active-lock lookup, lock records, metrics, audit, and runtime proof
+  writes.
+- Store menu form bindings under the normalized target subreddit and render the
+  normalized subreddit in hidden/default form fields.
+- Normalize manual/dashboard unlock targets before comparing expected scope and
+  before looking up the active lock.
+- Treat `unknown` target subreddit context as missing for unlock when a
+  validated expected subreddit is available.
+
+Reason:
+
+- Locking content under `reviewlock:Alpha:*` while dashboard, trigger, and form
+  paths read `reviewlock:alpha:*` would make a moderator-created lock invisible
+  to the rest of the app.
+- Form tokens must be stored and consumed in the same namespace even when
+  Devvit payload casing differs.
+- Dashboard unlock should use the trusted runtime scope when Reddit omits a
+  precise target subreddit, but it must still reject cross-subreddit targets.

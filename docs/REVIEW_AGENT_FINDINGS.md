@@ -5752,3 +5752,218 @@
   blank/stub.
 - Files reviewed: `README.md`, `devvit.json`, `package.json`,
   fresh `npx devvit view --json` output.
+
+## 2026-05-26 15:19 IST - Resolution
+
+- Addressed findings from 15:09, 15:10, and 15:11.
+- Canonicalized resolved target subreddits in `lockReviewedContent()` before
+  Redis guard keys, active-lock lookups, lock records, metrics, audit, and
+  runtime proof writes.
+- Canonicalized form binding namespaces and menu-rendered subreddit fields so
+  mixed-case target payloads store and consume lock/unlock tokens under the
+  same lowercase namespace.
+- Canonicalized unlock target subreddit scope before manual/dashboard active
+  lock lookup, with validated expected-subreddit fallback when Reddit returns
+  `unknown`.
+- Added regressions:
+  - `src/server/services/lockFlow.test.ts` proves mixed-case target locks are
+    stored under `alpha`, not `Alpha`.
+  - `src/server/services/formBindings.test.ts` proves mixed-case form bindings
+    use lowercase keys.
+  - `src/server/services/unlockFlow.test.ts` proves dashboard/manual unlock
+    works with mixed-case and `unknown` target subreddit context.
+  - `src/routes/menu.test.ts` proves menu lock/unlock forms can be submitted
+    end-to-end after mixed-case target resolution.
+- Focused validation:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 6 files and 99 tests.
+
+## 2026-05-26 15:15 IST - Finding
+
+- Severity: medium
+- Area: Namespace hardening documentation overclaims the current implementation.
+- Evidence:
+  - `decisions.md:2532-2545` records D140 as covering subreddit names from
+    "Devvit runtime context, form payloads, dashboard query strings, Reddit
+    targets, and trigger payload fallbacks" and says valid names are normalized
+    to lowercase before Redis namespace use or runtime scope comparison.
+  - `log.md:3038-3045` accurately lists the implemented areas as client
+    context, server runtime hardening, form/API scope checks, dashboard launch
+    records, runtime smoke, trigger fallback paths, and report-trigger selected
+    namespace use after refetch.
+  - `src/server/services/lockFlow.ts:66-95` still persists new
+    `ReviewLockRecord` objects with `subreddit: target.subreddit`.
+  - `src/server/services/lockFlow.ts:187-199` and
+    `src/server/services/lockFlow.ts:237-242` still use
+    `resolution.target.subreddit` directly for the lock-creation guard and
+    active-lock lookup.
+  - `src/routes/menu.ts:242-254` and `src/routes/menu.ts:293-309` still create
+    lock/unlock form bindings and hidden form values from the raw resolved
+    target subreddit.
+  - `src/server/services/formBindings.ts:87-108` stores bindings under
+    `target.subreddit`.
+  - `src/server/services/unlockFlow.ts:50-62` still compares
+    `expectedSubreddit` with raw `resolution.target.subreddit` and looks up the
+    active lock under raw `resolution.target.subreddit`.
+- Why it matters: The decision record is supposed to be a durable handoff for
+  agents and submission hardening. Right now it implies Reddit target-derived
+  namespaces are already canonical everywhere, while the high-risk lock/menu/
+  unlock paths remain open in separate findings. A main agent or submission
+  writer could treat D140 as complete and miss the remaining mixed-case
+  namespace split before the publishability pass.
+- Suggested fix: Either implement target-derived namespace canonicalization in
+  lock creation, menu form binding, and unlock flow, or narrow D140 to the
+  paths actually fixed. If implemented, add regressions for mixed-case target
+  subreddit values across lock form open/submit, dashboard unlock, and direct
+  lock-flow duplicate lookup.
+- Files reviewed: `decisions.md`, `log.md`,
+  `src/server/services/lockFlow.ts`, `src/routes/menu.ts`,
+  `src/server/services/formBindings.ts`, `src/server/services/unlockFlow.ts`.
+
+## 2026-05-26 15:18 IST - Integration Status
+
+- The main agent now has a dirty implementation patch that addresses the
+  target-derived namespace split described in the 15:09, 15:10, 15:11, and
+  15:15 findings.
+- Current dirty implementation observed:
+  - `src/server/services/lockFlow.ts` now normalizes resolved target subreddit
+    values through `normalizeRuntimeSubreddit()` before fingerprinting,
+    lock-creation guard keys, active-lock lookup, lock persistence, metrics,
+    runtime proof, and moderation rollback paths.
+  - `src/server/services/unlockFlow.ts` now normalizes both
+    `expectedSubreddit` and the refetched target subreddit, treats `unknown` as
+    missing, falls back to the validated expected subreddit when needed, and
+    looks up the active lock under the canonical namespace.
+  - `src/routes/menu.ts` now normalizes resolved menu targets before loading
+    config, creating form bindings, looking up active locks, and rendering
+    hidden/default subreddit fields.
+  - `src/server/services/formBindings.ts` now stores bindings under a canonical
+    normalized target subreddit and fingerprints that canonical target.
+- Focused validation run against the dirty worktree:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/routes/menu.test.ts src/routes/forms.test.ts --reporter verbose`
+  - PASS, 4 files / 73 tests.
+- Remaining reviewer concern: the patch is behaviorally plausible and focused
+  tests pass, but there are no direct mixed-case target regressions yet for the
+  newly changed service/menu paths. See the following finding.
+
+## 2026-05-26 15:18 IST - Finding
+
+- Severity: medium
+- Area: Dirty target-namespace patch lacks direct regression coverage.
+- Evidence:
+  - The dirty patch changes namespace behavior in
+    `src/server/services/lockFlow.ts`, `src/server/services/unlockFlow.ts`,
+    `src/routes/menu.ts`, and `src/server/services/formBindings.ts`.
+  - `rg -n "subreddit.*Alpha|Alpha.*subreddit|canonical|normalizeLockTarget|target\\(\\{ subreddit: 'Alpha|unknown.*subreddit" src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/routes/menu.test.ts src/routes/forms.test.ts`
+    returned no matches.
+  - Existing `forms.test.ts:356-383` accepts a mixed-case runtime subreddit, but
+    it manually creates a lowercase binding and uses a lowercase target fixture;
+    it does not exercise the real menu -> binding -> submit path where the
+    Reddit target itself has `subreddit: 'AlphaTeam'`.
+  - Existing `unlockFlow.test.ts:181-203` covers a different-subreddit rejection
+    but not same-subreddit different-casing or target `subreddit: 'unknown'`
+    with a validated `expectedSubreddit`.
+  - Existing `lockFlow.test.ts` covers duplicate locking, stale relock, and
+    rollback behavior under lowercase `alpha`, but not persistence under
+    lowercase `alpha` when the refetched target reports `Alpha`.
+- Why it matters: The dirty patch is closing a high-risk publishability bug.
+  Without focused regressions, a later refactor can reintroduce the mixed-case
+  namespace split while the broad route/service tests still pass. The failure
+  mode is serious: a moderator can open a lock form successfully, but active
+  lock lookup, submit binding lookup, dashboard unlock, or trigger lookup can
+  miss the lock under a different Redis namespace.
+- Suggested fix: Before committing the namespace patch, add targeted
+  regressions:
+  - `lockFlow.test.ts`: refetched target has `subreddit: 'Alpha'`; saved active
+    lock and metrics exist under `alpha`, not `Alpha`.
+  - `unlockFlow.test.ts`: active lock is saved under `alpha`, refetched target
+    has `subreddit: 'Alpha'`, `expectedSubreddit: 'alpha'`; unlock succeeds and
+    calls `unignoreReports()`.
+  - `unlockFlow.test.ts`: refetched target has `subreddit: 'unknown'`,
+    `expectedSubreddit: 'alpha'`; unlock uses the active `alpha` lock.
+  - `menu.test.ts` or `forms.test.ts`: `/internal/menu/lock-post` with target
+    `subreddit: 'AlphaTeam'` stores the binding under `alphateam`, renders the
+    lowercase form subreddit, and the submit route consumes that binding.
+- Files reviewed: `src/server/services/lockFlow.ts`,
+  `src/server/services/lockFlow.test.ts`,
+  `src/server/services/unlockFlow.ts`,
+  `src/server/services/unlockFlow.test.ts`, `src/routes/menu.ts`,
+  `src/routes/menu.test.ts`, `src/routes/forms.test.ts`,
+  `src/server/services/formBindings.ts`.
+
+## 2026-05-26 15:19 IST - Integration Status
+
+- The 15:18 regression-coverage finding is now addressed in the current dirty
+  worktree.
+- New/observed coverage:
+  - `src/server/services/formBindings.test.ts` now covers mixed-case target
+    subreddit bindings stored under the canonical lowercase Redis key.
+  - `src/server/services/lockFlow.test.ts` now covers a refetched target with
+    `subreddit: 'Alpha'` and asserts lock, metrics, and runtime proof are under
+    `alpha`, not `Alpha`.
+  - `src/server/services/unlockFlow.test.ts` now covers mixed-case resolved
+    target subreddit unlock and the `subreddit: 'unknown'` target fallback to a
+    validated `expectedSubreddit`.
+  - `src/routes/menu.test.ts` now covers mixed-case target subreddits across both
+    menu lock form submission and menu unlock form submission.
+- Focused validation run:
+  - `npm run test -- src/server/services/formBindings.test.ts src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/routes/menu.test.ts src/routes/forms.test.ts --reporter verbose`
+  - PASS, 5 files / 82 tests.
+- Remaining note: this is still a dirty implementation patch owned by the main
+  agent. I did not commit or edit the implementation files.
+
+## 2026-05-26 15:19 IST - Validation Status
+
+- Additional validation run against the current dirty namespace patch:
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+- Current dirty files observed after validation:
+  - `TODO.md`
+  - `decisions.md`
+  - `docs/DATA_NAMESPACE_AUDIT.md`
+  - `docs/REVIEW_AGENT_FINDINGS.md`
+  - `src/routes/menu.test.ts`
+  - `src/routes/menu.ts`
+  - `src/server/services/formBindings.test.ts`
+  - `src/server/services/formBindings.ts`
+  - `src/server/services/lockFlow.test.ts`
+  - `src/server/services/lockFlow.ts`
+  - `src/server/services/unlockFlow.test.ts`
+  - `src/server/services/unlockFlow.ts`
+
+## 2026-05-26 15:21 IST - Main Agent Commit-Ready Status
+
+- Main agent reviewed and retained the reviewer-observed target namespace
+  patch, added the missing direct regressions, and ran the full local
+  validation suite.
+- Commands completed:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 6 files and 99 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files and 417 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+  - `rg -n "TODO" src`
+  - PASS, no source TODO matches.
+  - `rg -n "not reportable|disable reports|blocked reports|reports disabled|Make posts not reportable|Hide all reports forever|AI decides whether reports matter|Automated removal after edit" src docs README.md`
+  - Production UI/code clean; matches are guardrail tests, audit docs, prompts,
+    and proof checklists.
+- Commit planned from the main agent after staging the implementation, tests,
+  and documentation updates.
+
+## 2026-05-26 15:21 IST - Validation Status
+
+- Verified the exact focused validation command now listed in dirty `log.md`
+  and `docs/DATA_NAMESPACE_AUDIT.md`:
+  - `npm run test -- src/server/services/lockFlow.test.ts src/server/services/unlockFlow.test.ts src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/routes/api.dashboard.test.ts --reporter verbose`
+  - PASS, 6 files / 99 tests.
+- This validates the local test claim for the dirty target-namespace patch. It
+  does not add any live Devvit/playtest proof.
