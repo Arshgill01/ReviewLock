@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-26 15:46 IST.
+Last updated: 2026-05-26 15:53 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -20,10 +20,10 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, logged in as `u/BrightyBrainiac`.
 - `npx devvit view --json`
   - Result: PASS, app `reviewlock` exists, install count is `1`, owner is
-    `BrightyBrainiac`, versions count is `352`.
-  - Latest upload completed through `npm run deploy` on 2026-05-26 15:46 IST.
-  - Latest listing check after upload showed current uploaded version `0.0.3`,
-    uploaded `2026-05-26T10:16:14.709Z`, with `version.about` populated from
+    `BrightyBrainiac`, versions count is `356`.
+  - Latest upload completed through `npm run deploy` on 2026-05-26 15:51 IST.
+  - Latest listing check after upload showed current uploaded version `0.0.4`,
+    uploaded `2026-05-26T10:21:20.861Z`, with `version.about` populated from
     the launch-grade README.
   - Remaining listing blocker: `app.description`, `marketingInfo`,
     `privacyPolicy`, and `termsAndConditions` are still empty. If the Developer
@@ -43,6 +43,8 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     `v0.0.2.107`.
   - Latest observed hot reload in the runtime proof reconciliation hardening
     recheck: `v0.0.2.185`.
+  - Latest observed hot reload in the post-upload target-link hardening
+    recheck: `v0.0.3.3`.
 - Zen browser embedded WebView smoke
   - Result: PASS, the ReviewLock dashboard rendered inside Reddit at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
   - Result: PASS, the header showed `r/reviewlock_dev` after the WebView context fix.
@@ -55,6 +57,12 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     Zen showed `postReportTrigger verified`, kept
     `commentReportTrigger unverified`, and `Verify runtime` completed with
     `Runtime proof refreshed.` under `r/reviewlock_dev`.
+  - Result: PASS, repeated after submission upload and dashboard target-link
+    canonicalization; Zen rendered playtest `v0.0.3.3`, the first viewport
+    showed `2` active locks, `1` report suppressed, `2` reopened after edit,
+    latest event `comment:ontlx1k`, and `Verify runtime` completed with
+    `Runtime proof refreshed.` Target links resolved to `reddit.com/r/...`
+    URLs instead of the Devvit WebView host.
 - Zen browser dashboard unlock proof
   - Result: PASS, the dashboard inline `Unlock` confirmation called `/api/locks/unlock`, removed the active lock, wrote audit, and runtime status showed `unignoreReports verified`.
   - Controlled target: `t3_1tm8nak`.
@@ -84,6 +92,12 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS.
 - `npm run build`
   - Result: PASS.
+- `npm run deploy`
+  - Result: PASS after dashboard target-link canonicalization.
+  - The script ran `npm run type-check`, `npm run lint`, `npm run test`,
+    `vite build`, and `devvit upload`.
+  - Test gate during deploy: 43 files and 419 tests.
+  - Devvit upload auto-bumped the uploaded app version to `0.0.4`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
   - Result: BLOCKED while playtest was running; Devvit CLI reported `listen EADDRINUSE: address already in use :::5678`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps`
@@ -108,9 +122,9 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | Subreddit dashboard menu response            | verified   | `Open ReviewLock dashboard` no longer returns the Devvit `UiResponse` unknown-key error after replacing `{ ok: true }` with valid `showForm`/`navigateTo`/`showToast` responses. | Valid response keys confirmed from installed `@devvit/build-pack` validator.                                     |
 | Dashboard custom post launch                 | verified   | A ReviewLock dashboard custom post was created in `r/reviewlock_dev` and opened as a Reddit custom post WebView.                                                                 | Existing post observed at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.                            |
 | Dashboard custom post reuse                  | unverified | Implemented and locally tested with cached permalink reuse, unsafe cached permalink rejection, and duplicate creation lease coverage.                                            | Needs controlled playtest proof that a repeated subreddit launch opens the existing dashboard post without creating another post. |
-| Dashboard subreddit context                  | verified   | Zen live WebView smoke rendered the dashboard header as `r/reviewlock_dev` at `reviewlock-i1a3xr-0-0-2-6-webview.devvit.net/index.html`.                                         | Client now prefers Devvit-injected WebView context and refuses mismatched weaker runtime context overwrites.     |
-| Redis smoke from authorized WebView          | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redis verified` and `Runtime proof refreshed.`                                                        | Rechecked on playtest `v0.0.2.64` after Reddit adapter mapping and trigger-wrapper hardening.                    |
-| Reddit context smoke from authorized WebView | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redditContext verified` and `Runtime proof refreshed.`                                                | Rechecked on playtest `v0.0.2.64` after Reddit adapter mapping and trigger-wrapper hardening.                    |
+| Dashboard subreddit context                  | verified   | Zen live WebView smoke rendered the dashboard header as `r/reviewlock_dev`; latest recheck used playtest `v0.0.3.3`.                                                            | Client now prefers Devvit-injected WebView context and refuses mismatched weaker runtime context overwrites.     |
+| Redis smoke from authorized WebView          | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redis verified` and `Runtime proof refreshed.`                                                        | Rechecked on playtest `v0.0.3.3` after submission upload and target-link hardening.                              |
+| Reddit context smoke from authorized WebView | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redditContext verified` and `Runtime proof refreshed.`                                                | Rechecked on playtest `v0.0.3.3` after submission upload and target-link hardening.                              |
 | Direct terminal WebView API smoke            | blocked    | Direct API calls to Devvit WebView routes are not authorized without Reddit-injected WebView headers.                                                                            | Smoke endpoints are intentionally meant to run from the embedded dashboard.                                      |
 | `approve()` live behavior                    | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock, wrote audit, and runtime status showed `approve verified`.                                          | Verified for a controlled post target; comment target remains unverified.                                        |
 | `ignoreReports()` live behavior              | verified   | `Lock review` on controlled post target `t3_1tm8nak` created an active lock and runtime status showed `ignoreReports verified`.                                                  | Verified for a controlled post target; comment target remains unverified.                                        |
@@ -178,6 +192,12 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - Demo data could previously be requested from the demo namespace without
   `demo=true`.
   - Hardened by rejecting unlabeled dashboard reads of `reviewlock_demo`.
+- Dashboard target links previously canonicalized safe Reddit permalinks to
+  relative paths, which resolved inside the Devvit WebView host instead of
+  reddit.com.
+  - Hardened by canonicalizing safe relative and full Reddit permalinks to
+    absolute `https://www.reddit.com/r/...` links and rendering unsafe
+    permalinks as plain text.
 - Lock creation rollback could previously delete the local lock even when
   `unignoreReports()` rollback failed after a Redis persistence error.
   - Hardened by recording rollback runtime proof and keeping a visible `failed`

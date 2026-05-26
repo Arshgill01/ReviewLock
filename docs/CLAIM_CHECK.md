@@ -102,7 +102,7 @@ Preferred replacements:
 
 | Risk | Severity | Status | Required action |
 | --- | --- | --- | --- |
-| Developer Portal listing still has stub metadata | high | open | Upload final build/listing and verify with `npx devvit view --json`. |
+| Developer Portal app-level metadata still empty | high | open | Use `docs/APP_LISTING.md` to fill app description, marketing, privacy, and terms fields if the Developer Portal exposes them. |
 | Public judging post URL not yet recorded | high | open | Add URL in a public subreddit with fewer than 200 members. |
 | Comment report live proof missing | medium | open | Keep unverified, or run controlled proof. |
 | NSFW/spoiler/flair live proof missing | medium | open | Keep unverified, or run controlled proof. |

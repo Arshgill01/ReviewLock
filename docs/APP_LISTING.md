@@ -6,7 +6,7 @@ Target listing: `https://developers.reddit.com/apps/reviewlock`
 
 Current listing state:
 
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.3`.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.4`.
 - `npx devvit view --json` after that upload returned `version.about` populated
   from the launch-grade README.
 - App-level `description`, `marketingInfo`, `privacyPolicy`, and
@@ -142,7 +142,7 @@ Suggested category framing:
 - [ ] Run `npm run build`.
 - [ ] Run `devvit upload` only after the local gate passes.
 - [ ] Run `npx devvit view --json`.
-- [ ] Confirm `version.about` contains the updated README/listing copy.
+- [x] Confirm `version.about` contains the updated README/listing copy.
 - [ ] Confirm `app.description` is no longer empty, or confirm the current
   Developer Portal workflow does not expose this field for manual editing before
   public submission.

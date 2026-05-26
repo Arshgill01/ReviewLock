@@ -30,7 +30,7 @@ export const safeRedditPermalinkHref = (value: string | undefined | null): strin
   }
 
   if (raw.startsWith('/')) {
-    return isSafeRedditPath(raw) ? raw : null;
+    return isSafeRedditPath(raw) ? `https://www.reddit.com${raw}` : null;
   }
 
   try {
@@ -40,7 +40,7 @@ export const safeRedditPermalinkHref = (value: string | undefined | null): strin
     }
 
     const pathWithQuery = `${url.pathname}${url.search}`;
-    return isSafeRedditPath(url.pathname) ? pathWithQuery : null;
+    return isSafeRedditPath(url.pathname) ? `https://www.reddit.com${pathWithQuery}` : null;
   } catch {
     return null;
   }

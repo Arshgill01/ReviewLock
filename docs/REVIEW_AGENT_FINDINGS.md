@@ -6403,3 +6403,52 @@
     manual editing before Devpost submission.
 - Safety note:
   - This was an upload, not public publish. No `devvit publish` command was run.
+
+## 2026-05-26 15:53 IST - Resolution
+
+- Addressed follow-up finding from live WebView testing: safe relative Reddit
+  permalinks rendered as links, but inside the Devvit iframe they resolved under
+  the WebView host instead of reddit.com.
+- Code change:
+  - `src/client/utils/format.ts` now canonicalizes accepted relative Reddit
+    comment paths and accepted full Reddit URLs to
+    `https://www.reddit.com/r/...`.
+  - `src/client/utils/format.test.ts` now expects canonical absolute Reddit
+    URLs.
+  - `src/client/render.test.ts` now asserts active lock links render with an
+    absolute reddit.com href.
+- Targeted validation:
+  - `npm run test -- src/client/utils/format.test.ts src/client/render.test.ts --reporter verbose`
+  - PASS, 2 files / 23 tests.
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+- Live WebView validation:
+  - `npm run dev -- reviewlock_dev`
+  - PASS, playtest reached `v0.0.3.3` after the target-link hardening patch.
+  - Zen browser opened the ReviewLock dashboard post under `r/reviewlock_dev`.
+  - The first viewport showed `2` active locks, `1` report suppressed, `2`
+    reopened after edit, latest event `comment:ontlx1k`, active locks, reopen
+    queue, and runtime proof/status.
+  - `Verify runtime` completed and showed `Runtime proof refreshed.`
+  - Active lock target links resolved to `reddit.com/r/...` instead of
+    `reviewlock-i1a3xr-...-webview.devvit.net/r/...`.
+- Upload/listing validation:
+  - `npm run deploy`
+  - PASS. The script ran `npm run type-check`, `npm run lint`, `npm run test`,
+    `vite build`, and `devvit upload`.
+  - Full deploy test gate: 43 files / 419 tests.
+  - Devvit upload auto-bumped the uploaded app version to `0.0.4`.
+  - `npx devvit view --json`
+  - PASS. App id `5201a616-7c35-48d6-a030-743e41456e69`, slug
+    `reviewlock`, owner `BrightyBrainiac`, install count `1`, versions count
+    `356`.
+  - Uploaded version `0.0.4`, uploaded `2026-05-26T10:21:20.861Z`.
+  - `version.about` contains the launch-grade README.
+- Remaining blockers:
+  - Developer Portal app-level `description`, `marketingInfo`, `privacyPolicy`,
+    and `termsAndConditions` are still empty in `npx devvit view --json`.
+  - This was a non-public upload, not a public `devvit publish`.
+  - Public judging post URL is still not recorded.
+  - Comment report and post NSFW/spoiler/flair live proof remain unverified.

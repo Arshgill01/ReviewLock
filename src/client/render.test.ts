@@ -116,6 +116,7 @@ describe('client render helpers', () => {
     expect(html).toContain('Reviewed post');
     expect(html).toContain('Reports suppressed');
     expect(html).toContain('Unlock');
+    expect(html).toContain('href="https://www.reddit.com/r/reviewlock/comments/reviewed"');
     expect(html).toContain('target="_blank" rel="noopener noreferrer"');
     expect(renderLockTable([])).toContain('No active locks.');
     expectSafeCopy(html);

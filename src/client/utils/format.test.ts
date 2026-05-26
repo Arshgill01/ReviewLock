@@ -28,10 +28,10 @@ describe('client format helpers', () => {
 
   it('allows only safe Reddit comment permalinks', () => {
     expect(safeRedditPermalinkHref('/r/reviewlock/comments/abc123/title/')).toBe(
-      '/r/reviewlock/comments/abc123/title/',
+      'https://www.reddit.com/r/reviewlock/comments/abc123/title/',
     );
     expect(safeRedditPermalinkHref('https://www.reddit.com/r/reviewlock/comments/abc123/title/')).toBe(
-      '/r/reviewlock/comments/abc123/title/',
+      'https://www.reddit.com/r/reviewlock/comments/abc123/title/',
     );
     expect(safeRedditPermalinkHref('javascript:alert(1)')).toBeNull();
     expect(safeRedditPermalinkHref('data:text/html,<script>alert(1)</script>')).toBeNull();

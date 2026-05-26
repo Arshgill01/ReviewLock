@@ -212,3 +212,29 @@ Result: PASS. The regenerated screenshots load the ReviewLock CSS, show compact
 `May 25` / `3:29 PM` style timestamps, preserve spacing between audit kind and
 actor, and keep target/lock/reason details readable at desktop and 390px mobile
 widths. This is styled local browser proof, not live Reddit WebView proof.
+
+## Live WebView Target Link Recheck
+
+After browser testing found that safe relative Reddit permalinks resolved under
+the Devvit WebView host, target links were canonicalized to absolute Reddit
+URLs.
+
+Commands and runtime actions:
+
+- `npm run test -- src/client/utils/format.test.ts src/client/render.test.ts --reporter verbose`
+- `npm run type-check`
+- `npm run lint`
+- `npm run dev -- reviewlock_dev`
+- Zen browser opened
+  `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`, then the
+  ReviewLock dashboard post.
+- Zen browser clicked `Verify runtime`.
+
+Result: PASS. The live dashboard rendered on playtest `v0.0.3.3`; first
+viewport showed active locks `2`, reports suppressed `1`, reopened after edit
+`2`, and latest edit-break event `comment:ontlx1k`. The embedded WebView showed
+`Runtime proof refreshed.` and active lock target links resolved to
+`reddit.com/r/...` URLs instead of the Devvit WebView host.
+
+No screenshot artifact was captured in this pass; the proof source was the Zen
+browser accessibility tree inside the live Reddit WebView.

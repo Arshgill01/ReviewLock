@@ -19,7 +19,7 @@ Source requirements checked:
 Submission status:
 
 - App listing URL exists: `https://developers.reddit.com/apps/reviewlock`
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.3`; `npx devvit view
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.4`; `npx devvit view
   --json` showed `version.about` populated from the launch-grade README.
 - Developer Portal app-level metadata still needs a final listing pass before
   submission if editable: `app.description`, `marketingInfo`, `privacyPolicy`,
@@ -49,8 +49,9 @@ Before final submission, verify the listing after upload:
 npx devvit view --json
 ```
 
-The listing is not submission-ready until the returned app/version metadata no
-longer shows the stub description/about copy.
+The listing still needs a final Developer Portal metadata pass if editable, but
+the latest uploaded version no longer uses the old short README as
+`version.about`.
 
 ### Reddit usernames
 

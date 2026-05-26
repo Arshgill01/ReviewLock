@@ -1,12 +1,12 @@
 # Live WebView Runtime Smoke
 
-Last updated: 2026-05-26 02:50 IST.
+Last updated: 2026-05-26 15:53 IST.
 
 ## Scope
 
-Wave 31 proves that ReviewLock renders inside the live Reddit Devvit WebView for the controlled subreddit and that dashboard-driven runtime smoke writes to the `reviewlock_dev` namespace.
+Wave 31 proved that ReviewLock renders inside the live Reddit Devvit WebView for the controlled subreddit and that dashboard-driven runtime smoke writes to the `reviewlock_dev` namespace. This file also records later live WebView rechecks after runtime, dashboard, and submission hardening.
 
-This pass does not prove live moderation methods or live report/edit trigger delivery. Those remain Wave 32 and Wave 33 work.
+This file does not upgrade any trigger or moderation method claim unless the specific controlled proof is listed in `docs/RUNTIME_PROOF.md`.
 
 ## Browser Isolation
 
@@ -37,6 +37,8 @@ This pass does not prove live moderation methods or live report/edit trigger del
   `v0.0.2.250`.
 - Latest embedded audit timeline formatting hardening playtest version observed
   in Zen: `v0.0.2.317`.
+- Latest post-upload target-link hardening playtest version observed in Zen:
+  `v0.0.3.3`.
 
 ## Failure Found
 
@@ -378,6 +380,36 @@ After the reviewed Antigravity frontend refresh was cleaned and integrated:
 No live report submission, post edit, comment edit, unlock, or dismiss action was
 performed in this recheck.
 
+## Post-Upload Target Link Recheck
+
+After the submission README upload and dashboard target-link hardening:
+
+- Uploaded app version: `0.0.4`.
+- Playtest hot reload observed in Zen: `v0.0.3.3`.
+- Existing ReviewLock dashboard post opened at
+  `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.
+- Live dashboard rendered under `r/reviewlock_dev`.
+- First viewport showed:
+  - `Lock reviewed content until it changes.`
+  - active locks `2`
+  - reports suppressed `1`
+  - reopened after edit `2`
+  - latest edit-break event `comment:ontlx1k`
+  - active lock table
+  - reopen queue
+  - runtime proof/status
+- `Verify runtime` completed from the embedded WebView and showed
+  `Runtime proof refreshed.`
+- Runtime status rows remained honest: post report, post update, and comment
+  update proof stayed verified; comment report and post NSFW/spoiler/flair
+  update proof stayed unverified.
+- Active lock target links were rechecked in the live WebView accessibility
+  tree and resolved to `reddit.com/r/...` URLs instead of the Devvit WebView
+  host.
+
+No live report submission, post edit, comment edit, unlock, or dismiss action was
+performed in this recheck.
+
 ## Commands Run
 
 - `npm run dev -- reviewlock_dev`
@@ -440,6 +472,14 @@ performed in this recheck.
     timeline exposed separate kind/timestamp/actor/message/detail nodes instead
     of the previous overlapping horizontal row, and remaining unverified trigger
     rows stayed unverified.
+- `npm run dev -- reviewlock_dev`
+  - Result: PASS, playtest reached `v0.0.3.3` during the post-upload target-link
+    hardening recheck.
+- Zen browser live WebView post-upload target-link recheck
+  - Result: PASS, live dashboard rendered on playtest `v0.0.3.3`, first
+    viewport showed the current active lock/suppress/reopen metrics, `Verify
+    runtime` completed with `Runtime proof refreshed.`, and active lock target
+    links resolved to `reddit.com/r/...` instead of the Devvit WebView host.
 - `npm exec devvit logs reviewlock_dev reviewlock --since 5m --show-timestamps --log-runtime`
   - Result: FAIL, npm passthrough treated `5m` as an unexpected argument.
 - `npm exec devvit logs -- reviewlock_dev reviewlock --connect --since=15m --show-timestamps --log-runtime`
