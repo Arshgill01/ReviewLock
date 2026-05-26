@@ -20,11 +20,11 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, logged in as `u/BrightyBrainiac`.
 - `npx devvit view --json`
   - Result: PASS, app `reviewlock` exists, install count is `1`, owner is
-    `BrightyBrainiac`, versions count is `356`.
-  - Latest upload completed through `npm run deploy` on 2026-05-26 15:51 IST.
-  - Latest listing check after upload showed current uploaded version `0.0.4`,
-    uploaded `2026-05-26T10:21:20.861Z`, with `version.about` populated from
-    the launch-grade README.
+    `BrightyBrainiac`, versions count is `357`.
+  - Latest upload completed through `npm run deploy` on 2026-05-26 17:13 IST.
+  - Latest listing check after upload showed current uploaded version `0.0.5`,
+    uploaded `2026-05-26T11:43:06.145Z`, with `version.about` populated from
+    the self-contained README/App Directory summary.
   - Remaining listing blocker: `app.description`, `marketingInfo`,
     `privacyPolicy`, and `termsAndConditions` are still empty. If the Developer
     Portal exposes those fields separately from `devvit upload`, fill them from
@@ -93,11 +93,11 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 - `npm run build`
   - Result: PASS.
 - `npm run deploy`
-  - Result: PASS after dashboard target-link canonicalization.
+  - Result: PASS after form-binding identity and listing-copy hardening.
   - The script ran `npm run type-check`, `npm run lint`, `npm run test`,
     `vite build`, and `devvit upload`.
-  - Test gate during deploy: 43 files and 419 tests.
-  - Devvit upload auto-bumped the uploaded app version to `0.0.4`.
+  - Test gate during deploy: 43 files and 434 tests.
+  - Devvit upload auto-bumped the uploaded app version to `0.0.5`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
   - Result: BLOCKED while playtest was running; Devvit CLI reported `listen EADDRINUSE: address already in use :::5678`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps`

@@ -6,13 +6,12 @@ Target listing: `https://developers.reddit.com/apps/reviewlock`
 
 Current listing state:
 
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.4`.
+- `npm run deploy` on 2026-05-26 uploaded version `0.0.5`.
 - `npx devvit view --json` after that upload returned `version.about` populated
-  from the launch-grade README.
-- The root `README.md` now includes a self-contained App Directory summary,
-  proof boundary, permissions explanation, data/privacy summary, and terms of
-  use summary before the repository documentation map. This local README rewrite
-  happened after upload `0.0.4` and still needs a final upload/view verification.
+  from the self-contained README/App Directory summary.
+- The root `README.md` includes a self-contained App Directory summary, proof
+  boundary, permissions explanation, data/privacy summary, and terms of use
+  summary before the repository documentation map.
 - App-level `description`, `marketingInfo`, `privacyPolicy`, and
   `termsAndConditions` are still empty in the CLI response.
 - Treat this file as ready-to-use listing copy. It is not proof that the
@@ -151,8 +150,8 @@ Suggested category framing:
 - [ ] Run `npx devvit publish --public` only after final approval if public App
       Directory review is required.
 - [x] Confirm the root README is self-contained enough for `version.about`.
-- [ ] Confirm `version.about` contains the post-`4a6a98a` self-contained README
-      after the next upload.
+- [x] Confirm `version.about` contains the post-`4a6a98a` self-contained README
+      after upload `0.0.5`.
 - [ ] Confirm `app.description` is no longer empty, or confirm the current
       Developer Portal workflow does not expose this field for manual editing before
       public submission.

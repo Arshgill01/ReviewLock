@@ -6995,3 +6995,18 @@ desktop/mobile browser screenshots` complete.
   - PASS.
   - `git diff --check`
   - PASS.
+
+## 2026-05-26 18:15 IST - Resolution
+
+- Addressed finding: App listing upload state is stale after the self-contained README rewrite.
+- Change:
+  - Ran `npm run deploy`; the deploy gate passed and Devvit upload auto-bumped the app to version `0.0.5`.
+  - Ran `npx devvit view --json`; the CLI reported app `reviewlock`, owner `BrightyBrainiac`, install count `1`, versions count `357`, uploaded version `0.0.5`, and `version.about` populated from the self-contained README/App Directory summary.
+  - `docs/RUNTIME_PROOF.md`, `docs/APP_LISTING.md`, `docs/DEVPOST_SUBMISSION.md`, and `docs/CLAIM_COPY_AUDIT.md` now record the verified `0.0.5` upload state.
+- Validation:
+  - `npm run deploy`
+  - PASS; included `npm run type-check`, `npm run lint`, `npm test`, `vite build`, and `devvit upload`.
+  - `npx devvit view --json`
+  - PASS.
+- Boundary:
+  - This verifies uploaded `version.about`. It does not populate app-level Developer Portal metadata fields; `app.description`, `marketingInfo`, `privacyPolicy`, and `termsAndConditions` were still empty in the CLI response.
