@@ -110,7 +110,7 @@ Optional but high value:
 Do not perform destructive proof outside `r/reviewlock_dev` or another
 controlled subreddit.
 
-## 5. Upload And Listing
+## 5. Upload, Publish Request, And Listing
 
 - [ ] Confirm logged-in account.
 
@@ -121,7 +121,7 @@ npx devvit whoami
 - [ ] Upload only after the local gate passes.
 
 ```bash
-devvit upload
+npx devvit upload
 ```
 
 - [ ] Inspect listing metadata.
@@ -136,6 +136,27 @@ npx devvit view --json
   - uploaded version is newer than the previous stub build;
   - listing/about copy is not the old short README;
   - app listing URL is available.
+
+- [ ] Decide whether to file an unlisted publish request or a public App
+  Directory publish request. `npx devvit publish` creates a new app version,
+  uploads source for review, and files a publish request; `--public` submits the
+  app for public review. Do not run this until the final local gate, proof
+  boundary, listing metadata, and judging post URL are ready.
+
+```bash
+npx devvit publish
+# or, only if public App Directory review is the intended final action:
+npx devvit publish --public
+```
+
+- [ ] After publish request submission, rerun:
+
+```bash
+npx devvit view --json
+```
+
+- [ ] Record the requested version, visibility, and any review/request status
+  shown by the Developer Portal or CLI.
 
 ## 6. Judging Access
 
@@ -175,4 +196,3 @@ subreddit with fewer than 200 members.
 - [ ] README links point to files that exist.
 - [ ] Proof docs do not cite stale app version counts as current.
 - [ ] Final answer reports exact commands run and pass/fail status.
-

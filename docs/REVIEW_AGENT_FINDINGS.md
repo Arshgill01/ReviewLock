@@ -6497,3 +6497,24 @@
   - PASS, 43 files / 419 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-26 16:12 IST - Resolution
+
+- Addressed launch-protocol clarity for Devvit upload vs publish.
+- Evidence:
+  - `npx devvit publish --help` reports that publish creates a new app version,
+    uploads source for review, and files a publish request. The default is
+    unlisted; `--public` submits the app for public review.
+  - `npx devvit whoami` confirmed the active account is `u/BrightyBrainiac`.
+  - `npx devvit view --json` still shows app slug `reviewlock`, owner
+    `BrightyBrainiac`, uploaded version `0.0.4`, versions count `356`, and
+    empty app-level `description`, `marketingInfo`, `privacyPolicy`, and
+    `termsAndConditions`.
+- Change:
+  - Updated `docs/LAUNCH_CHECKLIST.md` to use `npx devvit upload`, to separate
+    upload from unlisted/public publish requests, and to require final local
+    gate, proof boundary, listing metadata, and judging post URL before publish.
+  - Updated `docs/APP_LISTING.md` to include explicit `npx devvit publish` and
+    `npx devvit publish --public` final-approval checklist items.
+- Validation:
+  - Documentation-only change after the previous full local gate.

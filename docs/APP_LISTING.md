@@ -140,8 +140,12 @@ Suggested category framing:
 - [ ] Run `npm run lint`.
 - [ ] Run `npm run test`.
 - [ ] Run `npm run build`.
-- [ ] Run `devvit upload` only after the local gate passes.
+- [ ] Run `npx devvit upload` only after the local gate passes.
 - [ ] Run `npx devvit view --json`.
+- [ ] Run `npx devvit publish` only after final approval if an unlisted publish
+  request is required for judging access.
+- [ ] Run `npx devvit publish --public` only after final approval if public App
+  Directory review is required.
 - [x] Confirm `version.about` contains the updated README/listing copy.
 - [ ] Confirm `app.description` is no longer empty, or confirm the current
   Developer Portal workflow does not expose this field for manual editing before
