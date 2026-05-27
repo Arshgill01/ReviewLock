@@ -1,6 +1,6 @@
 # App Listing Copy
 
-Last updated: 2026-05-26.
+Last updated: 2026-05-27.
 
 Target listing: `https://developers.reddit.com/apps/reviewlock`
 
@@ -14,6 +14,9 @@ Current listing state:
   summary before the repository documentation map.
 - App-level `description`, `marketingInfo`, `privacyPolicy`, and
   `termsAndConditions` are still empty in the CLI response.
+- Devvit CLI `0.12.24` does not expose a direct command for editing those
+  app-level listing fields; use the Developer Portal if it exposes them, or
+  record that the current workflow only publishes `version.about`.
 - Treat this file as ready-to-use listing copy. It is not proof that the
   remaining Developer Portal listing fields have been updated.
 

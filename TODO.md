@@ -33,9 +33,9 @@
 - [x] Wave 30 - Production Trust Audit
 - [x] Wave 31 - Isolated Live WebView Runtime Smoke Proof
 - [x] Wave 32 - Controlled Moderation Method Proof
-- [ ] Wave 33 - Controlled Report and Edit Trigger Proof
-- [ ] Wave 34 - Claim Boundary Cleanup After Live Proof
-- [ ] Wave 14 - Submission Package and Final Audit
+- [x] Wave 33 - Controlled Report and Edit Trigger Proof
+- [x] Wave 34 - Claim Boundary Cleanup After Live Proof
+- [x] Wave 14 - Submission Package and Final Audit
 
 ## Cross-wave reminders
 
@@ -43,9 +43,9 @@
 - [x] Confirm trigger payload shapes in generated app typings.
 - [x] Confirm controlled post-target `ignoreReports()` and `unignoreReports()` work in playtest before claiming live support for that target class.
 - [x] Rerun dashboard `Verify runtime` in an isolated ReviewLock browser window and confirm proof writes under `reviewlock_dev`.
-- [ ] Capture screenshots only after demo loop is integrated.
-- [ ] Keep `decisions.md` updated for every scope or platform call.
-- [ ] Do not treat Wave 14 as final until Waves 15-30 have run and committed.
+- [x] Capture screenshots only after demo loop is integrated.
+- [x] Keep `decisions.md` updated for every scope or platform call.
+- [x] Do not treat Wave 14 as final until Waves 15-30 have run and committed.
 
 ## Current Wave 32 proof state
 
@@ -209,4 +209,15 @@
 - [x] Canonicalize lock creation target namespaces before guard, lock, metric, audit, and runtime proof writes.
 - [x] Canonicalize menu lock/unlock form bindings before rendering or consuming confirmation forms.
 - [x] Canonicalize dashboard/manual unlock target namespaces before scope comparison and active-lock lookup.
+
+## Post-submission live proof backlog
+
 - [ ] Live-verify repeated dashboard launch reuses the existing dashboard post.
+- [ ] Replace `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED` with a public judging
+      Reddit post URL after the final access path is chosen.
+- [ ] Populate Developer Portal app-level metadata if the portal exposes those
+      fields, or record the exact portal limitation if only `version.about` is
+      editable.
+- [ ] Decide whether final distribution should be unlisted
+      `npx devvit publish` or public `npx devvit publish --public`, then update
+      docs after the publish request changes the app version or visibility.

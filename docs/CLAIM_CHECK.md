@@ -1,6 +1,6 @@
 # Claim Check
 
-Last updated: 2026-05-26.
+Last updated: 2026-05-27.
 
 Purpose: keep README, Devpost, app listing, screenshots, and demo narration
 aligned with runtime proof. If a claim is not listed as approved here or in a
@@ -102,7 +102,7 @@ Preferred replacements:
 
 | Risk | Severity | Status | Required action |
 | --- | --- | --- | --- |
-| Developer Portal app-level metadata still empty | high | open | Use `docs/APP_LISTING.md` to fill app description, marketing, privacy, and terms fields if the Developer Portal exposes them. |
+| Developer Portal app-level metadata still empty | high | open | Devvit CLI `0.12.24` has no direct edit command; use `docs/APP_LISTING.md` in Developer Portal if the fields are exposed, or document that only `version.about` is editable in the current workflow. |
 | Public judging post URL not yet recorded | high | open | Add URL in a public subreddit with fewer than 200 members. |
 | Comment report live proof missing | medium | open | Keep unverified, or run controlled proof. |
 | NSFW/spoiler/flair live proof missing | medium | open | Keep unverified, or run controlled proof. |

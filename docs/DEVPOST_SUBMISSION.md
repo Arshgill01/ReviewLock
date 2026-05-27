@@ -1,6 +1,6 @@
 # Devpost Submission Draft
 
-Last updated: 2026-05-26.
+Last updated: 2026-05-27.
 
 Submission target: Reddit Mod Tools and Migrated Apps Hackathon, Best New Mod
 Tool category.
@@ -110,7 +110,7 @@ Capabilities:
   changes.
 - Dashboard metrics for active locks, suppressed reports, reopened-after-edit
   items, and latest reopen events.
-- Active-lock table, reopen queue, report churn view, runtime status panel, and
+- Active-lock list, reopen queue, report churn view, runtime status panel, and
   audit timeline.
 - Deterministic, visibly labeled demo mode.
 - Redis-backed audit and runtime proof ledger.

@@ -2826,6 +2826,57 @@
   - PASS, 1 file and 34 tests.
   - `npm run build`
   - PASS.
+
+## 2026-05-27 17:35 IST - Final Wave 14 audit reconciliation
+
+- Read the reviewer agent's final master checklist in
+  `docs/REVIEW_AGENT_FINDINGS.md`.
+- Reconciled Wave 14 bookkeeping after the reviewer found the core app locally
+  green:
+  - `TODO.md` now marks Waves 33, 34, and repo-side Wave 14 complete.
+  - Remaining public access work is separated into a post-submission live proof
+    backlog instead of being silently treated as runtime proof.
+  - `docs/FINAL_AUDIT.md` now records the reviewer verdict and the still-open
+    Devpost/App Directory access blockers.
+  - `docs/APP_LISTING.md` and `docs/CLAIM_CHECK.md` now record that Devvit CLI
+    `0.12.24` exposes no direct app-level metadata edit command.
+- Reviewer status:
+  - No unresolved high or critical core-app finding remains in the final
+    checklist.
+  - Reviewer still flags final public judging URL, Developer Portal metadata,
+    publish/unlisted decision, final gate rerun, and clean git status as
+    must-not-skip submission blockers.
+- Final verification after these documentation edits:
+  - `npm run type-check`
+  - PASS.
+  - `npm run lint`
+  - PASS.
+  - `npm run test`
+  - PASS, 43 files and 444 tests.
+  - `npm run build`
+  - PASS.
+  - `git diff --check`
+  - PASS.
+  - `rg -n "TODO|FIXME|XXX|HACK" src || true`
+  - PASS, no source markers.
+  - `rg -n "not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|unreportable|AI decides|automatic removal|permanent|forever|ignore reports wrapper|disable user reporting" README.md docs/DEVPOST_SUBMISSION.md docs/APP_LISTING.md docs/SCREENSHOTS.md docs/CLAIM_COPY_AUDIT.md docs/LAUNCH_CHECKLIST.md docs/FINAL_AUDIT.md docs/DEVPOST.md docs/SCREENSHOT_PLAN.md src || true`
+  - PASS after manual review: matches are restricted to launch/audit/test
+    guardrail contexts and the `lockExpiryDays: 'forever'` config test fixture.
+  - `npx devvit whoami`
+  - PASS, logged in as `u/BrightyBrainiac`.
+  - `npx devvit view --json`
+  - PASS, app `reviewlock`, owner `BrightyBrainiac`, latest uploaded version
+    `0.0.10`, build status `1`, visibility `1`, populated `version.about`,
+    empty app-level `description`, `privacyPolicy`, `termsAndConditions`, and
+    `marketingInfo`.
+- Repository-side Wave 14 status: ready to commit.
+- Remaining non-repo submission/access blockers:
+  - replace the final public judging Reddit URL placeholder;
+  - resolve Developer Portal app-level metadata availability;
+  - decide and execute unlisted or public Devvit publish request if required for
+    judging access;
+  - rerun `npx devvit view --json` and update docs if publish changes the
+    version or visibility.
 - Full validation:
   - `npm run type-check`
   - `npm run lint`

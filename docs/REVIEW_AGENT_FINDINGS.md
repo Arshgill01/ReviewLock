@@ -7903,3 +7903,104 @@ desktop/mobile browser screenshots` complete.
     `BrightyBrainiac`, install count `1`, visibility `1`, uploaded
     `2026-05-26T14:17:37.752Z`, built `2026-05-26T14:17:40.373Z`, populated
     `version.about`, and empty app-level description/privacy/terms fields.
+
+## 2026-05-27 17:08 IST - Final Master Checklist
+
+- Area: Final submission/app-hardening verifier handoff for the main agent.
+- Result: Core app and local submission bundle are technically green; final
+  Devpost/App Directory access is not fully checkable from the repository yet.
+- Current code/app status:
+  - [x] No unresolved high or critical reviewer finding was found in this pass.
+  - [x] The earlier form-binding findings are resolved in current tests:
+        same-millisecond bindings, context reservation rollback, malformed
+        context cleanup, and neutral menu failure toasts all have regressions.
+  - [x] Full local gate is green.
+  - [x] Local browser/dashboard smoke is green against the built production
+        client bundle with mocked ReviewLock API responses.
+  - [x] Product-guardrail copy remains clean in production-facing copy. Matches
+        for forbidden phrases are limited to guardrail/audit/test contexts.
+  - [x] Source TODO marker scan is clean.
+  - [x] Devvit account is logged in as `u/BrightyBrainiac`.
+  - [x] Devvit uploaded app state is current at version `0.0.10`, with
+        `version.about` populated.
+  - [x] Runtime proof docs still keep unverified variants bounded instead of
+        overclaiming them as live verified.
+- Commands run and results:
+  - `git status --short` passed but reported a dirty docs worktree:
+    `M docs/DEVPOST_SUBMISSION.md`, `?? docs/DEVPOST.md`,
+    `?? docs/FINAL_AUDIT.md`, and `?? docs/SCREENSHOT_PLAN.md`.
+  - `git diff --stat` passed and showed only
+    `docs/DEVPOST_SUBMISSION.md | 4 ++--` before this findings append.
+  - `npm run type-check` passed.
+  - `git diff --check` passed.
+  - `npm run lint` passed.
+  - `npm run test -- src/server/services/formBindings.test.ts src/routes/menu.test.ts src/routes/forms.test.ts src/fullScenario.test.ts src/client/render.test.ts --reporter verbose`
+    passed with 5 files and 89 tests.
+  - `npm run test` passed with 43 files and 444 tests.
+  - `npm run build` passed.
+  - `npx devvit view --json` passed and showed app `reviewlock`, owner
+    `BrightyBrainiac`, latest uploaded version `0.0.10`, build status `1`,
+    versions count `366`, install count `1`, visibility `1`, populated
+    `version.about`, empty app-level `description`, empty `privacyPolicy`,
+    empty `termsAndConditions`, and empty `marketingInfo`.
+  - `npx devvit whoami` passed with `Logged in as u/BrightyBrainiac`.
+  - `rg -n "TODO|FIXME|XXX|HACK" src` returned no matches.
+  - `rg -n "0\\.0\\.[0-9]+|FINAL_|TODO|TBD|PLACEHOLDER|REQUIRED|public Reddit|developer\\.reddit|visibility|private|unverified|not verified|not reportable|disable reports|reports disabled|blocked reports|users cannot report|cannot report locked content|unreportable|AI decides|automatic removal|permanent|forever|ignore reports wrapper|disable user reporting" README.md docs/DEVPOST_SUBMISSION.md docs/APP_LISTING.md docs/LAUNCH_CHECKLIST.md docs/RUNTIME_PROOF.md docs/SCREENSHOTS.md docs/CLAIM_COPY_AUDIT.md src`
+    passed as a review scan. Expected remaining matches are proof-boundary
+    language, forbidden-copy audit/test contexts, and the final public judging
+    URL placeholder.
+  - `python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/client`
+    served the built client bundle for browser smoke.
+  - `npx --yes --package=playwright node <<'NODE' ... NODE` passed after
+    updating the smoke path to current read-only demo behavior. Verified states:
+    `live-desktop`, `runtime-verified-desktop`,
+    `unlock-confirmation-desktop`, `dismiss-confirmation-live-desktop`,
+    `demo-desktop`, `demo-mobile`, and `live-mobile`. Assertions covered
+    required first-viewport phrases, forbidden-copy absence, no body overflow,
+    no nested panels, no `undefined`/`NaN`, and no clipped buttons/metrics.
+- Final submission blockers the main agent must not skip:
+  - [ ] Commit or otherwise intentionally handle the current docs worktree:
+        modified `docs/DEVPOST_SUBMISSION.md`, untracked `docs/DEVPOST.md`,
+        untracked `docs/FINAL_AUDIT.md`, untracked
+        `docs/SCREENSHOT_PLAN.md`, plus this findings append.
+  - [ ] Replace `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED` in
+        `docs/DEVPOST_SUBMISSION.md` and Devpost with a Reddit post running
+        ReviewLock in a public subreddit with fewer than 200 members. Do not use
+        private `r/reviewlock_dev` playtest proof as the judge-access URL.
+  - [ ] Populate Developer Portal app-level metadata if the portal exposes
+        those fields, or explicitly document that only `version.about` is
+        editable/available before submission. Current CLI still shows empty
+        `description`, `privacyPolicy`, `termsAndConditions`, and
+        `marketingInfo`.
+  - [ ] Decide whether the final action is `npx devvit publish` or
+        `npx devvit publish --public`. Do not run either until the judging URL
+        and metadata decision are ready, because publish creates a new app
+        version/review request.
+  - [ ] After any publish/upload action, rerun `npx devvit view --json` and
+        update docs if the version changes from `0.0.10`.
+  - [ ] Rerun the required final gate after any remaining doc, publish, or
+        screenshot updates: `npm run type-check`, `npm run lint`,
+        `npm run test`, `npm run build`, and `git diff --check`.
+  - [ ] Ensure final `git status --short` is clean after the main agent's final
+        commit.
+- Honorable-mention readiness verdict:
+  - The core app is now in strong honorable-mention shape from a code,
+    reliability, proof-boundary, and dashboard UX standpoint.
+  - The remaining risk is submission/access packaging, not core implementation:
+    public judging URL, Developer Portal metadata/publish state, and final clean
+    commit.
+- Files reviewed:
+  - `README.md`
+  - `docs/DEVPOST_SUBMISSION.md`
+  - `docs/APP_LISTING.md`
+  - `docs/LAUNCH_CHECKLIST.md`
+  - `docs/RUNTIME_PROOF.md`
+  - `docs/SCREENSHOTS.md`
+  - `docs/CLAIM_COPY_AUDIT.md`
+  - `docs/FINAL_AUDIT.md`
+  - `docs/DEVPOST.md`
+  - `docs/SCREENSHOT_PLAN.md`
+  - `src/server/services/formBindings.ts`
+  - `src/routes/menu.ts`
+  - `src/routes/forms.ts`
+  - `src/client`
