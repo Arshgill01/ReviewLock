@@ -14,5 +14,7 @@ Validation:
 - `docs/DEVPOST_SUBMISSION.md` uses the ReviewLock thesis: "Lock reviewed
   content until it changes."
 - Runtime claims are bounded to `docs/RUNTIME_PROOF.md`.
-- The final public judging Reddit URL remains a submission-time field and must
-  not be replaced with private `r/reviewlock_dev` playtest evidence.
+- The final public judging Reddit URL is:
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+  Private `r/reviewlock_dev` playtest evidence remains controlled runtime proof,
+  not the judge-access URL.

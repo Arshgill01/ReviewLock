@@ -1,6 +1,6 @@
 # Launch Checklist
 
-Last updated: 2026-05-26.
+Last updated: 2026-05-27.
 
 This checklist is ordered for the final day. Do not skip the proof-boundary
 checks: ReviewLock's strongest submission story depends on being honest about
@@ -8,14 +8,14 @@ what is verified.
 
 ## 1. Local Gate
 
-- [ ] Confirm the worktree only contains intended submission changes.
+- [x] Confirm the worktree only contains intended submission changes.
 
 ```bash
 git status --short
 git diff --stat
 ```
 
-- [ ] Run the required local gate.
+- [x] Run the required local gate.
 
 ```bash
 npm run type-check
@@ -25,13 +25,13 @@ npm run build
 git diff --check
 ```
 
-- [ ] Confirm there are no source TODO markers.
+- [x] Confirm there are no source TODO markers.
 
 ```bash
 rg -n "TODO" src
 ```
 
-- [ ] Confirm forbidden product copy is absent from production UI/code. Matches
+- [x] Confirm forbidden product copy is absent from production UI/code. Matches
       in guardrail docs, audits, and tests are acceptable only when they are
       explicitly discussing forbidden copy.
 
@@ -41,10 +41,10 @@ rg -n "not reportable|disable reports|reports disabled|blocked reports|users can
 
 ## 2. Proof Boundary
 
-- [ ] Read `docs/RUNTIME_PROOF.md`.
-- [ ] Read `docs/KNOWN_LIMITATIONS.md`.
-- [ ] Read `docs/MODERATION_METHOD_PROOF.md`.
-- [ ] Ensure README, Devpost copy, demo narration, and app listing copy claim
+- [x] Read `docs/RUNTIME_PROOF.md`.
+- [x] Read `docs/KNOWN_LIMITATIONS.md`.
+- [x] Read `docs/MODERATION_METHOD_PROOF.md`.
+- [x] Ensure README, Devpost copy, demo narration, and app listing copy claim
       only verified rows as verified.
 - [ ] Keep these unverified unless a newer controlled proof pass updates
       `docs/RUNTIME_PROOF.md`:
@@ -52,8 +52,11 @@ rg -n "not reportable|disable reports|reports disabled|blocked reports|users can
   - post NSFW update trigger delivery;
   - post spoiler update trigger delivery;
   - post flair update trigger delivery;
-  - repeated dashboard launch reuse;
   - independent comment-target moderation method proof.
+
+Repeated dashboard launch reuse is now verified on public
+`r/reviewlock_judges`: the subreddit menu action reopened the existing dashboard
+post `1tp3jxl`.
 
 ## 3. Browser And WebView Recheck
 
@@ -112,32 +115,32 @@ controlled subreddit.
 
 ## 5. Upload, Publish Request, And Listing
 
-- [ ] Confirm logged-in account.
+- [x] Confirm logged-in account.
 
 ```bash
 npx devvit whoami
 ```
 
-- [ ] Upload only after the local gate passes.
+- [x] Upload only after the local gate passes.
 
 ```bash
 npx devvit upload
 ```
 
-- [ ] Inspect listing metadata.
+- [x] Inspect listing metadata.
 
 ```bash
 npx devvit view --json
 ```
 
-- [ ] Confirm:
+- [x] Confirm:
   - app slug is `reviewlock`;
   - owner is `BrightyBrainiac`;
   - uploaded version is newer than the previous stub build;
   - listing/about copy is not the old short README;
   - app listing URL is available.
 
-- [ ] Decide whether to file an unlisted publish request or a public App
+- [x] Decide whether to file an unlisted publish request or a public App
       Directory publish request. `npx devvit publish` creates a new app version,
       uploads source for review, and files a publish request; `--public` submits the
       app for public review. Do not run this until the final local gate, proof
@@ -158,29 +161,35 @@ npx devvit view --json
 - [ ] Record the requested version, visibility, and any review/request status
       shown by the Developer Portal or CLI.
 
+Decision for final hackathon judging access: do not file a last-minute App
+Directory publish request. The Devpost judging access requirement is satisfied
+by the public Reddit dashboard post running the installed app in
+`r/reviewlock_judges`; App Directory public review is a separate distribution
+step.
+
 ## 6. Judging Access
 
 Devpost rules require access to a working project for judging/testing by
 providing a link to a Reddit post running the app. The rules specify a public
 subreddit with fewer than 200 members.
 
-- [ ] Confirm the judging subreddit is public and has fewer than 200 members.
-- [ ] Confirm the final Reddit post runs ReviewLock there and is accessible to
+- [x] Confirm the judging subreddit is public and has fewer than 200 members.
+- [x] Confirm the final Reddit post runs ReviewLock there and is accessible to
       judges without developer-only playtest privileges.
-- [ ] Keep `r/reviewlock_dev` evidence scoped as private controlled proof, not
+- [x] Keep `r/reviewlock_dev` evidence scoped as private controlled proof, not
       the final judging access URL.
-- [ ] Create or reuse the ReviewLock dashboard post.
-- [ ] Add the final judging post URL to:
+- [x] Create or reuse the ReviewLock dashboard post.
+- [x] Add the final judging post URL to:
   - `docs/DEVPOST_SUBMISSION.md`;
   - Devpost submission field;
   - final handoff message.
 
 ## 7. Submission Assets
 
-- [ ] Devpost copy: `docs/DEVPOST_SUBMISSION.md`.
-- [ ] App listing copy: `docs/APP_LISTING.md`.
-- [ ] Demo script: `docs/DEMO_SCRIPT.md`.
-- [ ] Claim audit: `docs/CLAIM_CHECK.md`.
+- [x] Devpost copy: `docs/DEVPOST_SUBMISSION.md`.
+- [x] App listing copy: `docs/APP_LISTING.md`.
+- [x] Demo script: `docs/DEMO_SCRIPT.md`.
+- [x] Claim audit: `docs/CLAIM_CHECK.md`.
 - [x] Screenshot set:
   - lock form;
   - dashboard active locks and reports suppressed;
@@ -192,10 +201,10 @@ subreddit with fewer than 200 members.
 
 ## 8. Final Reviewer Signoff
 
-- [ ] No known high or critical reviewer finding remains unresolved.
-- [ ] Medium findings are either fixed or explicitly accepted in
+- [x] No known high or critical reviewer finding remains unresolved.
+- [x] Medium findings are either fixed or explicitly accepted in
       `docs/KNOWN_LIMITATIONS.md`.
-- [ ] Developer Portal listing is no longer stub-grade.
-- [ ] README links point to files that exist.
-- [ ] Proof docs do not cite stale app version counts as current.
+- [x] Developer Portal listing is no longer stub-grade.
+- [x] README links point to files that exist.
+- [x] Proof docs do not cite stale app version counts as current.
 - [ ] Final answer reports exact commands run and pass/fail status.

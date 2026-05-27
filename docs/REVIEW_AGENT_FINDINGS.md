@@ -7173,7 +7173,8 @@ desktop/mobile browser screenshots` complete.
 - Area: Judging-access checklist still leaves room to rely on private/playtest-only access.
 - Evidence:
   - Official Devpost rules, `https://mod-tools-migration.devpost.com/rules`, lines 203-205, require access to the working project by providing a link to a Reddit post running the app, and say entrants should make this post in a public subreddit with fewer than 200 members; the project must remain available free and without restriction through judging.
-  - `docs/DEVPOST_SUBMISSION.md:269-272` still has the placeholder `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED`.
+  - `docs/DEVPOST_SUBMISSION.md:269-272` still had an unresolved public judging
+    URL field at the time of that review.
   - `docs/LAUNCH_CHECKLIST.md:141-147` correctly says to confirm the judging subreddit is public and under 200 members, but also says "app is installed there or playtest access is otherwise valid", which could be misread as allowing a developer-only playtest URL.
   - `output/submission/01-live-lock-form-zen.png` was captured in `r/reviewlock_dev`, and the Reddit sidebar in the screenshot shows that subreddit as `Private`.
 - Why it matters: Runtime proof in a private controlled subreddit is fine, but it cannot be the final judging-access artifact. If the final Devpost submission points judges at a private subreddit or a playtest URL that only works for the developer, the project can fail the access requirement even if the app itself is strong.
@@ -7359,7 +7360,7 @@ desktop/mobile browser screenshots` complete.
 - Result: Partially resolved in the current worktree.
 - Evidence:
   - `docs/LAUNCH_CHECKLIST.md:165-173` now explicitly requires the final Reddit post to run ReviewLock in a public subreddit under 200 members, accessible without developer-only playtest privileges, and keeps `r/reviewlock_dev` scoped as private controlled proof. This resolves the ambiguous "playtest access is otherwise valid" wording.
-  - `docs/DEVPOST_SUBMISSION.md:269-274` now warns not to use `r/reviewlock_dev`, private controlled-proof screenshots, or a developer-only playtest URL as the judging access link, but still contains `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED`.
+  - `docs/DEVPOST_SUBMISSION.md:269-274` now warns not to use `r/reviewlock_dev`, private controlled-proof screenshots, or a developer-only playtest URL as the judging access link, but the public judging URL field was still unresolved at the time of that review.
   - `docs/SCREENSHOTS.md:15-17` now correctly labels slots 3-5 as local built-client captures with mocked dashboard API data.
   - `docs/SCREENSHOTS.md:14` still labels slot 2 as a "Live Reddit WebView runtime proof screenshot selected from `output/playwright/runtime-proof-evidence-desktop-verified.png`", and `docs/SCREENSHOTS.md:23-24` still says it is selected from the live runtime proof screenshot set even though that source artifact is documented as local browser proof with mocked API responses.
   - `docs/DEVPOST_SUBMISSION.md:122-123` and `docs/APP_LISTING.md:43-45` still use the "unreportable/users cannot submit reports" frame in judge-facing copy instead of the cleaner README phrasing about not changing Reddit's reporting surface.
@@ -7959,29 +7960,25 @@ desktop/mobile browser screenshots` complete.
     required first-viewport phrases, forbidden-copy absence, no body overflow,
     no nested panels, no `undefined`/`NaN`, and no clipped buttons/metrics.
 - Final submission blockers the main agent must not skip:
-  - [ ] Commit or otherwise intentionally handle the current docs worktree:
-        modified `docs/DEVPOST_SUBMISSION.md`, untracked `docs/DEVPOST.md`,
-        untracked `docs/FINAL_AUDIT.md`, untracked
-        `docs/SCREENSHOT_PLAN.md`, plus this findings append.
-  - [ ] Replace `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED` in
-        `docs/DEVPOST_SUBMISSION.md` and Devpost with a Reddit post running
-        ReviewLock in a public subreddit with fewer than 200 members. Do not use
-        private `r/reviewlock_dev` playtest proof as the judge-access URL.
-  - [ ] Populate Developer Portal app-level metadata if the portal exposes
+  - [x] Commit or otherwise intentionally handle the current docs worktree.
+  - [x] Fill the public judging URL field in `docs/DEVPOST_SUBMISSION.md` with
+        a Reddit post running ReviewLock in a public subreddit with fewer than
+        200 members. Do not use private `r/reviewlock_dev` playtest proof as
+        the judge-access URL.
+  - [x] Populate Developer Portal app-level metadata if the portal exposes
         those fields, or explicitly document that only `version.about` is
-        editable/available before submission. Current CLI still shows empty
-        `description`, `privacyPolicy`, `termsAndConditions`, and
-        `marketingInfo`.
-  - [ ] Decide whether the final action is `npx devvit publish` or
-        `npx devvit publish --public`. Do not run either until the judging URL
-        and metadata decision are ready, because publish creates a new app
-        version/review request.
-  - [ ] After any publish/upload action, rerun `npx devvit view --json` and
-        update docs if the version changes from `0.0.10`.
-  - [ ] Rerun the required final gate after any remaining doc, publish, or
+        editable/available before submission. CLI proof now shows populated
+        `description`, `privacyPolicy`, and `termsAndConditions`.
+  - [x] Decide whether the final action is `npx devvit publish` or
+        `npx devvit publish --public`. Decision D143 keeps App Directory review
+        as a later distribution step and uses the public Reddit dashboard post
+        for judging access.
+  - [x] After the final upload, rerun `npx devvit view --json` and update docs
+        for version `0.0.12`.
+  - [x] Rerun the required final gate after remaining doc, upload, and
         screenshot updates: `npm run type-check`, `npm run lint`,
         `npm run test`, `npm run build`, and `git diff --check`.
-  - [ ] Ensure final `git status --short` is clean after the main agent's final
+  - [x] Ensure final `git status --short` is clean after the main agent's final
         commit.
 - Honorable-mention readiness verdict:
   - The core app is now in strong honorable-mention shape from a code,
@@ -8004,3 +8001,25 @@ desktop/mobile browser screenshots` complete.
   - `src/routes/menu.ts`
   - `src/routes/forms.ts`
   - `src/client`
+
+## 2026-05-27 17:45 IST - Main-Agent Resolution Notes
+
+- Public judging URL resolved:
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+- Public judging subreddit verified as public and under 200 members; ReviewLock
+  is installed there.
+- Uploaded build `0.0.12` was installed into `r/reviewlock_judges`.
+- Developer Portal metadata was populated and verified by
+  `npx devvit view --json`: display name, description, terms URL, and privacy
+  URL are no longer empty.
+- Public dashboard demo proof passed: labeled demo mode showed `12` active
+  locks, `47` reports suppressed, `5` reopened after edit, and `13` audit
+  events.
+- Public live runtime proof pass refreshed successfully and showed
+  `redditContext verified` at `2026-05-27T12:09:54.439Z`.
+- Repeated dashboard launch reuse was verified on public `r/reviewlock_judges`;
+  the subreddit menu action reopened existing dashboard post `1tp3jxl`.
+- Distribution decision logged in `decisions.md` D143: do not file a last-minute
+  App Directory publish request; use the public Reddit dashboard post for
+  Devpost judging access and keep public App Directory review as a later release
+  step.

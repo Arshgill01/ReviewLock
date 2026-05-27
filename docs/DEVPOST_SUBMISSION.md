@@ -19,13 +19,16 @@ Source requirements checked:
 Submission status:
 
 - App listing URL exists: `https://developers.reddit.com/apps/reviewlock`
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.10`; `npx devvit view --json`
+- Public judging dashboard URL exists:
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`
+- `npm run deploy` on 2026-05-27 uploaded version `0.0.12`; `npx devvit view --json`
   showed `version.about` populated from the self-contained README/App Directory
   summary.
-- Developer Portal app-level metadata still needs a final listing pass before
-  submission if editable: `app.description`, `marketingInfo`, `privacyPolicy`,
-  and `termsAndConditions` are still empty in the CLI response.
-- Public judging post still needs final confirmation after the final upload.
+- Developer Portal app-level metadata was populated on 2026-05-27: display name
+  `ReviewLock`, description, terms URL, and privacy URL are present in
+  `npx devvit view --json`.
+- `r/reviewlock_judges` is public with fewer than 200 members, the app is
+  installed there, and the dashboard post is accessible for judging.
 
 ## Submission Fields
 
@@ -50,8 +53,9 @@ Before final submission, verify the listing after upload:
 npx devvit view --json
 ```
 
-The uploaded `version.about` copy is current as of version `0.0.10`. The listing
-still needs a final Developer Portal metadata pass if editable.
+The uploaded `version.about` copy is current as of the final submission upload.
+Before submitting, rerun `npx devvit view --json` after any final upload and
+confirm the displayed version matches the installed judging build.
 
 ### Reddit usernames
 
@@ -201,7 +205,12 @@ Keep these as implemented but not live-verified:
 - Post flair update trigger delivery.
 - Comment-target moderation method proof beyond the observed comment lock and
   reopen flow.
-- Repeated dashboard launch reuse.
+
+Additional live UI proof:
+
+- Repeated dashboard launch reuse is verified on public `r/reviewlock_judges`.
+  The subreddit menu action reopened the existing dashboard post
+  `1tp3jxl` instead of creating another dashboard post.
 
 ### Challenges
 
@@ -244,7 +253,6 @@ Technical challenges included:
 
 - Live-verify comment report trigger delivery.
 - Live-verify NSFW, spoiler, and flair update trigger variants.
-- Live-verify repeated dashboard launch reuse.
 - Add a first-run setup surface for lock expiry defaults and reason presets.
 - Recruit 1-3 moderator teams for real-world playtesting after the hackathon.
 
@@ -267,12 +275,12 @@ Stable screenshot manifest: `docs/SCREENSHOTS.md`.
 
 ### Testing instructions for judges
 
-Use the final public Reddit post URL after upload and playtest confirmation.
-Do not use `r/reviewlock_dev`, private controlled-proof screenshots, or a
-developer-only playtest URL as the judging access link:
+Use this public Reddit post URL for judging access. Do not use
+`r/reviewlock_dev`, private controlled-proof screenshots, or a developer-only
+playtest URL as the judging access link:
 
 ```txt
-FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED
+https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/
 ```
 
 Suggested text:

@@ -2612,3 +2612,32 @@ Reason:
   unlocking content that differs from the reviewed snapshot.
 - The context reservation and rollback path prevents same-millisecond form
   races and avoids orphan Redis records when form preparation fails.
+
+### D143 - Final judging access uses the public dashboard post, not a last-minute App Directory publish request
+
+Devpost judging access requires a Reddit post running the app in a public
+subreddit with fewer than 200 members. ReviewLock now has public judging access
+through `r/reviewlock_judges`, where the uploaded app is installed and the
+dashboard runs at
+`https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+
+Decision:
+
+- Use the public dashboard post as the final Devpost judging access URL.
+- Populate Developer Portal directory metadata through the portal fields for
+  display name, description, terms URL, and privacy URL.
+- Do not file a last-minute `npx devvit publish` or
+  `npx devvit publish --public` request as part of the hackathon handoff.
+- Keep App Directory public review as a later distribution step if the owner
+  wants a public marketplace release after judging.
+
+Reason:
+
+- The public Reddit dashboard post satisfies the judging/testing access path
+  without depending on App Directory review timing.
+- A publish request creates a new review workflow and can change version state
+  close to submission; doing that after proof and docs are stable adds avoidable
+  launch risk.
+- ReviewLock's core runtime proof remains strongest when the app version,
+  public install, public dashboard URL, and proof docs all point at the same
+  known-good build.

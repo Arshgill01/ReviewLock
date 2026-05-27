@@ -1,6 +1,6 @@
 # Runtime Proof
 
-Last updated: 2026-05-26 20:20 IST.
+Last updated: 2026-05-27 17:55 IST.
 
 This file distinguishes implemented behavior from verified Devvit runtime behavior. README, submission, and demo claims may cite only rows marked `verified`.
 
@@ -20,18 +20,24 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
   - Result: PASS, logged in as `u/BrightyBrainiac`.
 - `npx devvit view --json`
   - Result: PASS, app `reviewlock` exists, owner is `BrightyBrainiac`, install
-    count is `1`, and default playtest subreddit is `t5_i1a3xr`.
-  - Latest upload completed through `npm run deploy` on 2026-05-26 19:47 IST.
-  - Latest listing check after upload showed current uploaded version `0.0.10`,
-    uploaded `2026-05-26T14:17:37.752Z`, built
-    `2026-05-26T14:17:40.373Z`, with `version.about` populated from the
+    count is `2`, and default playtest subreddit is `t5_i1a3xr`.
+  - Latest upload completed through `npm run deploy` on 2026-05-27 17:53 IST.
+  - Latest listing check after upload showed current uploaded version `0.0.12`,
+    uploaded `2026-05-27T12:23:41.717Z`, built
+    `2026-05-27T12:23:44.267Z`, with `version.about` populated from the
     self-contained README/App Directory summary.
   - The current CLI JSON shape exposes `majorVersion`, `minorVersion`, and
     `patchVersion`, but not the older total versions-count field.
-  - Remaining listing blocker: `app.description`, `marketingInfo`,
-    `privacyPolicy`, and `termsAndConditions` are still empty. If the Developer
-    Portal exposes those fields separately from `devvit upload`, fill them from
-    `docs/APP_LISTING.md` before Devpost submission.
+  - Developer Portal metadata was updated on 2026-05-27. `app.description`,
+    `privacyPolicy`, and `termsAndConditions` are populated in the CLI response;
+    `marketingInfo` remains empty because no separate marketing media field was
+    required for the public judging access path.
+- `npx devvit install reviewlock_judges reviewlock@0.0.12`
+  - Result: PASS, installed the uploaded build into public
+    `r/reviewlock_judges`.
+- `npx devvit list installs`
+  - Result: PASS, showed `reviewlock_judges (v0.0.12)` and controlled
+    `reviewlock_dev (v0.0.10.4)`.
 - `npm run dev -- reviewlock_dev`
   - Result: PASS, playtest served `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.
   - Latest observed hot reload in the Wave 31 live WebView smoke pass: `v0.0.2.6`.
@@ -94,6 +100,22 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     rendered without the timestamp/detail overlap visible in the earlier
     screenshots.
   - Screenshot: `output/submission/02-live-dashboard-runtime-proof.png`.
+- Zen browser public judging dashboard proof
+  - Result: PASS, public `r/reviewlock_judges` opened the ReviewLock dashboard
+    post at
+    `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+  - Result: PASS, after installing uploaded version `0.0.12`, the dashboard
+    rendered live mode under `r/reviewlock_judges` and demo mode under
+    `reviewlock_demo`.
+  - Result: PASS, demo mode on the public dashboard showed labeled seeded data:
+    `12` active locks, `47` reports suppressed, `5` reopened after edit, and
+    `13` audit events.
+  - Result: PASS, live mode showed the public subreddit scope
+    `r/reviewlock_judges`; clicking `Verify runtime` returned
+    `Runtime proof refreshed.` and recorded `redditContext verified` with
+    timestamp `2026-05-27T12:09:54.439Z`.
+  - Result: PASS, repeated subreddit-menu launch reused the existing dashboard
+    post `1tp3jxl` instead of creating another dashboard post.
 - Zen browser controlled post report proof
   - Result: PASS, submitted one controlled Reddit report against unchanged locked post `t3_1tm8nak`.
   - Result: PASS, Devvit emitted sanitized `reviewlock.trigger.payload_shape` for `on-post-report`.
@@ -123,7 +145,7 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
     `vite build`, and `devvit upload`.
   - Latest deploy gate: type-check, lint, 43 test files and 444 tests, build,
     and Devvit upload.
-  - Devvit upload auto-bumped the uploaded app version to `0.0.10`.
+  - Devvit upload auto-bumped the uploaded app version to `0.0.12`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps --log-runtime`
   - Result: BLOCKED while playtest was running; Devvit CLI reported `listen EADDRINUSE: address already in use :::5678`.
 - `npx devvit logs reviewlock_dev reviewlock --since 10m --show-timestamps`
@@ -147,7 +169,7 @@ This file distinguishes implemented behavior from verified Devvit runtime behavi
 | Devvit Web server boot                       | verified   | Playtest served `https://www.reddit.com/r/reviewlock_dev/?playtest=reviewlock`.                                                                                                  | Runtime server uses `createServer`, `getServerPort`, `reddit`, `redis`, and `context` from `@devvit/web/server`. |
 | Subreddit dashboard menu response            | verified   | `Open ReviewLock dashboard` no longer returns the Devvit `UiResponse` unknown-key error after replacing `{ ok: true }` with valid `showForm`/`navigateTo`/`showToast` responses. | Valid response keys confirmed from installed `@devvit/build-pack` validator.                                     |
 | Dashboard custom post launch                 | verified   | A ReviewLock dashboard custom post was created in `r/reviewlock_dev` and opened as a Reddit custom post WebView.                                                                 | Existing post observed at `/r/reviewlock_dev/comments/1tm8nak/reviewlock_dashboard/`.                            |
-| Dashboard custom post reuse                  | unverified | Implemented and locally tested with cached permalink reuse, unsafe cached permalink rejection, and duplicate creation lease coverage.                                            | Needs controlled playtest proof that a repeated subreddit launch opens the existing dashboard post without creating another post. |
+| Dashboard custom post reuse                  | verified   | Public `r/reviewlock_judges` subreddit-menu launch reopened existing dashboard post `1tp3jxl`; latest public install is `0.0.12`.                                               | Cached permalink reuse, unsafe cached permalink rejection, and duplicate creation lease remain covered by local tests. |
 | Dashboard subreddit context                  | verified   | Zen live WebView smoke rendered the dashboard header as `r/reviewlock_dev`; latest recheck used playtest `v0.0.10.2`.                                                           | Client now prefers Devvit-injected WebView context and refuses mismatched weaker runtime context overwrites.     |
 | Redis smoke from authorized WebView          | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redis verified` and `Runtime proof refreshed.`                                                        | Rechecked on playtest `v0.0.10.2` after no-visible-token form and audit timeline hardening.                      |
 | Reddit context smoke from authorized WebView | verified   | Zen live WebView smoke clicked `Verify runtime`; the runtime panel showed `redditContext verified` and `Runtime proof refreshed.`                                                | Rechecked on playtest `v0.0.10.2` after no-visible-token form and audit timeline hardening.                      |

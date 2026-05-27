@@ -3282,6 +3282,43 @@
   - `npm run build`
   - PASS.
 
+## 2026-05-27 17:55 IST - Public judging access and listing metadata proof
+
+- Upgraded the public judging path from uploaded-only proof to an accessible
+  Reddit post running ReviewLock:
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+- Ran `npm run deploy`.
+  - PASS, the script ran type-check, lint, test, build, and Devvit upload.
+  - Devvit upload auto-bumped the app to version `0.0.12`.
+- Ran `npx devvit install reviewlock_judges reviewlock@0.0.12`.
+  - PASS, installed version `0.0.12` into public `r/reviewlock_judges`.
+- Ran `npx devvit list installs`.
+  - PASS, showed `reviewlock_judges (v0.0.12)` and
+    `reviewlock_dev (v0.0.10.4)`.
+- Filled Developer Portal directory metadata:
+  - display name: `ReviewLock`;
+  - description: `ReviewLock helps moderator teams lock reviewed posts and
+    comments until their content changes, suppressing repeat report churn while
+    reopening edited items for review.`;
+  - terms URL: `https://github.com/Arshgill01/ReviewLock#terms-of-use-summary`;
+  - privacy URL: `https://github.com/Arshgill01/ReviewLock#data-and-privacy`.
+- Ran `npx devvit view --json`.
+  - PASS, app `reviewlock`, owner `BrightyBrainiac`, install count `2`,
+    uploaded version `0.0.12`, populated `version.about`, populated app
+    description, populated terms URL, and populated privacy URL.
+- Zen public dashboard proof:
+  - PASS, public dashboard post loaded under `r/reviewlock_judges`.
+  - PASS, demo mode showed labeled seeded state with `12` active locks, `47`
+    reports suppressed, `5` reopened after edit, and `13` audit events.
+  - PASS, live mode `Verify runtime` returned `Runtime proof refreshed.` and
+    showed `redditContext verified` at `2026-05-27T12:09:54.439Z`.
+  - PASS, repeated subreddit menu launch reopened existing dashboard post
+    `1tp3jxl` instead of creating a duplicate post.
+- Distribution decision:
+  - Do not file a last-minute `devvit publish` or `devvit publish --public`
+    request for hackathon submission. The public Reddit dashboard post is the
+    judge-access URL; App Directory review remains a later distribution step.
+
   - `test -s output/submission/01-live-lock-form-zen.png && test -s output/submission/02-live-dashboard-runtime-proof.png && test -s output/submission/03-local-dashboard-active-locks.png && test -s output/submission/04-local-reopened-after-edit.png && test -s output/submission/05-local-demo-mode.png`
   - PASS.
   - `rg -n "TODO" src || true`

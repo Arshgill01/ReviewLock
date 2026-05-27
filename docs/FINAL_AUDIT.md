@@ -19,7 +19,7 @@ intact: "Lock reviewed content until it changes."
 | No external services or AI scope drift | `README.md`, `docs/DEVPOST_SUBMISSION.md`, `docs/SAFETY_PRIVACY_AUDIT.md`, and `package.json` show no AI service, external database, or paid service dependency. | Complete |
 | Devvit app wired | `devvit.json` registers post/comment lock, unlock, open actions, subreddit dashboard launch, forms, report triggers, update triggers, Reddit permission, and Redis permission. | Complete |
 | Live account verified | `npx devvit whoami` on 2026-05-27 returned `u/BrightyBrainiac`. | Complete |
-| Uploaded app state verified | `npx devvit view --json` on 2026-05-27 shows slug `reviewlock`, owner `BrightyBrainiac`, version `0.0.10`, `version.about` populated from README, install count `1`, and app-level description/privacy/terms still empty. | Complete with listing limitation |
+| Uploaded app state verified | `npx devvit view --json` on 2026-05-27 shows slug `reviewlock`, owner `BrightyBrainiac`, version `0.0.12`, `version.about` populated from README, install count `2`, and app-level description/privacy/terms populated. | Complete |
 | Runtime proof documented | `docs/RUNTIME_PROOF.md`, `docs/MODERATION_METHOD_PROOF.md`, and `docs/KNOWN_LIMITATIONS.md` separate verified post/comment paths from unverified trigger variants. | Complete |
 | Browser/UI proof documented | `docs/BROWSER_REGRESSION.md`, `docs/SCREENSHOTS.md`, and `output/submission/*` document desktop/mobile local proof and live Zen proof. | Complete |
 | Submission package produced | `README.md`, `docs/DEVPOST_SUBMISSION.md`, `docs/DEVPOST.md`, `docs/DEMO_SCRIPT.md`, `docs/SCREENSHOTS.md`, `docs/SCREENSHOT_PLAN.md`, `docs/CLAIM_CHECK.md`, `docs/CLAIM_COPY_AUDIT.md`, and this audit file. | Complete |
@@ -39,6 +39,8 @@ Verified in controlled `r/reviewlock_dev` playtest:
 - Comment body edit reopening.
 - Live no-visible-token lock form open and submit on playtest `v0.0.10.2`.
 - Live audit timeline formatting in Zen on playtest `v0.0.10.2`.
+- Repeated dashboard launch reuse on public `r/reviewlock_judges`, reopening
+  the existing dashboard post `1tp3jxl`.
 
 Still intentionally not claimed as live-verified:
 
@@ -47,22 +49,22 @@ Still intentionally not claimed as live-verified:
 - Post spoiler update trigger delivery.
 - Post flair update trigger delivery.
 - Independent comment-target moderation method proof.
-- Repeated dashboard launch reuse.
 
 ## Final limitations
 
-- Current Developer Portal app-level metadata fields are still empty in
-  `npx devvit view --json`; the uploaded `version.about` is populated and
-  self-contained.
-- Final public judging Reddit post URL must be supplied in Devpost after the
-  public/publish access path is chosen. Private `r/reviewlock_dev` playtest
-  proof must not be used as the judge-access URL.
-- Public App Directory approval is separate from the current uploaded build.
-- Devvit CLI `0.12.24` exposes `upload`, `publish`, `view`, `install`, and app
-  settings commands, but no CLI command for directly editing the app-level
-  `description`, `marketingInfo`, `privacyPolicy`, or `termsAndConditions`
-  fields. Those fields need Developer Portal confirmation if they are required
-  for the final submission.
+- Comment report delivery, post NSFW update delivery, post spoiler update
+  delivery, post flair update delivery, and independent comment-target
+  moderation method proof remain implemented/local-test covered but not claimed
+  as live verified.
+- Public judging access is the installed app running in public
+  `r/reviewlock_judges` at
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`.
+  Private `r/reviewlock_dev` playtest proof remains scoped as controlled
+  runtime evidence, not the judge-access URL.
+- Public App Directory approval is separate from the current uploaded build and
+  public judging dashboard. A last-minute `devvit publish --public` request was
+  not filed because Devpost judging access is already satisfied by the public
+  Reddit post and App Directory review timing is outside the core proof path.
 
 ## Completion rule
 
@@ -73,7 +75,6 @@ For repository-side completion, do not mark the goal complete until:
    high/critical findings.
 3. `git status --short` is clean after the final commit.
 
-For public Devpost submission completion, additionally do not claim final
-judge-access readiness until the public Reddit judging post URL, Developer
-Portal metadata decision, and publish/unlisted-public distribution decision are
-resolved and documented.
+For public Devpost submission completion, the public Reddit judging post URL,
+Developer Portal metadata decision, and distribution decision are resolved and
+documented. Final submission still requires pasting the URL into Devpost.

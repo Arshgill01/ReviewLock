@@ -212,12 +212,12 @@
 
 ## Post-submission live proof backlog
 
-- [ ] Live-verify repeated dashboard launch reuses the existing dashboard post.
-- [ ] Replace `FINAL_PUBLIC_REDDIT_POST_URL_REQUIRED` with a public judging
+- [x] Live-verify repeated dashboard launch reuses the existing dashboard post.
+- [x] Fill the public judging URL field with a public judging
       Reddit post URL after the final access path is chosen.
-- [ ] Populate Developer Portal app-level metadata if the portal exposes those
+- [x] Populate Developer Portal app-level metadata if the portal exposes those
       fields, or record the exact portal limitation if only `version.about` is
       editable.
-- [ ] Decide whether final distribution should be unlisted
+- [x] Decide whether final distribution should be unlisted
       `npx devvit publish` or public `npx devvit publish --public`, then update
       docs after the publish request changes the app version or visibility.

@@ -43,6 +43,8 @@ Use `verified` only for these rows unless `docs/RUNTIME_PROOF.md` is updated:
   `t1_ontlx1k`.
 - Devvit logs captured sanitized payload-shape evidence for `on-post-report`,
   `on-post-update`, and `on-comment-update`.
+- Repeated dashboard launch reuse is verified on public `r/reviewlock_judges`;
+  the subreddit menu action reopened existing dashboard post `1tp3jxl`.
 
 ## Implemented But Not Yet Verified
 
@@ -53,7 +55,6 @@ verified:
 - Post NSFW update trigger delivery.
 - Post spoiler update trigger delivery.
 - Post flair update trigger delivery.
-- Repeated dashboard launch reuse.
 - Independent comment-target moderation method proof for approve, ignore, and
   unignore operations.
 
@@ -85,26 +86,26 @@ Preferred replacements:
 
 ## Submission Copy Audit Checklist
 
-- [ ] Headline says `Lock reviewed content until it changes.`
-- [ ] First paragraph explains the edit-aware reopen loop.
-- [ ] Copy does not frame ReviewLock as an ignore-reports wrapper.
-- [ ] Copy does not imply users are prevented from reporting.
-- [ ] Copy explains why this is safer than open-ended ignore behavior.
-- [ ] Copy names the proof boundary.
-- [ ] Copy names remaining proof gaps without burying them.
-- [ ] Copy includes 1-3 realistic community types.
-- [ ] Copy includes a conservative time-savings model.
-- [ ] Copy explains Devvit-native integration.
-- [ ] Copy avoids unsupported production-scale claims.
-- [ ] App listing status is verified after upload with `npx devvit view --json`.
+- [x] Headline says `Lock reviewed content until it changes.`
+- [x] First paragraph explains the edit-aware reopen loop.
+- [x] Copy does not frame ReviewLock as an ignore-reports wrapper.
+- [x] Copy does not imply users are prevented from reporting.
+- [x] Copy explains why this is safer than open-ended ignore behavior.
+- [x] Copy names the proof boundary.
+- [x] Copy names remaining proof gaps without burying them.
+- [x] Copy includes 1-3 realistic community types.
+- [x] Copy includes a conservative time-savings model.
+- [x] Copy explains Devvit-native integration.
+- [x] Copy avoids unsupported production-scale claims.
+- [x] App listing status is verified after upload with `npx devvit view --json`.
 
 ## Current Submission Risk Register
 
 | Risk | Severity | Status | Required action |
 | --- | --- | --- | --- |
-| Developer Portal app-level metadata still empty | high | open | Devvit CLI `0.12.24` has no direct edit command; use `docs/APP_LISTING.md` in Developer Portal if the fields are exposed, or document that only `version.about` is editable in the current workflow. |
-| Public judging post URL not yet recorded | high | open | Add URL in a public subreddit with fewer than 200 members. |
+| Developer Portal app-level metadata | high | resolved | Developer Portal fields were exposed and populated on 2026-05-27; `npx devvit view --json` now reports app description, privacy URL, and terms URL. |
+| Public judging post URL not yet recorded | high | resolved | Public judging dashboard URL recorded: `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`. |
 | Comment report live proof missing | medium | open | Keep unverified, or run controlled proof. |
 | NSFW/spoiler/flair live proof missing | medium | open | Keep unverified, or run controlled proof. |
-| Repeated dashboard launch reuse live proof missing | low | open | Keep unverified until controlled browser proof. |
-| Browser screenshot fixture used from `/tmp` | low | open | Move fixture into repo or mark artifact-only proof. |
+| Repeated dashboard launch reuse live proof missing | low | resolved | Verified on public `r/reviewlock_judges`; repeated menu launch reopened existing dashboard post `1tp3jxl`. |
+| Browser screenshot fixture used from `/tmp` | low | accepted | Screenshot manifest labels local/browser artifacts by source and does not present them as live Reddit proof. |

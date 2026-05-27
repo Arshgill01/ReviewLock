@@ -6,19 +6,19 @@ Target listing: `https://developers.reddit.com/apps/reviewlock`
 
 Current listing state:
 
-- `npm run deploy` on 2026-05-26 uploaded version `0.0.10`.
+- `npm run deploy` on 2026-05-27 uploaded version `0.0.12`.
 - `npx devvit view --json` after that upload returned `version.about` populated
   from the self-contained README/App Directory summary.
 - The root `README.md` includes a self-contained App Directory summary, proof
   boundary, permissions explanation, data/privacy summary, and terms of use
   summary before the repository documentation map.
-- App-level `description`, `marketingInfo`, `privacyPolicy`, and
-  `termsAndConditions` are still empty in the CLI response.
-- Devvit CLI `0.12.24` does not expose a direct command for editing those
-  app-level listing fields; use the Developer Portal if it exposes them, or
-  record that the current workflow only publishes `version.about`.
-- Treat this file as ready-to-use listing copy. It is not proof that the
-  remaining Developer Portal listing fields have been updated.
+- Developer Portal app-level metadata was populated on 2026-05-27. The CLI now
+  reports display name `ReviewLock`, the listing description, terms URL, and
+  privacy URL.
+- `marketingInfo` remains empty because no separate Developer Portal marketing
+  media section was required for the final judging access path.
+- Public judging dashboard:
+  `https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/`
 
 ## Short Description
 
@@ -142,24 +142,23 @@ Suggested category framing:
 
 ## Listing Validation Checklist
 
-- [ ] Run `npm run type-check`.
-- [ ] Run `npm run lint`.
-- [ ] Run `npm run test`.
-- [ ] Run `npm run build`.
-- [ ] Run `npx devvit upload` only after the local gate passes.
-- [ ] Run `npx devvit view --json`.
+- [x] Run `npm run type-check`.
+- [x] Run `npm run lint`.
+- [x] Run `npm run test`.
+- [x] Run `npm run build`.
+- [x] Run `npx devvit upload` only after the local gate passes.
+- [x] Run `npx devvit view --json`.
 - [ ] Run `npx devvit publish` only after final approval if an unlisted publish
       request is required for judging access.
 - [ ] Run `npx devvit publish --public` only after final approval if public App
       Directory review is required.
 - [x] Confirm the root README is self-contained enough for `version.about`.
-- [x] Confirm `version.about` contains the post-`4a6a98a` self-contained README
-      after upload `0.0.10`.
-- [ ] Confirm `app.description` is no longer empty, or confirm the current
+- [x] Confirm `version.about` contains the self-contained README after upload.
+- [x] Confirm `app.description` is no longer empty, or confirm the current
       Developer Portal workflow does not expose this field for manual editing before
       public submission.
-- [ ] Confirm `marketingInfo`, privacy, and terms fields are either populated
+- [x] Confirm `marketingInfo`, privacy, and terms fields are either populated
       or intentionally left unavailable by the current Developer Portal workflow.
-- [ ] Confirm the app listing URL opens: `https://developers.reddit.com/apps/reviewlock`.
-- [ ] Confirm the public judging post URL works in a public subreddit with
+- [x] Confirm the app listing URL opens: `https://developers.reddit.com/apps/reviewlock`.
+- [x] Confirm the public judging post URL works in a public subreddit with
       fewer than 200 members.

@@ -83,7 +83,9 @@ Verified in controlled `r/reviewlock_dev` playtest:
 - post-target `approve()`, `ignoreReports()`, and `unignoreReports()`;
 - repeat-report suppression on an unchanged locked post;
 - post body edit reopening a locked post;
-- comment body edit reopening a locked comment.
+- comment body edit reopening a locked comment;
+- repeated dashboard launch reuse, verified on the public judging subreddit by
+  opening the same existing dashboard post from the subreddit menu.
 
 Implemented and locally tested, but still requiring live payload proof before
 being claimed as verified:
@@ -91,8 +93,7 @@ being claimed as verified:
 - comment report trigger delivery;
 - post NSFW update trigger delivery;
 - post spoiler update trigger delivery;
-- post flair update trigger delivery;
-- repeated dashboard launch reuse in a controlled playtest.
+- post flair update trigger delivery.
 
 ## Data and privacy
 
@@ -134,6 +135,12 @@ App listing:
 https://developers.reddit.com/apps/reviewlock
 ```
 
+Public judging dashboard:
+
+```txt
+https://www.reddit.com/r/reviewlock_judges/comments/1tp3jxl/reviewlock_dashboard/
+```
+
 Developer validation for this repository:
 
 ```bash
@@ -163,8 +170,8 @@ proof log and reproduced in controlled playtest.
   calls to the WebView API are expected to fail without Reddit-injected context.
 - Reopen is non-destructive. A reopened item returns to moderator attention; it
   is not removed by default.
-- Public App Directory listing approval is separate from having an uploaded app
-  listing URL.
+- Public App Directory listing approval is separate from the public judging
+  dashboard URL and uploaded app listing.
 
 ## Repository documentation map
 
